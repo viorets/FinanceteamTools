@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TUSU: Finance team | Tools</title>
+    
+    <!-- Favicon Integration via Google Drive Direct Link -->
+    <link rel="icon" type="image/png" href="https://drive.google.com/uc?id=1uPFprLOtE9tx4W5morQmhMdiOS0ULNB8">
+
+    <!-- SheetJS for reading Excel files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Plotly for Data Visualization and SVG export -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
+    <!-- Import LINE Seed Sans TH via CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@line/seed-sans-th@latest/css/line-seed-sans-th.css">
+    
+    <style>
+        /* Theme Configuration based on Coolors Palette */
+        :root {
+            --bg-color: #f0f7fa; 
+            --fg-color: #1b4965;
+            --table-accent: #5fa8d3;
+            --font-family: 'LINE Seed Sans TH', 'LINE Seed TH', sans-serif;
+            --border-color: #62b6cb;
+            
+            --palette-1: #1b4965;
+            --palette-2: #5fa8d3;
+            --palette-3: #62b6cb;
+            --palette-4: #bee9e8;
+            --palette-5: #cae9ff;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1, h2, h3 {
+            color: var(--fg-color);
+            font-weight: bold;
+        }
+
+        /* Tabs Styling */
+        .tabs-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 1450px;
+        }
+
+        .tab-btn {
+            background-color: #ffffff;
+            color: var(--palette-1);
+            border: 2px solid var(--palette-1);
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            margin: 0;
+        }
+
+        .tab-btn.active {
+            background-color: var(--palette-1);
+            color: #ffffff;
+        }
+
+        .tab-btn:hover:not(.active) {
+            background-color: var(--palette-5);
+        }
+
+        /* Layout Configuration */
+        .tool-view {
+            display: none; /* Hidden by default, managed by JS */
+            width: 100%;
+            max-width: 1450px;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+        }
+
+        .tool-view.active {
+            display: grid;
+        }
+
+        .sidebar {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+
+        /* Controls Styling */
+        .control-group {
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        
+        .control-row .control-group {
+            margin-bottom: 0;
+            flex: 1;
+        }
+
+        .checkbox-group {
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 13px;
+            margin-bottom: 4px;
+            font-weight: bold;
+            color: var(--fg-color);
+        }
+
+        input[type="file"], select, input[type="number"], input[type="color"], button {
+            font-family: var(--font-family);
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #ffffff;
+            color: var(--fg-color);
+            font-size: 14px;
+        }
+
+        input[type="color"] {
+            padding: 2px;
+            height: 36px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .color-presets {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .color-swatch {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.15);
+            border: 1px solid rgba(0,0,0,0.3);
+        }
+
+        .action-btn {
+            background-color: var(--palette-1);
+            color: #ffffff;
+            cursor: pointer;
+            border: none;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+            padding: 12px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .action-btn:hover {
+            background-color: var(--palette-2);
+        }
+
+        /* SVG Tool Specifics */
+        .filters-container {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px dashed var(--border-color);
+        }
+
+        .help-text {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 12px;
+            font-weight: normal;
+            line-height: 1.3;
+        }
+        
+        .cb-list-container {
+            max-height: 160px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 6px;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .cb-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: normal;
+            margin: 0;
+            padding: 2px 0;
+        }
+
+        #chart {
+            width: 100%;
+            height: 700px;
+        }
+
+        /* Word Tool Specifics */
+        .export-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            border-top: 2px dashed var(--border-color);
+            padding-top: 15px;
+        }
+        
+        .export-actions .action-btn {
+            margin-top: 0;
+        }
+
+        #wordTableOutput {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }
+
+        /* Plain table styling specifically to ensure it copies clearly to word */
+        .plain-html-table {
+            border-collapse: collapse;
+            width: 100%;
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            color: #000;
+        }
+        .plain-html-table th, .plain-html-table td {
+            border: 1px solid #000;
+            padding: 5px;
+            text-align: left;
+        }
+        .plain-html-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>TUSU: Finance team | Data Tools</h1>
+
+    <!-- Tabs Navigation -->
+    <div class="tabs-container">
+        <button class="tab-btn active" onclick="switchTab('svgTool', this)">Excel to SVG Tools</button>
+        <button class="tab-btn" onclick="switchTab('wordTool', this)">Excel to Word table Tools</button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TOOL 1: EXCEL TO SVG (Existing Application)  -->
+    <!-- ========================================== -->
+    <div id="svgTool" class="tool-view active">
+        <!-- Controls Sidebar -->
+        <div class="sidebar">
+            <div class="control-group">
+                <label for="fileInput">Upload Excel File</label>
+                <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" />
+            </div>
+
+            <div class="control-group">
+                <label for="chartType">Chart Type</label>
+                <select id="chartType">
+                    <option value="line">Line Chart</option>
+                    <option value="area">Area Chart (1 Value)</option>
+                    <option value="area2" selected>Area Chart (2 Values)</option>
+                    <option value="combo">Line + Area Combo</option>
+                    <option value="bar">Bar Chart</option>
+                    <option value="treemap">Tree Chart (Treemap)</option>
+                    <option value="donut">Donut Chart</option>
+                    <option value="pie">Pie Chart</option>
+                    <option value="scatter">Scatter Plot</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="xAxis">Grouping Field (X Axis / Category)</label>
+                <select id="xAxis"></select>
+            </div>
+
+            <div class="control-group">
+                <label for="yAxis">Value Field 1</label>
+                <select id="yAxis"></select>
+            </div>
+
+            <div class="control-group" id="yAxis2Group">
+                <label for="yAxis2">Value Field 2 (Overlay)</label>
+                <select id="yAxis2"></select>
+            </div>
+
+            <div class="control-row">
+                <div class="control-group">
+                    <label>Color - Value 1</label>
+                    <div class="color-presets" id="presets1"></div>
+                    <input type="color" id="val1Color" value="#1b4965" />
+                </div>
+                <div class="control-group" id="colorGroup2">
+                    <label>Color - Value 2</label>
+                    <div class="color-presets" id="presets2"></div>
+                    <input type="color" id="val2Color" value="#5fa8d3" />
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="labelPosition">Data Labels</label>
+                <select id="labelPosition">
+                    <option value="none">Hidden</option>
+                    <option value="inside">Inside Chart</option>
+                    <option value="outside" selected>Outside Chart</option>
+                </select>
+            </div>
+
+            <div class="control-group checkbox-group">
+                <input type="checkbox" id="dashXAxis" checked />
+                <label for="dashXAxis" style="margin: 0; cursor: pointer;">Enable Dashed X-Axis Gridlines</label>
+            </div>
+
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="labelFontSize">Label Size</label>
+                    <input type="number" id="labelFontSize" value="14" min="8" max="40" />
+                </div>
+                <div class="control-group">
+                    <label for="labelFontColor">Label Color</label>
+                    <input type="color" id="labelFontColor" value="#1b4965" />
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="legendFontSize">Legend Size</label>
+                    <input type="number" id="legendFontSize" value="12" min="8" max="40" />
+                </div>
+                <div class="control-group">
+                    <label for="legendFontColor">Legend Color</label>
+                    <input type="color" id="legendFontColor" value="#1b4965" />
+                </div>
+            </div>
+
+            <button class="action-btn" id="exportSvgBtn">Export Chart as SVG</button>
+
+            <div class="filters-container">
+                <h3 style="margin-top: 0; margin-bottom: 2px; font-size: 16px;">Filters</h3>
+                <p class="help-text">Tick boxes to filter data. Leave all unticked to show all data.</p>
+                <div id="dynamicFilters">
+                    <p style="font-size: 12px; color: #666;">Load data to view filters.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div id="chart"></div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TOOL 2: EXCEL TO WORD TABLE (New Tool)       -->
+    <!-- ========================================== -->
+    <div id="wordTool" class="tool-view">
+        <div class="sidebar">
+            <div class="control-group">
+                <label for="wordFileInput">Upload Excel File</label>
+                <input type="file" id="wordFileInput" accept=".xlsx, .xls, .csv" />
+            </div>
+
+            <div class="control-group">
+                <label for="sheetSelector">Select Table/Sheet</label>
+                <select id="sheetSelector">
+                    <option value="">Upload a file first...</option>
+                </select>
+            </div>
+
+            <div class="control-group checkbox-group" style="margin-top: 15px;">
+                <input type="checkbox" id="defineHeader" checked />
+                <label for="defineHeader" style="margin: 0; cursor: pointer;">Define first row as HEADER</label>
+            </div>
+
+            <div class="export-actions">
+                <button class="action-btn" id="copyTableBtn" style="flex: 1;" title="Copy transformed table">
+                    <!-- Copy Icon SVG -->
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy
+                </button>
+                <button class="action-btn" id="exportDocxBtn" style="flex: 1;" title="Download as .doc">
+                    Download .doc
+                </button>
+            </div>
+            <p class="help-text" style="margin-top: 10px;">Note: Download uses a widely compatible .doc format ensuring Word reads the HTML table cleanly.</p>
+        </div>
+
+        <div class="main-content" style="align-items: flex-start;">
+            <div id="wordTableOutput">
+                <p style="color:#666; text-align:center; padding-top: 50px;">Upload an Excel file to view the plain text table format.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Application Logic -->
+    <script>
+        // --- TAB MANAGEMENT ---
+        function switchTab(tabId, btnElement) {
+            // Update active states for views
+            document.querySelectorAll('.tool-view').forEach(view => view.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            // Update active states for buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+        }
+
+        // ==========================================
+        // TOOL 1 LOGIC: EXCEL TO SVG (Original Code)
+        // ==========================================
+        const themeColors = ["#1b4965", "#5fa8d3", "#62b6cb", "#bee9e8", "#cae9ff"];
+        const treemapColors = ["#1b4965", "#3a7a9e", "#5fa8d3", "#62b6cb", "#8fcad6", "#bee9e8", "#cae9ff"];
+        const themeBg = "#ffffff";
+        const themeFg = "#1b4965";
+        const themeFont = "'LINE Seed Sans TH', 'LINE Seed TH', sans-serif";
+
+        let rawData = [];
+        let filteredData = [];
+        let columns = [];
+        let filterState = {};
+
+        const fileInput = document.getElementById('fileInput');
+        const chartTypeSelect = document.getElementById('chartType');
+        const xAxisSelect = document.getElementById('xAxis');
+        const yAxisSelect = document.getElementById('yAxis');
+        const yAxis2Select = document.getElementById('yAxis2');
+        const yAxis2Group = document.getElementById('yAxis2Group');
+        const colorGroup2 = document.getElementById('colorGroup2');
+        
+        const val1ColorInput = document.getElementById('val1Color');
+        const val2ColorInput = document.getElementById('val2Color');
+        const presets1 = document.getElementById('presets1');
+        const presets2 = document.getElementById('presets2');
+        
+        const labelPositionSelect = document.getElementById('labelPosition');
+        const dashXAxisCheckbox = document.getElementById('dashXAxis');
+        const dynamicFiltersContainer = document.getElementById('dynamicFilters');
+        const exportSvgBtn = document.getElementById('exportSvgBtn');
+        const labelFontSizeInput = document.getElementById('labelFontSize');
+        const labelFontColorInput = document.getElementById('labelFontColor');
+        const legendFontSizeInput = document.getElementById('legendFontSize');
+        const legendFontColorInput = document.getElementById('legendFontColor');
+
+        function createPresets(container, inputElement) {
+            themeColors.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.style.backgroundColor = color;
+                swatch.addEventListener('click', () => {
+                    inputElement.value = color;
+                    updateChart();
+                });
+                container.appendChild(swatch);
+            });
+        }
+        createPresets(presets1, val1ColorInput);
+        createPresets(presets2, val2ColorInput);
+
+        fileInput.addEventListener('change', handleFileUpload);
+        
+        const updateTriggers = [
+            chartTypeSelect, xAxisSelect, yAxisSelect, yAxis2Select, 
+            val1ColorInput, val2ColorInput, labelPositionSelect, 
+            dashXAxisCheckbox, labelFontSizeInput, labelFontColorInput, 
+            legendFontSizeInput, legendFontColorInput
+        ];
+        
+        updateTriggers.forEach(el => {
+            el.addEventListener('change', () => {
+                if(el === chartTypeSelect) {
+                    const type = chartTypeSelect.value;
+                    const showSecond = (type === 'combo' || type === 'area2');
+                    yAxis2Group.style.display = showSecond ? 'flex' : 'none';
+                    colorGroup2.style.display = showSecond ? 'flex' : 'none';
+                }
+                updateChart();
+            });
+        });
+        
+        exportSvgBtn.addEventListener('click', exportSVG);
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                
+                rawData = XLSX.utils.sheet_to_json(worksheet);
+                filteredData = [...rawData];
+
+                if (rawData.length > 0) {
+                    columns = Object.keys(rawData[0]);
+                    populateDropdowns();
+                    buildFilters();
+                    updateChart();
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function populateDropdowns() {
+            xAxisSelect.innerHTML = '';
+            yAxisSelect.innerHTML = '';
+            yAxis2Select.innerHTML = '';
+            
+            columns.forEach(col => {
+                xAxisSelect.add(new Option(col, col));
+                yAxisSelect.add(new Option(col, col));
+                yAxis2Select.add(new Option(col, col));
+            });
+
+            if (columns.length > 1) yAxisSelect.selectedIndex = 1;
+            if (columns.length > 2) yAxis2Select.selectedIndex = 2;
+            else if (columns.length > 1) yAxis2Select.selectedIndex = 1;
+        }
+
+        function buildFilters() {
+            dynamicFiltersContainer.innerHTML = '';
+            filterState = {};
+
+            columns.forEach(col => {
+                let isCalculatable = true;
+                for(let i=0; i < Math.min(rawData.length, 50); i++) {
+                    let val = rawData[i][col];
+                    if (val !== undefined && val !== null && val !== '') {
+                        if (isNaN(Number(val))) {
+                            isCalculatable = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (!isCalculatable) {
+                    const uniqueValues = [...new Set(rawData.map(item => item[col]))].filter(val => val !== undefined && val !== null);
+                    
+                    if (uniqueValues.length > 0 && uniqueValues.length < 100) {
+                        const group = document.createElement('div');
+                        group.className = 'control-group';
+                        
+                        const label = document.createElement('label');
+                        label.textContent = col;
+                        
+                        const cbListContainer = document.createElement('div');
+                        cbListContainer.className = 'cb-list-container';
+                        
+                        uniqueValues.forEach(val => {
+                            const cbLabel = document.createElement('label');
+                            cbLabel.className = 'cb-item';
+                            
+                            const cb = document.createElement('input');
+                            cb.type = 'checkbox';
+                            cb.value = val;
+                            
+                            cb.addEventListener('change', () => {
+                                const checkedBoxes = Array.from(cbListContainer.querySelectorAll('input:checked')).map(el => el.value);
+                                filterState[col] = checkedBoxes;
+                                applyFilters();
+                            });
+                            
+                            cbLabel.appendChild(cb);
+                            cbLabel.appendChild(document.createTextNode(val));
+                            cbListContainer.appendChild(cbLabel);
+                        });
+
+                        group.appendChild(label);
+                        group.appendChild(cbListContainer);
+                        dynamicFiltersContainer.appendChild(group);
+                    }
+                }
+            });
+            
+            if(dynamicFiltersContainer.innerHTML === '') {
+                dynamicFiltersContainer.innerHTML = '<p style="font-size: 12px; color: #666;">No non-calculatable categorical fields found to filter.</p>';
+            }
+        }
+
+        function applyFilters() {
+            filteredData = rawData.filter(row => {
+                return Object.keys(filterState).every(col => {
+                    const selectedValues = filterState[col];
+                    if (!selectedValues || selectedValues.length === 0) return true; // Show all if none ticked
+                    return selectedValues.includes(String(row[col]));
+                });
+            });
+            updateChart();
+        }
+
+        function aggregateData(data, xCol, yCol, chartType) {
+            const grouped = {};
+            data.forEach(row => {
+                const xVal = row[xCol] || 'Unknown';
+                const yVal = parseFloat(row[yCol]) || 0;
+                if (grouped[xVal] === undefined) grouped[xVal] = 0;
+                grouped[xVal] += yVal;
+            });
+            
+            let sortedKeys = Object.keys(grouped);
+            if (['bar', 'treemap', 'pie', 'donut'].includes(chartType)) {
+                sortedKeys.sort((a, b) => grouped[b] - grouped[a]);
+            } else {
+                sortedKeys.sort((a, b) => isNaN(a) ? a.localeCompare(b) : parseFloat(a) - parseFloat(b));
+            }
+            
+            return {
+                x: sortedKeys,
+                y: sortedKeys.map(k => grouped[k])
+            };
+        }
+
+        function hexToRgba(hex, alpha) {
+            const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+            hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})` : null;
+        }
+
+        function updateChart() {
+            if (filteredData.length === 0) {
+                document.getElementById('chart').innerHTML = '<p style="color:#666;">No data to display.</p>';
+                return;
+            }
+
+            const type = chartTypeSelect.value;
+            const xCol = xAxisSelect.value;
+            const yCol = yAxisSelect.value;
+            const yCol2 = yAxis2Select.value;
+            
+            const v1Color = val1ColorInput.value;
+            const v2Color = val2ColorInput.value;
+            
+            const labelPos = labelPositionSelect.value;
+            const showDash = dashXAxisCheckbox.checked;
+            
+            const lblSize = parseInt(labelFontSizeInput.value);
+            const lblColor = labelFontColorInput.value;
+            const lgndSize = parseInt(legendFontSizeInput.value);
+            const lgndColor = legendFontColorInput.value;
+
+            const aggData1 = aggregateData(filteredData, xCol, yCol, type);
+            let traces = [];
+
+            const textFontConfig = {
+                family: themeFont,
+                size: lblSize,
+                color: lblColor
+            };
+
+            let textArray = labelPos !== 'none' ? aggData1.y.map(val => val.toLocaleString()) : null;
+            let scatterMode = labelPos !== 'none' ? 'lines+markers+text' : 'lines+markers';
+            let scatterLabelPos = labelPos === 'inside' ? 'bottom center' : 'top center';
+
+            if (type === 'treemap') {
+                traces.push({
+                    labels: aggData1.x, parents: Array(aggData1.x.length).fill(""), values: aggData1.y,
+                    type: 'treemap', textinfo: labelPos === 'none' ? 'none' : (labelPos === 'outside' ? 'label+value' : 'label'),
+                    textfont: textFontConfig, tiling: { pad: 3 },
+                    marker: { colors: treemapColors, line: { width: 2, color: '#ffffff' } }
+                });
+            }
+            else if (type === 'bar') {
+                traces.push({
+                    x: aggData1.x, y: aggData1.y, type: 'bar',
+                    text: textArray, textposition: labelPos === 'none' ? 'none' : (labelPos === 'inside' ? 'inside' : 'outside'),
+                    textfont: textFontConfig, 
+                    marker: { color: v1Color },
+                    cliponaxis: false
+                });
+            } 
+            else if (type === 'line' || type === 'scatter') {
+                traces.push({
+                    x: aggData1.x, y: aggData1.y, type: 'scatter',
+                    mode: type === 'line' ? scatterMode : (labelPos !== 'none' ? 'markers+text' : 'markers'),
+                    text: textArray, textposition: scatterLabelPos, textfont: textFontConfig,
+                    marker: { color: v1Color, size: 8 }, 
+                    line: { color: v1Color, width: 3 },
+                    cliponaxis: false
+                });
+            }
+            else if (type === 'area') {
+                traces.push({
+                    x: aggData1.x, y: aggData1.y, type: 'scatter', mode: scatterMode, fill: 'tozeroy',
+                    text: textArray, textposition: scatterLabelPos, textfont: textFontConfig,
+                    line: { color: v1Color, width: 3 }, 
+                    fillcolor: hexToRgba(v1Color, 0.3), 
+                    marker: { color: v1Color, size: 6 },
+                    cliponaxis: false
+                });
+            }
+            else if (type === 'area2') {
+                const aggData2 = aggregateData(filteredData, xCol, yCol2, type);
+                let textArray2 = labelPos !== 'none' ? aggData2.y.map(val => val.toLocaleString()) : null;
+
+                traces.push({
+                    x: aggData1.x, y: aggData1.y, type: 'scatter', mode: scatterMode, fill: 'tozeroy', name: yCol,
+                    text: textArray, textposition: scatterLabelPos, textfont: textFontConfig,
+                    line: { color: v1Color, width: 2 }, 
+                    fillcolor: hexToRgba(v1Color, 0.3), 
+                    marker: { color: v1Color, size: 6 },
+                    cliponaxis: false
+                });
+                
+                traces.push({
+                    x: aggData2.x, y: aggData2.y, type: 'scatter', mode: scatterMode, fill: 'tozeroy', name: yCol2,
+                    text: textArray2, textposition: scatterLabelPos, textfont: textFontConfig,
+                    line: { color: v2Color, width: 2 }, 
+                    fillcolor: hexToRgba(v2Color, 0.3), 
+                    marker: { color: v2Color, size: 6 },
+                    cliponaxis: false
+                });
+            }
+            else if (type === 'combo') {
+                const aggData2 = aggregateData(filteredData, xCol, yCol2, type);
+                let textArray2 = labelPos !== 'none' ? aggData2.y.map(val => val.toLocaleString()) : null;
+                
+                traces.push({
+                    x: aggData1.x, y: aggData1.y, type: 'scatter', mode: scatterMode, fill: 'tozeroy', name: yCol + ' (Area)',
+                    text: textArray, textposition: scatterLabelPos, textfont: textFontConfig,
+                    line: { color: v1Color, width: 2 }, 
+                    fillcolor: hexToRgba(v1Color, 0.3), 
+                    marker: { color: v1Color, size: 6 },
+                    cliponaxis: false
+                });
+                
+                traces.push({
+                    x: aggData2.x, y: aggData2.y, type: 'scatter', mode: scatterMode, name: yCol2 + ' (Line)',
+                    text: textArray2, textposition: scatterLabelPos, textfont: textFontConfig,
+                    line: { color: v2Color, width: 3 }, 
+                    marker: { color: v2Color, size: 6 },
+                    cliponaxis: false
+                });
+            }
+            else if (type === 'pie' || type === 'donut') {
+                traces.push({
+                    labels: aggData1.x, values: aggData1.y, type: 'pie', hole: type === 'donut' ? 0.5 : 0,
+                    textinfo: labelPos === 'none' ? 'none' : (labelPos === 'inside' ? 'label+percent' : 'label+percent+value'),
+                    textposition: labelPos === 'none' ? 'none' : (labelPos === 'inside' ? 'inside' : 'outside'),
+                    textfont: textFontConfig, marker: { colors: themeColors, line: {color: '#ffffff', width: 2} }
+                });
+            }
+
+            const layout = {
+                font: { family: themeFont, color: themeFg },
+                paper_bgcolor: '#ffffff',
+                plot_bgcolor: themeBg,
+                xaxis: { 
+                    title: xCol, 
+                    gridcolor: '#cbd5e1',
+                    zerolinecolor: '#94a3b8',
+                    griddash: showDash ? 'dash' : 'solid',
+                    gridwidth: showDash ? 2 : 1,
+                    layer: 'above traces' 
+                },
+                yaxis: { 
+                    title: (type === 'combo' || type === 'area2') ? `${yCol} / ${yCol2}` : yCol, 
+                    gridcolor: '#e2e8f0',
+                    zerolinecolor: '#cbd5e1',
+                    layer: 'above traces'
+                },
+                margin: { t: 60, l: 70, r: 80, b: 80 }, 
+                colorway: themeColors,
+                hovermode: 'closest',
+                legend: {
+                    font: { family: themeFont, size: lgndSize, color: lgndColor },
+                    bgcolor: 'rgba(255,255,255,0.8)'
+                }
+            };
+
+            Plotly.newPlot('chart', traces, layout, {responsive: true, displayModeBar: false});
+        }
+
+        function exportSVG() {
+            Plotly.downloadImage('chart', {
+                format: 'svg',
+                width: 1000,
+                height: 700,
+                filename: 'analytics_chart_export'
+            });
+        }
+
+        // ==========================================
+        // TOOL 2 LOGIC: EXCEL TO WORD TABLE
+        // ==========================================
+        let wordWorkbook = null;
+        
+        const wordFileInput = document.getElementById('wordFileInput');
+        const sheetSelector = document.getElementById('sheetSelector');
+        const defineHeaderCheckbox = document.getElementById('defineHeader');
+        const wordTableOutput = document.getElementById('wordTableOutput');
+        
+        const copyTableBtn = document.getElementById('copyTableBtn');
+        const exportDocxBtn = document.getElementById('exportDocxBtn');
+
+        wordFileInput.addEventListener('change', handleWordFileUpload);
+        sheetSelector.addEventListener('change', renderWordTable);
+        defineHeaderCheckbox.addEventListener('change', renderWordTable);
+        
+        copyTableBtn.addEventListener('click', copyTableToClipboard);
+        exportDocxBtn.addEventListener('click', exportToDocx);
+
+        function handleWordFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                wordWorkbook = XLSX.read(data, {type: 'array'});
+                
+                // Populate Sheet Selector
+                sheetSelector.innerHTML = '';
+                wordWorkbook.SheetNames.forEach(sheetName => {
+                    sheetSelector.add(new Option(sheetName, sheetName));
+                });
+                
+                if(wordWorkbook.SheetNames.length > 0) {
+                    renderWordTable();
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function renderWordTable() {
+            if (!wordWorkbook) return;
+            
+            const selectedSheet = sheetSelector.value;
+            const worksheet = wordWorkbook.Sheets[selectedSheet];
+            
+            // Get array data formatted as strings to preserve Excel number/percentage formatting (raw: false)
+            let rawArrayData = XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: false});
+            
+            if(rawArrayData.length === 0) {
+                wordTableOutput.innerHTML = '<p style="color:#666; text-align:center;">Sheet is empty.</p>';
+                return;
+            }
+
+            // 1. Filter out completely empty rows
+            rawArrayData = rawArrayData.filter(row => 
+                row.some(cell => cell !== undefined && cell !== null && cell.toString().trim() !== "")
+            );
+
+            // 2. Find the actual maximum number of columns that contain data
+            let maxCols = 0;
+            rawArrayData.forEach(row => {
+                if (row.length > maxCols) {
+                    maxCols = row.length;
+                }
+            });
+
+            const useHeader = defineHeaderCheckbox.checked;
+            
+            let html = '<table class="plain-html-table">';
+            
+            rawArrayData.forEach((row, index) => {
+                html += '<tr>';
+                
+                // 3. Iterate only up to the highest column index containing data
+                for (let i = 0; i < maxCols; i++) {
+                    const cellValue = (row[i] !== undefined && row[i] !== null) ? row[i] : "";
+                    
+                    if (index === 0 && useHeader) {
+                        html += `<th>${cellValue}</th>`;
+                    } else {
+                        html += `<td>${cellValue}</td>`;
+                    }
+                }
+                
+                html += '</tr>';
+            });
+            
+            html += '</table>';
+            wordTableOutput.innerHTML = html;
+        }
+
+        async function copyTableToClipboard() {
+            const tableEl = wordTableOutput.querySelector('table');
+            if (!tableEl) {
+                alert('No table available to copy.');
+                return;
+            }
+
+            try {
+                // We use ClipboardItem to strictly declare it as HTML so Word reads the styling
+                const htmlStr = tableEl.outerHTML;
+                const blobHtml = new Blob([htmlStr], { type: "text/html" });
+                const blobText = new Blob([tableEl.innerText], { type: "text/plain" });
+
+                const data = [new ClipboardItem({
+                    ["text/html"]: blobHtml,
+                    ["text/plain"]: blobText
+                })];
+
+                await navigator.clipboard.write(data);
+                alert('Table successfully copied! You can now paste it into Microsoft Word.');
+            } catch (err) {
+                // Fallback for older browsers
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(tableEl);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                
+                try {
+                    document.execCommand('copy');
+                    alert('Table copied (using fallback method)! Paste into Word.');
+                } catch (e) {
+                    alert('Copy failed. Please select the table manually and press Ctrl+C.');
+                }
+                selection.removeAllRanges();
+            }
+        }
+
+        function exportToDocx() {
+            const tableEl = wordTableOutput.querySelector('table');
+            if (!tableEl) {
+                alert('No table available to export.');
+                return;
+            }
+
+            // Word-specific XML and HTML headers required to enforce a document view
+            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Exported Table</title></head><body>";
+            const footer = "</body></html>";
+            
+            const sourceHTML = header + tableEl.outerHTML + footer;
+            
+            const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+            const fileDownload = document.createElement("a");
+            
+            document.body.appendChild(fileDownload);
+            fileDownload.href = source;
+            // .doc extension is universally readable by MS Word without throwing HTML corruption errors
+            fileDownload.download = 'Table_Export.doc'; 
+            fileDownload.click();
+            document.body.removeChild(fileDownload);
+        }
+    </script>
+</body>
+</html>
