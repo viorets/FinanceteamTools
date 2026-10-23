@@ -2,14 +2,17 @@
 // formats, merged cells and column widths are kept; charts, images and pivot tables are not (ExcelJS drops them).
 // On a protected sheet, locked cells stay read-only, and relock() (xlsx-relock.js, from TUSUFinanceFeedback) copies
 // the original file's protection back onto the saved copy, so its password never has to be known.
+// Formulas are calculated live with HyperFormula (GPL-3.0): editing a cell updates every result that depends on it.
 import { relock } from './xlsx-relock.js';
 
 const EXCELJS = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+const HYPERFORMULA = 'https://cdn.jsdelivr.net/npm/hyperformula@3.0.1/dist/hyperformula.full.min.js'; // not on cdnjs
 const MAX_ROWS = 1000; const MAX_COLS = 60; // grid size shown; larger sheets show their top-left part
+const MAX_CALC_CELLS = 500000; // larger workbooks show the results saved in the file instead of live ones
 
-const loadExcelJS = () => window.ExcelJS ? Promise.resolve(window.ExcelJS) : new Promise((res, rej) => {
-  const s = document.createElement('script'); s.src = EXCELJS; s.crossOrigin = 'anonymous';
-  s.onload = () => res(window.ExcelJS); s.onerror = () => rej(new Error('Could not load the Excel tools. Try again.'));
+const script = (src, global) => window[global] ? Promise.resolve(window[global]) : new Promise((res, rej) => {
+  const s = document.createElement('script'); s.src = src; s.crossOrigin = 'anonymous';
+  s.onload = () => res(window[global]); s.onerror = () => rej(new Error('Could not load the Excel tools. Try again.'));
   document.head.append(s);
 });
 
@@ -27,13 +30,31 @@ function rawText(cell) {
   if (typeof v === 'object') return v.richText ? v.richText.map((r) => r.text).join('') : v.text ?? v.error ?? '';
   return String(v);
 }
-// The text a cell shows in the grid: a formula's last calculated result (none stored: blank, as in Excel), else its
-// value, in the cell's number format.
-function shownText(cell) {
-  const v = cell.formula ? cell.result : cell.value;
-  if (typeof v === 'number') return formatNumber(v, cell.numFmt);
+// The text a cell shows in the grid: a formula's result (`res`: the live one, else the one saved in the file; none:
+// blank, as in Excel), else its value, in the cell's number format.
+function shownText(cell, res = cell.result) {
+  const v = cell.formula ? res : cell.value;
+  if (typeof v === 'number') return cell.formula && isDateFmt(cell.numFmt) ? rawText({ value: fromSerial(v) }) : formatNumber(v, cell.numFmt);
+  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
   if (cell.formula) return v == null ? '' : v instanceof Date ? rawText({ value: v }) : typeof v === 'object' ? v.error ?? '' : String(v);
   return rawText(cell);
+}
+// Dates are day numbers in formulas (Excel's serial dates, day 0 = 30 Dec 1899).
+const EPOCH = Date.UTC(1899, 11, 30);
+const toSerial = (d) => (d.getTime() - EPOCH) / 86400000;
+const fromSerial = (n) => new Date(EPOCH + Math.round(n * 86400000));
+const isDateFmt = (f) => { const x = (f || '').replace(/"[^"]*"|\[[^\]]*\]|\\./g, ''); return /[dy]|m{3,}/i.test(x) && !/[#0]/.test(x); };
+// A cell as the calculation engine reads it: "=..." for formulas (without Excel's _xlfn. prefixes), day numbers for
+// dates; the hidden cells of a merged range are empty, as in Excel.
+function calcContent(cell) {
+  if (!cell || (cell.isMerged && cell.master !== cell)) return null;
+  if (cell.formula) return `=${cell.formula.replace(/_xlfn\.|_xlws\./g, '')}`;
+  const v = cell.value;
+  if (v == null) return null;
+  if (v instanceof Date) return toSerial(v);
+  if (typeof v === 'object') return v.error ?? (v.richText ? v.richText.map((r) => r.text).join('') : v.text ?? null);
+  if (typeof v === 'string' && /^[=+-]/.test(v)) return `'${v}`; // text that only looks like a formula
+  return v;
 }
 // Number formats, the common parts: thousands separator, decimals, percent, negative and zero sections, and text
 // around the number ("฿", "บาท", brackets). Other formats show the plain number.
@@ -41,13 +62,16 @@ function formatNumber(v, fmt) {
   if (!fmt || fmt === 'General') return String(Math.round(v * 1e10) / 1e10);
   const sec = fmt.split(';');
   const f = v < 0 && sec[1] ? sec[1] : v === 0 && sec[2] ? sec[2] : sec[0];
-  const lit = (x) => x.replace(/\[[^\]]*\]/g, '').replace(/"([^"]*)"/g, '$1').replace(/[_*]./g, '').replace(/\\(.)/g, '$1').replace(/\?/g, '');
-  const core = /[#0?][#0?,]*(\.[0#?]+)?%?/.exec(f.replace(/"[^"]*"/g, (q) => ' '.repeat(q.length)));
-  if (!core) return lit(f).trim() || String(v);
+  // Literal parts: [$฿-41E] is a currency symbol, other [...] codes are dropped; "*x" fills (shown as a space) and
+  // "_x" spacers; "?" placeholders only pad.
+  const lit = (x) => x.replace(/\[\$([^\]-]*)[^\]]*\]/g, '$1').replace(/\[[^\]]*\]/g, '').replace(/"([^"]*)"/g, '$1').replace(/\*./g, ' ').replace(/_./g, '').replace(/\\(.)/g, '$1').replace(/\?/g, '');
+  const core = /[#0?][#0?,]*(\.[0#?]+)?%?/.exec(f.replace(/"[^"]*"|\[[^\]]*\]/g, (q) => ' '.repeat(q.length)));
+  if (!core || !/[#0]/.test(core[0])) return lit(f).trim() || String(v); // e.g. the zero section "-" of accounting formats
   const dec = (core[1] || '.').length - 1; const pct = core[0].endsWith('%');
   let s = Math.abs(pct ? v * 100 : v).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: core[0].includes(',') });
   if (pct) s += '%';
-  return `${v < 0 && !sec[1] ? '-' : ''}${lit(f.slice(0, core.index))}${s}${lit(f.slice(core.index + core[0].length))}`.trim();
+  const minus = v < 0 && !sec[1] && Number(s.replace(/[^0-9.]/g, '')) !== 0; // as in Excel, no "-0.00"
+  return `${minus ? '-' : ''}${lit(f.slice(0, core.index))}${s}${lit(f.slice(core.index + core[0].length))}`.trim();
 }
 
 // Colours: argb, or a colour of the workbook theme with its tint.
@@ -109,19 +133,51 @@ async function recalcOnOpen(buf) {
 // Opens the editor in `root`. bytes: the .xlsx (ArrayBuffer). Resolves { isDirty(), save() }; save() resolves the
 // edited .xlsx as an ArrayBuffer.
 export async function openXlsxEditor(root, bytes) {
-  const ExcelJS = await loadExcelJS();
+  const ExcelJS = await script(EXCELJS, 'ExcelJS');
   const wb = new ExcelJS.Workbook();
   try { await wb.xlsx.load(bytes.slice(0)); } catch { throw new Error('Could not read this file. Only .xlsx files can be edited.'); }
   if (!wb.worksheets.length) throw new Error('This workbook has no sheets.');
   const theme = themeColors(wb);
   let dirty = false;
 
+  // Live calculation: every sheet goes into HyperFormula, which keeps track of which cells depend on which. Where it
+  // cannot work out a formula that Excel could (a function it does not have, a link to another file), the result
+  // saved in the file is shown instead.
+  let hf = null; const sheetId = new Map();
+  try {
+    const cells = wb.worksheets.reduce((n, ws) => n + ws.rowCount * ws.columnCount, 0);
+    if (cells <= MAX_CALC_CELLS) {
+      const HF = await script(HYPERFORMULA, 'HyperFormula');
+      const data = {};
+      wb.worksheets.forEach((ws) => {
+        data[ws.name] = Array.from({ length: ws.rowCount }, (_, r) => Array.from({ length: ws.columnCount }, (__, c) => calcContent(ws.findCell(r + 1, c + 1))));
+      });
+      hf = HF.buildFromSheets(data, { licenseKey: 'gpl-v3' });
+      wb.worksheets.forEach((ws) => sheetId.set(ws, hf.getSheetId(ws.name)));
+    }
+  } catch (e) { hf = null; console.warn('Live calculation is off:', e); }
+  function result(ws, cell) {
+    if (!hf || !cell.formula) return cell.result;
+    const v = hf.getCellValue({ sheet: sheetId.get(ws), row: cell.row - 1, col: cell.col - 1 });
+    if (v == null || typeof v !== 'object') return v;
+    const saved = cell.result;
+    return saved != null && !(typeof saved === 'object' && saved.error) ? saved : { error: v.value || '#ERROR' };
+  }
+
   root.innerHTML = `<div class="oe"><div class="oe-bar">
       <label>Sheet <select id="xe-sheet">${wb.worksheets.map((ws, i) => `<option value="${i}">${ws.name.replace(/</g, '&lt;')}</option>`).join('')}</select></label>
       <span class="oe-note" id="xe-note"></span>
+      <div class="xe-fx" id="xe-fx"><b></b><span></span></div>
     </div><div class="oe-scroll" id="xe-grid"></div></div>`;
   const grid = root.querySelector('#xe-grid');
   const note = root.querySelector('#xe-note');
+  const fx = root.querySelector('#xe-fx');
+  // Formula bar: the picked cell's address, and its formula with the result, or its value.
+  function showFx(ws, td) {
+    const cell = ws.getCell(+td.dataset.r, +td.dataset.c);
+    fx.firstChild.textContent = `${colName(+td.dataset.c)}${td.dataset.r}`;
+    fx.lastChild.textContent = cell.formula ? `=${cell.formula}   →   ${shownText(cell, result(ws, cell)) || '(blank)'}` : rawText(cell);
+  }
 
   function render(ws) {
     const rows = Math.min(Math.max(ws.rowCount, 1), MAX_ROWS);
@@ -137,6 +193,7 @@ export async function openXlsxEditor(root, bytes) {
     const notes = [];
     if (ws.rowCount > MAX_ROWS || ws.columnCount > MAX_COLS) notes.push(`Showing the first ${rows} rows and ${cols} columns`);
     if (isProtected) notes.push('Protected sheet: grey cells are locked');
+    notes.push(hf ? 'Formulas calculate live' : 'Live calculation is off for this file: formulas show the results saved in it');
     note.textContent = notes.join(' · ');
 
     const table = document.createElement('table'); table.className = 'xe-table';
@@ -158,7 +215,7 @@ export async function openXlsxEditor(root, bytes) {
         if (covered.has(`${r}:${c}`)) continue;
         const cell = ws.getCell(r, c); const td = tr.insertCell();
         const s = span.get(`${r}:${c}`); if (s) { td.rowSpan = s[0]; td.colSpan = s[1]; }
-        td.dataset.r = r; td.dataset.c = c; td.textContent = shownText(cell);
+        td.dataset.r = r; td.dataset.c = c; td.textContent = shownText(cell, result(ws, cell));
         styleCell(td, cell, theme);
         if (ws.getColumn(c).hidden) td.classList.add('xe-hid');
         if (isProtected && cell.protection?.locked !== false) { td.classList.add('xe-locked'); continue; }
@@ -167,19 +224,32 @@ export async function openXlsxEditor(root, bytes) {
     }
     grid.replaceChildren(table);
 
-    // Editing: a cell shows its formula while focused; Enter moves down, Escape cancels.
-    table.addEventListener('focusin', (e) => { const td = e.target.closest('td[contenteditable]'); if (td) { td.dataset.before = rawText(ws.getCell(+td.dataset.r, +td.dataset.c)); td.textContent = td.dataset.before; } });
+    // Editing: a cell shows its formula while focused; Enter moves down, Escape cancels. Any cell, locked ones too,
+    // shows its formula in the formula bar when clicked.
+    table.addEventListener('click', (e) => { const td = e.target.closest('td[data-r]'); if (td) showFx(ws, td); });
+    table.addEventListener('focusin', (e) => { const td = e.target.closest('td[contenteditable]'); if (td) { td.dataset.before = rawText(ws.getCell(+td.dataset.r, +td.dataset.c)); td.textContent = td.dataset.before; showFx(ws, td); } });
     table.addEventListener('focusout', (e) => {
       const td = e.target.closest('td[contenteditable]'); if (!td) return;
       const cell = ws.getCell(+td.dataset.r, +td.dataset.c);
       const text = td.innerText.replace(/\n$/, '');
+      let changes = [];
       if (text !== td.dataset.before) {
         cell.value = parseValue(text, cell);
         td.classList.add('xe-changed'); dirty = true;
+        if (hf) try { changes = hf.setCellContents({ sheet: sheetId.get(ws), row: cell.row - 1, col: cell.col - 1 }, [[calcContent(cell)]]); } catch (err) { console.warn(err); }
       }
-      // A formula typed here has no result until Excel calculates it: show the formula itself.
-      td.textContent = td.classList.contains('xe-changed') && cell.formula ? `=${cell.formula}` : shownText(cell);
+      // Without live calculation a formula typed here has no result until Excel calculates it: show the formula.
+      td.textContent = !hf && td.classList.contains('xe-changed') && cell.formula ? `=${cell.formula}` : shownText(cell, result(ws, cell));
       styleCell(td, cell, theme); // a number typed into a text cell now aligns right, as in Excel
+      // Results that changed because of this edit: redraw them and flash them briefly.
+      const sid = sheetId.get(ws);
+      changes.forEach((ch) => {
+        const a = ch.address; if (!a || a.sheet !== sid) return;
+        const other = table.querySelector(`td[data-r="${a.row + 1}"][data-c="${a.col + 1}"]`); if (!other || other === td) return;
+        other.textContent = shownText(ws.getCell(a.row + 1, a.col + 1), result(ws, ws.getCell(a.row + 1, a.col + 1)));
+        other.classList.remove('xe-calc'); void other.offsetWidth; other.classList.add('xe-calc');
+      });
+      showFx(ws, td);
     });
     table.addEventListener('keydown', (e) => {
       const td = e.target.closest('td[contenteditable]'); if (!td) return;

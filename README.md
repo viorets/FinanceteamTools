@@ -31,7 +31,8 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 - Click a cell to edit it (type `=` for a formula; Enter moves down, Esc cancels)
 - Keeps styles, formulas, merged cells, dropdowns, column widths and sheet protection; on a protected sheet, locked cells stay read-only
 - Charts, images and pivot tables are **not** kept
-- Excel recalculates every formula when it opens the downloaded `<name> (edited).xlsx`
+- Formulas calculate live as you edit (totals update straight away), and the formula bar shows the picked cell's formula and result, locked cells included
+- Excel also recalculates every formula when it opens the downloaded `<name> (edited).xlsx`
 
 ### Word editing (beta)
 - Upload a `.docx`: it is shown as a page with its own fonts, colours, numbered lists, tables and images
@@ -56,7 +57,7 @@ firebase.json                       # Firebase Hosting config
 .firebaserc                         # Firebase project: tusu-finance-team-tools
 ```
 
-Libraries are loaded from CDNs: [SheetJS](https://sheetjs.com/) reads the Excel files, [Plotly](https://plotly.com/javascript/) draws the charts, [pdf.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/) show and write PDFs, and [ExcelJS](https://github.com/exceljs/exceljs) and [JSZip](https://stuk.github.io/jszip/) edit Excel and Word files. Fonts: LINE Seed Sans TH, plus Noto Sans Thai and Sarabun from Google Fonts.
+Libraries are loaded from CDNs: [SheetJS](https://sheetjs.com/) reads the Excel files, [Plotly](https://plotly.com/javascript/) draws the charts, [pdf.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/) show and write PDFs, [ExcelJS](https://github.com/exceljs/exceljs) and [JSZip](https://stuk.github.io/jszip/) edit Excel and Word files, and [HyperFormula](https://hyperformula.handsontable.com/) calculates Excel formulas (used under its GPL-3.0 licence). Fonts: LINE Seed Sans TH, plus Noto Sans Thai and Sarabun from Google Fonts.
 
 ## Run locally
 

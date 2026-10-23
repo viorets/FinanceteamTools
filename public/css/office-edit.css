@@ -17,6 +17,10 @@
 .xe-table td[contenteditable]:focus { outline: 2px solid #1a7f45; outline-offset: -2px; white-space: pre-wrap; }
 .xe-table td.xe-locked { background-image: linear-gradient(rgba(0, 0, 0, .05), rgba(0, 0, 0, .05)); cursor: not-allowed; }
 .xe-table td.xe-changed { box-shadow: inset 3px 0 0 #e8a33d; }
+.xe-table td.xe-calc { animation: xe-flash 1.4s ease-out; } /* a result that just changed because of an edit */
+@keyframes xe-flash { from { background-color: #fff3c4; } }
+.xe-fx { flex-basis: 100%; display: flex; gap: 12px; min-height: 1.6em; padding: 4px 10px; border: 1px solid #dde5ea; border-radius: 6px; background: #f7f9fa; font: 13px Consolas, "Courier New", monospace; color: #1b4965; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.xe-fx b { min-width: 3.5em; color: #555; }
 
 /* Word page: white page on grey, the document's own margins; paragraphs keep spaces and tabs. */
 .de-doc { background: #e9edf0; padding: 24px; }
