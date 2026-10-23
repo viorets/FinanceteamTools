@@ -37,8 +37,11 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 ### Word editing (beta)
 - Upload a `.docx`: it is shown as a page with its own fonts, colours, numbered lists, tables and images
 - Click any paragraph or table cell to change its text; formatting around the edit is kept, and new text takes the style of the text before it
-- Only the text changes: styles, headers, footers, images and page layout stay exactly as they were
-- Headers, footers and text boxes are not shown or editable yet
+- Select text to change its font, size or colour (Thai text included)
+- Add text boxes, lines and arrows (saved as real Word shapes); click a shape to move, resize, recolour or delete it. Shapes and text boxes already in the file are shown too, and their text can be edited
+- Undo / Redo (Ctrl+Z / Ctrl+Y) for formatting and shape changes; typing is undone by the browser
+- Only `word/document.xml` changes: styles, headers, footers, images and page layout stay exactly as they were
+- Headers and footers are not shown or editable yet. Shapes are placed from their paragraph, as the page has no page breaks; shapes Word placed from the page edge are shown at their paragraph until moved
 - Old `.doc` files are not supported
 
 ## Project structure

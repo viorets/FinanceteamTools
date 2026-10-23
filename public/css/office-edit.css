@@ -36,3 +36,39 @@
 .de-tbl td { padding: 0 7px; vertical-align: top; }
 .de-tbl.de-borders td { border: 1px solid #000; }
 .de-tbl td.de-vcont { border-top-color: transparent; }
+
+/* Word toolbar: text font, size and colour; tools for text boxes, lines and arrows. */
+.de-bar { gap: 8px 12px; }
+.de-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid #dde5ea; border-radius: 6px; background: #f7f9fa; }
+.de-group select, .de-group button { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid #c9d1d6; border-radius: 4px; background: #fff; color: #222; cursor: pointer; margin: 0; }
+.de-group #de-font { max-width: 170px; }
+.de-group button[aria-pressed="true"] { background: #1b4965; border-color: #1b4965; color: #fff; }
+.de-group button:disabled { opacity: .45; cursor: default; }
+.de-swatch { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-size: 13px; color: #333; cursor: pointer; }
+.de-swatch input[type="color"] { width: 30px; height: 24px; padding: 0 1px; border: 1px solid #c9d1d6; border-radius: 4px; background: #fff; cursor: pointer; }
+#docxEditor:focus { outline: none; }
+
+/* Shapes: drawn over the page from their anchor paragraph. Lines take clicks only on the line itself. */
+.de-page { position: relative; }
+.de-layer { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.de-shape { position: absolute; box-sizing: border-box; }
+.de-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; min-width: 1px; min-height: 1px; overflow: visible; pointer-events: none; }
+.de-k-line .de-hit { pointer-events: stroke; cursor: move; }
+.de-k-shape, .de-k-ellipse, .de-k-box { pointer-events: auto; }
+.de-k-shape, .de-k-ellipse { cursor: move; }
+.de-txbx { position: relative; overflow-wrap: break-word; }
+.de-txbx .de-p:hover { background-color: transparent; }
+.de-k-box:hover, .de-k-box.de-sel { outline: 1px dashed #5fa8d3; }
+.de-shape.de-sel:not(.de-k-line):not(.de-k-box) { outline: 2px solid #1b4965; outline-offset: 1px; }
+.de-grip, .de-size { position: absolute; display: none; background: #1b4965; border: 2px solid #fff; box-shadow: 0 0 0 1px #1b4965; }
+.de-grip { left: 50%; top: -14px; width: 26px; height: 8px; margin-left: -13px; border-radius: 4px; cursor: move; }
+.de-size { right: -6px; bottom: -6px; width: 9px; height: 9px; border-radius: 2px; cursor: nwse-resize; }
+.de-k-box:hover .de-grip, .de-k-box.de-sel .de-grip, .de-k-box.de-sel .de-size { display: block; }
+.de-h { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #fff; border: 2px solid #1b4965; box-sizing: border-box; pointer-events: auto; cursor: crosshair; }
+.de-k-line.de-sel line:not(.de-hit) { filter: drop-shadow(0 0 2px rgba(27, 73, 101, .6)); }
+
+/* Drawing a new shape: the whole page takes the drag. */
+.de-capture { display: none; position: absolute; inset: 0; z-index: 2; cursor: crosshair; touch-action: none; }
+.de-page.de-drawing .de-capture { display: block; }
+.de-ghost { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.de-ghost rect { fill: rgba(95, 168, 211, .08); stroke: #1b4965; stroke-dasharray: 4 3; }
