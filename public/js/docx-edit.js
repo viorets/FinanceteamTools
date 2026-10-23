@@ -208,14 +208,14 @@ function runCss(r, thai) {
   return s.join(';');
 }
 
-// Opens the editor in `root`. bytes: the .docx (ArrayBuffer). Resolves { isDirty(), save() }; save() resolves the
-// edited .docx as an ArrayBuffer.
-export async function openDocxEditor(root, bytes) {
+// Opens the editor in `root`. bytes: the .docx (ArrayBuffer); t(en, th): translates labels. Resolves
+// { isDirty(), save() }; save() resolves the edited .docx as an ArrayBuffer.
+export async function openDocxEditor(root, bytes, { t = (en) => en } = {}) {
   const JSZip = await loadJSZip();
   let zip;
   try { zip = await JSZip.loadAsync(bytes.slice(0)); } catch { zip = null; }
   const part = zip?.file('word/document.xml');
-  if (!part) throw new Error('Could not read this file. Only .docx files can be edited (not old .doc files).');
+  if (!part) throw new Error(t('Could not read this file. Only .docx files can be edited (not old .doc files).', 'อ่านไฟล์นี้ไม่ได้ แก้ไขได้เฉพาะไฟล์ .docx (ไม่ใช่ไฟล์ .doc แบบเก่า)'));
   const xml = parse(await part.async('string'));
   let body = xml.getElementsByTagNameNS(W, 'body')[0]; // replaced by Undo
   const text = (path) => zip.file(path)?.async('string');
@@ -378,15 +378,16 @@ export async function openDocxEditor(root, bytes) {
       const content = document.createElement('div'); content.className = 'de-txbx';
       content.style.padding = `${inset('tIns', 45720)}px ${inset('rIns', 91440)}px ${inset('bIns', 45720)}px ${inset('lIns', 91440)}px`;
       renderBlock(txbx, content);
-      const grip = document.createElement('span'); grip.className = 'de-grip'; grip.title = 'Drag to move';
-      const size = document.createElement('span'); size.className = 'de-size'; size.title = 'Drag to resize';
+      const grip = document.createElement('span'); grip.className = 'de-grip'; grip.title = t('Drag to move', 'ลากเพื่อย้าย');
+      const size = document.createElement('span'); size.className = 'de-size'; size.title = t('Drag to resize', 'ลากเพื่อปรับขนาด');
       el.append(content, grip, size);
     }
     shapes.push(s); shapeOf.set(d, s); layer.append(el);
     return s;
   }
   const off = (pos) => +(nsKid(pos, WP, 'posOffset')?.textContent || 0) / EMU;
-  const hostTop = (p) => { const div = divOf.get(p); return div?.isConnected ? div.getBoundingClientRect().top - page.getBoundingClientRect().top : 0; };
+  let zoom = 1; // the page is shrunk to fit a narrow screen (an iPad held upright); page measures are unzoomed
+  const hostTop = (p) => { const div = divOf.get(p); return div?.isConnected ? (div.getBoundingClientRect().top - page.getBoundingClientRect().top) / zoom : 0; };
   function geom(s) { // the shape's box on the page (px)
     const ext = nsKid(s.anchor, WP, 'extent'); const w = +ext?.getAttribute('cx') / EMU || 0; const h = +ext?.getAttribute('cy') / EMU || 0;
     const H = nsKid(s.anchor, WP, 'positionH'); const V = nsKid(s.anchor, WP, 'positionV');
@@ -516,46 +517,61 @@ export async function openDocxEditor(root, bytes) {
   }
 
   renderBlock(body, page);
-  if (!items.length) throw new Error('No text was found in this document.');
+  if (!items.length) throw new Error(t('No text was found in this document.', 'ไม่พบข้อความในเอกสารนี้'));
 
   // ---------- toolbar ----------
   const fontsUsed = new Set();
   for (const f of xml.getElementsByTagNameNS(W, 'rFonts')) for (const k of ['ascii', 'cs']) { const v = attr(f, k); if (v) fontsUsed.add(v); }
   const fontList = [...fontsUsed].filter((f) => !FONTS.includes(f)).sort();
   const opt = (v, label = v) => `<option value="${String(v).replace(/"/g, '&quot;')}">${label}</option>`;
+  // Preset colours next to each colour box: quicker on a touch screen, and there where a browser has no colour picker.
+  const PRESETS = ['#000000', '#C00000', '#990000', '#0070C0', '#00B050', '#ED7D31'];
+  const presets = (id) => `<span class="de-presets" data-for="${id}">${PRESETS.map((c) => `<button type="button" data-c="${c}" style="background:${c}" title="${c}" aria-label="${c}"></button>`).join('')}</span>`;
+  const EDIT_NOTE = t('Select text, then pick a font, size or colour · edited paragraphs are marked on the left', 'เลือกข้อความ แล้วเลือกแบบอักษร ขนาด หรือสี · ย่อหน้าที่แก้ไขจะมีแถบสีส้มด้านซ้าย');
   root.innerHTML = `<div class="oe"><div class="oe-bar de-bar">
-      <div class="de-group" role="group" aria-label="Text">
-        <select id="de-font" title="Font of the selected text">${fontList.length ? `<optgroup label="In this file">${fontList.map((f) => opt(f)).join('')}</optgroup><optgroup label="More fonts">` : ''}${FONTS.map((f) => opt(f)).join('')}${fontList.length ? '</optgroup>' : ''}</select>
-        <select id="de-size" title="Size of the selected text (pt)">${SIZES.map((n) => opt(n)).join('')}</select>
-        <label class="de-swatch" title="Colour of the selected text">A <input type="color" id="de-color" value="${BOX.color}"></label>
+      <div class="de-group" role="group" aria-label="${t('Text', 'ข้อความ')}">
+        <select id="de-font" title="${t('Font of the selected text', 'แบบอักษรของข้อความที่เลือก')}">${fontList.length ? `<optgroup label="${t('In this file', 'ในไฟล์นี้')}">${fontList.map((f) => opt(f)).join('')}</optgroup><optgroup label="${t('More fonts', 'แบบอักษรอื่น')}">` : ''}${FONTS.map((f) => opt(f)).join('')}${fontList.length ? '</optgroup>' : ''}</select>
+        <select id="de-size" title="${t('Size of the selected text (pt)', 'ขนาดของข้อความที่เลือก (pt)')}">${SIZES.map((n) => opt(n)).join('')}</select>
+        <label class="de-swatch" title="${t('Colour of the selected text', 'สีของข้อความที่เลือก')}">A <input type="color" id="de-color" value="${BOX.color}"></label>${presets('de-color')}
       </div>
-      <div class="de-group" role="group" aria-label="Insert">
-        <button type="button" data-tool="edit" aria-pressed="true" title="Click text to edit it; click a shape to pick it">Edit</button>
-        <button type="button" data-tool="box" aria-pressed="false" title="Drag on the page to add a text box">Text box</button>
-        <button type="button" data-tool="line" aria-pressed="false" title="Drag to draw a line (Shift: 45° steps)">Line</button>
-        <button type="button" data-tool="arrow" aria-pressed="false" title="Drag to draw an arrow (Shift: 45° steps)">Arrow</button>
-        <label class="de-swatch" title="Line colour (also the border of a picked text box)"><svg width="14" height="14" aria-hidden="true"><path d="M2 12 12 2" stroke="currentColor" stroke-width="2"/></svg> <input type="color" id="de-lcolor" value="${SHAPE.color}"></label>
-        <select id="de-lwidth" title="Line width">${opt(0, 'No line')}${WIDTHS.map((w) => opt(w, `${w} pt`)).join('')}</select>
-        <button type="button" id="de-del" disabled title="Delete the picked shape (Delete key)">Delete</button>
+      <div class="de-group" role="group" aria-label="${t('Insert', 'แทรก')}">
+        <button type="button" data-tool="edit" aria-pressed="true" title="${t('Click text to edit it; click a shape to pick it', 'แตะข้อความเพื่อแก้ไข แตะรูปร่างเพื่อเลือก')}">${t('Edit', 'แก้ไข')}</button>
+        <button type="button" data-tool="box" aria-pressed="false" title="${t('Drag on the page to add a text box', 'ลากบนหน้าเพื่อเพิ่มกล่องข้อความ')}">${t('Text box', 'กล่องข้อความ')}</button>
+        <button type="button" data-tool="line" aria-pressed="false" title="${t('Drag to draw a line (Shift: 45° steps)', 'ลากเพื่อวาดเส้น (Shift: ทีละ 45°)')}">${t('Line', 'เส้น')}</button>
+        <button type="button" data-tool="arrow" aria-pressed="false" title="${t('Drag to draw an arrow (Shift: 45° steps)', 'ลากเพื่อวาดลูกศร (Shift: ทีละ 45°)')}">${t('Arrow', 'ลูกศร')}</button>
+        <label class="de-swatch" title="${t('Line colour (also the border of a picked text box)', 'สีเส้น (และขอบของกล่องข้อความที่เลือก)')}"><svg width="14" height="14" aria-hidden="true"><path d="M2 12 12 2" stroke="currentColor" stroke-width="2"/></svg> <input type="color" id="de-lcolor" value="${SHAPE.color}"></label>${presets('de-lcolor')}
+        <select id="de-lwidth" title="${t('Line width', 'ความหนาเส้น')}">${opt(0, t('No line', 'ไม่มีเส้น'))}${WIDTHS.map((w) => opt(w, `${w} pt`)).join('')}</select>
+        <button type="button" id="de-del" disabled title="${t('Delete the picked shape (Delete key)', 'ลบรูปร่างที่เลือก (ปุ่ม Delete)')}">${t('Delete', 'ลบ')}</button>
       </div>
-      <div class="de-group" role="group" aria-label="Undo">
-        <button type="button" id="de-undo" disabled title="Undo the last formatting or shape change (Ctrl+Z)">Undo</button>
-        <button type="button" id="de-redo" disabled title="Redo (Ctrl+Y)">Redo</button>
+      <div class="de-group" role="group" aria-label="${t('Undo', 'เลิกทำ')}">
+        <button type="button" id="de-undo" disabled title="${t('Undo the last formatting or shape change (Ctrl+Z)', 'เลิกทำการจัดรูปแบบหรือรูปร่างล่าสุด (Ctrl+Z)')}">${t('Undo', 'เลิกทำ')}</button>
+        <button type="button" id="de-redo" disabled title="${t('Redo (Ctrl+Y)', 'ทำซ้ำ (Ctrl+Y)')}">${t('Redo', 'ทำซ้ำ')}</button>
       </div>
-      <span class="oe-note" id="de-note">Select text, then pick a font, size or colour · edited paragraphs are marked on the left</span>
+      <span class="oe-note" id="de-note">${EDIT_NOTE}</span>
     </div><div class="oe-scroll de-doc"></div></div>`;
   const $ = (id) => root.querySelector(`#${id}`);
   $('de-lwidth').value = String(SHAPE.width);
   const lineColor = () => $('de-lcolor').value;
   const lineWidth = () => +$('de-lwidth').value || SHAPE.width;
-  const note = (t) => { $('de-note').textContent = t; };
+  const note = (text) => { $('de-note').textContent = text; };
   const capture = document.createElement('div'); capture.className = 'de-capture';
   page.append(layer, capture);
-  root.querySelector('.de-doc').append(page);
+  // Fit to width: on a screen narrower than the page, the page is scaled down (pointer and layout measures are
+  // divided by the zoom); a wrapper takes the scaled size so the scroll area matches.
+  const scroller = root.querySelector('.de-doc'); const fit = document.createElement('div'); fit.className = 'de-fit';
+  fit.append(page); scroller.append(fit);
+  function fitWidth() {
+    const room = scroller.clientWidth - 2 * (parseFloat(getComputedStyle(scroller).paddingLeft) || 0);
+    zoom = room > 0 ? Math.min(1, room / page.offsetWidth) : 1;
+    page.style.transform = zoom < 1 ? `scale(${zoom})` : '';
+    fit.style.width = `${page.offsetWidth * zoom}px`; fit.style.height = `${page.offsetHeight * zoom}px`;
+  }
+  fitWidth();
+  new ResizeObserver(fitWidth).observe(scroller);
   const textOf = (div) => div.innerText.replace(/\n$/, '');
   items.forEach((it) => { it.text = textOf(it.div); }); // read once the page is laid out
   shapes.forEach(draw);
-  new ResizeObserver(layout).observe(page); // images loading, edits that change heights
+  new ResizeObserver(() => { fitWidth(); layout(); }).observe(page); // images loading, edits that change heights
   document.fonts?.ready.then(layout);
 
   const changed = new Set();
@@ -604,7 +620,7 @@ export async function openDocxEditor(root, bytes) {
     }
     $('de-del').disabled = !s;
   }
-  const pagePoint = (e) => { const r = page.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const pagePoint = (e) => { const r = page.getBoundingClientRect(); return [(e.clientX - r.left) / zoom, (e.clientY - r.top) / zoom]; };
   const snap = (from, p, shift) => {
     if (!shift) return p;
     const dx = p[0] - from[0], dy = p[1] - from[1]; const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4); const len = Math.hypot(dx, dy);
@@ -613,8 +629,9 @@ export async function openDocxEditor(root, bytes) {
   function drag(e, onMove, onEnd = () => {}) {
     const start = pagePoint(e); let moved = false;
     const move = (ev) => { const p = pagePoint(ev); if (!moved && Math.hypot(p[0] - start[0], p[1] - start[1]) < 3) return; moved = true; onMove(p, start, ev); };
-    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); onEnd(moved); layout(); };
-    addEventListener('pointermove', move); addEventListener('pointerup', up);
+    // A touch the system takes over (pointercancel) ends the drag where it is.
+    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); onEnd(moved); layout(); };
+    addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
   }
   layer.addEventListener('pointerdown', (e) => {
     const el = e.target.closest('.de-shape'); if (!el || e.button !== 0) return;
@@ -646,7 +663,8 @@ export async function openDocxEditor(root, bytes) {
     tool = k;
     root.querySelectorAll('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === k)));
     page.classList.toggle('de-drawing', k !== 'edit');
-    note(k === 'box' ? 'Drag on the page to add a text box, or click for a standard size' : k === 'edit' ? 'Select text, then pick a font, size or colour · edited paragraphs are marked on the left' : 'Drag on the page to draw · Shift keeps 45° steps · Esc to stop');
+    note(k === 'box' ? t('Drag on the page to add a text box, or tap for a standard size', 'ลากบนหน้าเพื่อเพิ่มกล่องข้อความ หรือแตะเพื่อใช้ขนาดมาตรฐาน') : k === 'edit' ? EDIT_NOTE
+      : t('Drag on the page to draw · Shift keeps 45° steps · Esc or Edit to stop', 'ลากบนหน้าเพื่อวาด · Shift ให้เอียงทีละ 45° · กด Esc หรือแก้ไขเพื่อหยุด'));
   }
   root.querySelector('.de-bar').addEventListener('click', (e) => { const b = e.target.closest('[data-tool]'); if (b) setTool(b.dataset.tool); });
   capture.addEventListener('pointerdown', (e) => {
@@ -667,6 +685,14 @@ export async function openDocxEditor(root, bytes) {
         setTool('edit'); select(s);
         const div = s.el.querySelector('.de-p'); div?.focus();
       } else if (moved && Math.hypot(b[0] - a[0], b[1] - a[1]) > 4) select(newShape(kind, boxOf(a, b)));
+    });
+  });
+  // A preset sets its colour box and applies it; pressing it keeps the text selection.
+  root.querySelectorAll('.de-presets').forEach((g) => {
+    g.addEventListener('pointerdown', (e) => e.preventDefault());
+    g.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-c]'); if (!b) return;
+      const input = $(g.dataset.for); input.value = b.dataset.c.toLowerCase(); input.dispatchEvent(new Event('change'));
     });
   });
   $('de-lcolor').addEventListener('change', () => { if (sel) setLine(sel, lineColor(), +$('de-lwidth').value); });
@@ -777,7 +803,7 @@ export async function openDocxEditor(root, bytes) {
         if (e > s) targets.push({ i, s, e, all: s === 0 && e === Infinity });
       });
     }
-    if (!targets.length) { note('Select some text first (or pick a text box), then choose the font, size or colour'); return; }
+    if (!targets.length) { note(t('Select some text first (or pick a text box), then choose the font, size or colour', 'เลือกข้อความก่อน (หรือเลือกกล่องข้อความ) แล้วจึงเลือกแบบอักษร ขนาด หรือสี')); return; }
     checkpoint();
     for (const t of targets) {
       const it = items[t.i];

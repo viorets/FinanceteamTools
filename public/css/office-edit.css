@@ -4,7 +4,7 @@
 .oe-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 4px 12px; }
 .oe-bar select { margin-left: 6px; }
 .oe-note { font-size: 13px; color: #555; }
-.oe-scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border-color); border-radius: 6px; background: #fff; }
+.oe-scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border-color, #d5dfe3); border-radius: 6px; background: #fff; }
 
 /* Excel grid: Excel's default font and gridlines; fixed column widths, text clipped at the cell edge. */
 .xe-table { border-collapse: collapse; table-layout: fixed; font-family: Calibri, "Segoe UI", sans-serif; font-size: 11pt; color: #000; background: #fff; }
@@ -42,6 +42,9 @@
 .de-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid #dde5ea; border-radius: 6px; background: #f7f9fa; }
 .de-group select, .de-group button { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid #c9d1d6; border-radius: 4px; background: #fff; color: #222; cursor: pointer; margin: 0; }
 .de-group #de-font { max-width: 170px; }
+/* Sites with full-width form fields (the feedback site): the toolbar's own sizes win. */
+.de-group select { width: auto; min-height: 0; flex: none; box-shadow: none; }
+.oe-bar select { width: auto; min-height: 0; }
 .de-group button[aria-pressed="true"] { background: #1b4965; border-color: #1b4965; color: #fff; }
 .de-group button:disabled { opacity: .45; cursor: default; }
 .de-swatch { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-size: 13px; color: #333; cursor: pointer; }
@@ -49,12 +52,16 @@
 #docxEditor:focus { outline: none; }
 
 /* Shapes: drawn over the page from their anchor paragraph. Lines take clicks only on the line itself. */
-.de-page { position: relative; }
+.de-page { position: relative; transform-origin: 0 0; }
+.de-fit { margin: 0 auto; }
+.de-fit > .de-page { margin: 0; }
 .de-layer { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .de-shape { position: absolute; box-sizing: border-box; }
 .de-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; min-width: 1px; min-height: 1px; overflow: visible; pointer-events: none; }
-.de-k-line .de-hit { pointer-events: stroke; cursor: move; }
+.de-k-line .de-hit { pointer-events: stroke; cursor: move; touch-action: none; }
 .de-k-shape, .de-k-ellipse, .de-k-box { pointer-events: auto; }
+/* A finger on a shape, its grip or its handles moves the shape instead of scrolling the page. */
+.de-k-shape, .de-k-ellipse, .de-grip, .de-size, .de-h { touch-action: none; }
 .de-k-shape, .de-k-ellipse { cursor: move; }
 .de-txbx { position: relative; overflow-wrap: break-word; }
 .de-txbx .de-p:hover { background-color: transparent; }
@@ -72,3 +79,8 @@
 .de-page.de-drawing .de-capture { display: block; }
 .de-ghost { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .de-ghost rect { fill: rgba(95, 168, 211, .08); stroke: #1b4965; stroke-dasharray: 4 3; }
+
+/* Preset colours beside each colour box. */
+.de-presets { display: inline-flex; gap: 3px; }
+.de-presets button { width: 18px; height: 18px; min-height: 0; padding: 0; border: 1px solid rgba(0, 0, 0, .25); border-radius: 50%; cursor: pointer; }
+@media (pointer: coarse) { .de-presets button { width: 26px; height: 26px; } .de-h { width: 22px; height: 22px; margin: -11px 0 0 -11px; } .de-grip { height: 14px; top: -20px; width: 40px; margin-left: -20px; } .de-size { width: 18px; height: 18px; right: -10px; bottom: -10px; } }

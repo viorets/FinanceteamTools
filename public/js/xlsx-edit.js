@@ -130,13 +130,13 @@ async function recalcOnOpen(buf) {
   return zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
 }
 
-// Opens the editor in `root`. bytes: the .xlsx (ArrayBuffer). Resolves { isDirty(), save() }; save() resolves the
-// edited .xlsx as an ArrayBuffer.
-export async function openXlsxEditor(root, bytes) {
+// Opens the editor in `root`. bytes: the .xlsx (ArrayBuffer); t(en, th): translates labels. Resolves
+// { isDirty(), save() }; save() resolves the edited .xlsx as an ArrayBuffer.
+export async function openXlsxEditor(root, bytes, { t = (en) => en } = {}) {
   const ExcelJS = await script(EXCELJS, 'ExcelJS');
   const wb = new ExcelJS.Workbook();
-  try { await wb.xlsx.load(bytes.slice(0)); } catch { throw new Error('Could not read this file. Only .xlsx files can be edited.'); }
-  if (!wb.worksheets.length) throw new Error('This workbook has no sheets.');
+  try { await wb.xlsx.load(bytes.slice(0)); } catch { throw new Error(t('Could not read this file. Only .xlsx files can be edited.', 'อ่านไฟล์นี้ไม่ได้ แก้ไขได้เฉพาะไฟล์ .xlsx')); }
+  if (!wb.worksheets.length) throw new Error(t('This workbook has no sheets.', 'สมุดงานนี้ไม่มีชีต'));
   const theme = themeColors(wb);
   let dirty = false;
 
@@ -165,7 +165,7 @@ export async function openXlsxEditor(root, bytes) {
   }
 
   root.innerHTML = `<div class="oe"><div class="oe-bar">
-      <label>Sheet <select id="xe-sheet">${wb.worksheets.map((ws, i) => `<option value="${i}">${ws.name.replace(/</g, '&lt;')}</option>`).join('')}</select></label>
+      <label>${t('Sheet', 'ชีต')} <select id="xe-sheet">${wb.worksheets.map((ws, i) => `<option value="${i}">${ws.name.replace(/</g, '&lt;')}</option>`).join('')}</select></label>
       <span class="oe-note" id="xe-note"></span>
       <div class="xe-fx" id="xe-fx"><b></b><span></span></div>
     </div><div class="oe-scroll" id="xe-grid"></div></div>`;
@@ -176,7 +176,7 @@ export async function openXlsxEditor(root, bytes) {
   function showFx(ws, td) {
     const cell = ws.getCell(+td.dataset.r, +td.dataset.c);
     fx.firstChild.textContent = `${colName(+td.dataset.c)}${td.dataset.r}`;
-    fx.lastChild.textContent = cell.formula ? `=${cell.formula}   →   ${shownText(cell, result(ws, cell)) || '(blank)'}` : rawText(cell);
+    fx.lastChild.textContent = cell.formula ? `=${cell.formula}   →   ${shownText(cell, result(ws, cell)) || t('(blank)', '(ว่าง)')}` : rawText(cell);
   }
 
   function render(ws) {
@@ -191,9 +191,9 @@ export async function openXlsxEditor(root, bytes) {
       for (let r = a[0]; r <= b[0]; r++) for (let c = a[1]; c <= b[1]; c++) if (r !== a[0] || c !== a[1]) covered.add(`${r}:${c}`);
     });
     const notes = [];
-    if (ws.rowCount > MAX_ROWS || ws.columnCount > MAX_COLS) notes.push(`Showing the first ${rows} rows and ${cols} columns`);
-    if (isProtected) notes.push('Protected sheet: grey cells are locked');
-    notes.push(hf ? 'Formulas calculate live' : 'Live calculation is off for this file: formulas show the results saved in it');
+    if (ws.rowCount > MAX_ROWS || ws.columnCount > MAX_COLS) notes.push(t('Showing the first {rows} rows and {cols} columns', 'แสดง {rows} แถวและ {cols} คอลัมน์แรก').replace('{rows}', rows).replace('{cols}', cols));
+    if (isProtected) notes.push(t('Protected sheet: grey cells are locked', 'ชีตที่ป้องกัน: เซลล์สีเทาแก้ไขไม่ได้'));
+    notes.push(hf ? t('Formulas calculate live', 'สูตรคำนวณทันทีที่แก้ไข') : t('Live calculation is off for this file: formulas show the results saved in it', 'ไฟล์นี้ไม่คำนวณสูตรทันที: สูตรแสดงผลที่บันทึกไว้ในไฟล์'));
     note.textContent = notes.join(' · ');
 
     const table = document.createElement('table'); table.className = 'xe-table';
