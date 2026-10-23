@@ -26,19 +26,35 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 
 The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinanceFeedback) (`public/js/markup/pdf-markup.js`).
 
+### Excel editing (beta)
+- Upload an `.xlsx`, pick a sheet, and click a cell to edit it (type `=` for a formula; Enter moves down, Esc cancels)
+- Keeps styles, formulas, merged cells, dropdowns, column widths and sheet protection; on a protected sheet, locked cells stay read-only
+- Charts, images and pivot tables are **not** kept
+- Excel recalculates every formula when it opens the downloaded `<name> (edited).xlsx`
+
+### Word editing (beta)
+- Upload a `.docx` and edit the text of its paragraphs and table cells
+- Only the text changes: styles, headers, footers, images and page layout stay exactly as they were
+- An edited paragraph takes the style of its first word; headers, footers and text boxes are not editable yet
+- Old `.doc` files are not supported
+
 ## Project structure
 
 ```
-public/index.html                   # the app page: Excel tools (inline) and the PDF tab
+public/index.html                   # the app page: Excel tools (inline) and the PDF, Excel and Word editing tabs
 public/js/pdf-markup.js             # PDF editor module
 public/css/markup.css               # PDF editor styles
+public/js/xlsx-edit.js              # Excel editor (ExcelJS)
+public/js/xlsx-relock.js            # puts sheet protection back after saving (from TUSUFinanceFeedback)
+public/js/docx-edit.js              # Word editor (JSZip; edits word/document.xml only)
+public/css/office-edit.css          # Excel and Word editor styles
 public/fonts/LINESeedSansTH_Rg.ttf  # text box font (SIL Open Font License)
 public/favicon.png                  # tab icon
 firebase.json                       # Firebase Hosting config
 .firebaserc                         # Firebase project: tusu-finance-team-tools
 ```
 
-Libraries are loaded from CDNs: [SheetJS](https://sheetjs.com/) reads the Excel files, [Plotly](https://plotly.com/javascript/) draws the charts, and [pdf.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/) show and write PDFs. Fonts: LINE Seed Sans TH, plus Noto Sans Thai and Sarabun from Google Fonts.
+Libraries are loaded from CDNs: [SheetJS](https://sheetjs.com/) reads the Excel files, [Plotly](https://plotly.com/javascript/) draws the charts, [pdf.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/) show and write PDFs, and [ExcelJS](https://github.com/exceljs/exceljs) and [JSZip](https://stuk.github.io/jszip/) edit Excel and Word files. Fonts: LINE Seed Sans TH, plus Noto Sans Thai and Sarabun from Google Fonts.
 
 ## Run locally
 

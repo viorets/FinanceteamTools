@@ -18,6 +18,7 @@
     <!-- PDF editor: text box fonts (Noto Sans Thai, Sarabun) and editor styles -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Sarabun:wght@400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/markup.css">
+    <link rel="stylesheet" href="css/office-edit.css">
     
     <style>
         /* Theme Configuration based on Coolors Palette */
@@ -296,6 +297,8 @@
         <button class="tab-btn active" onclick="switchTab('svgTool', this)">Excel to SVG Tools</button>
         <button class="tab-btn" onclick="switchTab('wordTool', this)">Excel to Word table Tools</button>
         <button class="tab-btn" onclick="switchTab('pdfTool', this)">PDF Editing Tools</button>
+        <button class="tab-btn" onclick="switchTab('xlsxTool', this)">Excel Editing (beta)</button>
+        <button class="tab-btn" onclick="switchTab('docxTool', this)">Word Editing (beta)</button>
     </div>
 
     <!-- ========================================== -->
@@ -470,6 +473,50 @@
         <div class="main-content" style="align-items: stretch;">
             <div id="pdfEditor" style="height: calc(100vh - 200px); min-height: 500px; width: 100%;">
                 <p style="color:#666; text-align:center; padding-top: 50px;">Upload a PDF to start marking it up.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TOOL 4: EXCEL EDITING (prototype)           -->
+    <!-- ========================================== -->
+    <div id="xlsxTool" class="tool-view">
+        <div class="sidebar">
+            <div class="control-group">
+                <label for="xlsxFileInput">Upload Excel File (.xlsx)</label>
+                <input type="file" id="xlsxFileInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+            </div>
+            <div class="export-actions">
+                <button class="action-btn" id="xlsxDownloadBtn" style="flex: 1;" disabled>Download .xlsx</button>
+            </div>
+            <p class="help-text" id="xlsxStatus" style="margin-top: 10px;"></p>
+            <p class="help-text">Click a cell to edit it. Type <b>=</b> to start a formula; Enter moves down, Esc cancels. Styles, formulas, merged cells and sheet protection are kept; charts, images and pivot tables are not. Formulas are recalculated when the file is opened in Excel.</p>
+        </div>
+        <div class="main-content" style="align-items: stretch; min-width: 0;">
+            <div id="xlsxEditor" style="height: calc(100vh - 200px); min-height: 500px; width: 100%; min-width: 0;">
+                <p style="color:#666; text-align:center; padding-top: 50px;">Upload an Excel file to edit its cells.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TOOL 5: WORD EDITING (prototype)            -->
+    <!-- ========================================== -->
+    <div id="docxTool" class="tool-view">
+        <div class="sidebar">
+            <div class="control-group">
+                <label for="docxFileInput">Upload Word File (.docx)</label>
+                <input type="file" id="docxFileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+            </div>
+            <div class="export-actions">
+                <button class="action-btn" id="docxDownloadBtn" style="flex: 1;" disabled>Download .docx</button>
+            </div>
+            <p class="help-text" id="docxStatus" style="margin-top: 10px;"></p>
+            <p class="help-text">Edit the text of paragraphs and table cells. Everything else in the file (styles, headers, footers, images, page layout) stays as it was. An edited paragraph takes the style of its first word. Headers, footers and text boxes are not editable yet.</p>
+        </div>
+        <div class="main-content" style="align-items: stretch; min-width: 0;">
+            <div id="docxEditor" style="height: calc(100vh - 200px); min-height: 500px; width: 100%; min-width: 0;">
+                <p style="color:#666; text-align:center; padding-top: 50px;">Upload a Word file to edit its text.</p>
             </div>
         </div>
     </div>
@@ -1020,13 +1067,22 @@
         }
     </script>
 
-    <!-- TOOL 3 LOGIC: PDF EDITING (editor module from TUSUFinanceFeedback) -->
+    <!-- TOOL 3-5 LOGIC: PDF EDITING (editor module from TUSUFinanceFeedback), EXCEL and WORD EDITING (prototypes) -->
     <script type="module">
         import { openPdfEditor, MAX_BYTES } from './js/pdf-markup.js';
+        import { openXlsxEditor } from './js/xlsx-edit.js';
+        import { openDocxEditor } from './js/docx-edit.js';
 
         const $ = (id) => document.getElementById(id);
         const status = (t) => { $('pdfStatus').textContent = t; };
         const mb = (n) => `${(n / 1048576).toFixed(2)} MB`;
+        const download = (bytes, name, type) => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([bytes], { type }));
+            a.download = name;
+            document.body.append(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        };
         let editor = null; let fileName = ''; let draftKey = '';
 
         $('pdfFileInput').onchange = async (e) => {
@@ -1056,17 +1112,42 @@
             try {
                 const out = await editor.exportPdf();
                 if (out.byteLength > MAX_BYTES) { status(`Marked PDF is ${mb(out.byteLength)}: over the 12 MB limit`); return; }
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
-                a.download = fileName.replace(/\.pdf$/i, '') + ' (marked).pdf';
-                document.body.append(a); a.click(); a.remove();
-                setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+                download(out, fileName.replace(/\.pdf$/i, '') + ' (marked).pdf', 'application/pdf');
                 status(`Marked PDF downloaded (${mb(out.byteLength)})`);
             } catch (err) { status(err.message); console.error(err); }
             finally { $('pdfDownloadBtn').disabled = false; }
         };
 
-        addEventListener('beforeunload', (e) => { if (editor?.isDirty()) e.preventDefault(); });
+        // Excel and Word tabs: open a file, edit, download an edited copy (the original is never changed).
+        const office = {};
+        function bindOffice(kind, open, mime) {
+            const say = (t) => { $(`${kind}Status`).textContent = t; };
+            const btn = $(`${kind}DownloadBtn`);
+            let name = '';
+            $(`${kind}FileInput`).onchange = async (e) => {
+                const f = e.target.files[0]; e.target.value = '';
+                if (!f) return;
+                if (office[kind]?.isDirty() && !confirm('You have unsaved changes. Open another file anyway?')) return;
+                name = f.name; btn.disabled = true; say(`Opening ${f.name} (${mb(f.size)})…`);
+                try {
+                    office[kind] = await open($(`${kind}Editor`), await f.arrayBuffer());
+                    say(`${f.name} · ${mb(f.size)}`); btn.disabled = false;
+                } catch (err) { office[kind] = null; say(err.message); console.error(err); }
+            };
+            btn.onclick = async () => {
+                btn.disabled = true; say('Writing the edited file…');
+                try {
+                    const out = await office[kind].save();
+                    download(out, name.replace(/\.[^.]+$/, '') + ` (edited).${kind}`, mime);
+                    say(`Edited file downloaded (${mb(out.byteLength)})`);
+                } catch (err) { say(err.message); console.error(err); }
+                finally { btn.disabled = false; }
+            };
+        }
+        bindOffice('xlsx', openXlsxEditor, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        bindOffice('docx', openDocxEditor, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+        addEventListener('beforeunload', (e) => { if (editor?.isDirty() || office.xlsx?.isDirty() || office.docx?.isDirty()) e.preventDefault(); });
     </script>
 </body>
 </html>
