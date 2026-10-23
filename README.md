@@ -21,6 +21,7 @@ Browser-based data tools for the TUSU finance team. Upload an Excel file and tur
 
 ```
 public/index.html   # the whole app (HTML, CSS, JS in one file)
+public/favicon.png  # tab icon
 firebase.json       # Firebase Hosting config
 .firebaserc         # Firebase project: tusu-finance-team-tools
 ```
