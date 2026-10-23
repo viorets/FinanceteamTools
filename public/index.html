@@ -20,97 +20,126 @@
     <link rel="stylesheet" href="css/office-edit.css">
     
     <style>
-        /* Theme Configuration based on Coolors Palette */
+        /* Look of the TUSU feedback site (tusu-budget-pitching-feedback.web.app): the TUSU CI deep teal #006371 →
+           cyan #2babc2, a white page tinted with teal, white rounded cards, pill buttons and tabs, and a thin
+           translucent top bar. System font (SF Pro on Apple devices), Noto Sans Thai for Thai. */
         :root {
-            --bg-color: #f0f7fa; 
-            --fg-color: #1b4965;
-            --table-accent: #5fa8d3;
-            --font-family: 'LINE Seed Sans TH', 'LINE Seed TH', sans-serif;
-            --border-color: #62b6cb;
-            
-            --palette-1: #1b4965;
-            --palette-2: #5fa8d3;
-            --palette-3: #62b6cb;
-            --palette-4: #bee9e8;
-            --palette-5: #cae9ff;
+            --teal: #006371; --cyan: #2babc2; --mid: #0097b2; --pale: #b2dce1; --ice: #e8f9ff; --mist: #f8fdfd;
+            --grad: linear-gradient(90deg, var(--teal), var(--cyan));
+            --text: #1d1d1f; --text2: #6e6e73; --sep: rgba(0, 99, 113, .14); --fill: rgba(43, 171, 194, .10);
+            --page: radial-gradient(45% 40% at 8% 8%, rgba(0, 99, 113, .32), transparent 70%),
+                radial-gradient(40% 35% at 92% 12%, rgba(43, 171, 194, .26), transparent 70%),
+                radial-gradient(45% 45% at 85% 92%, rgba(0, 99, 113, .30), transparent 70%),
+                radial-gradient(40% 40% at 12% 90%, rgba(43, 171, 194, .22), transparent 70%),
+                linear-gradient(180deg, #f7fbfc, #dcebee);
+            --radius: 18px; --shadow: 0 2px 6px rgba(0, 99, 113, .05), 0 12px 32px rgba(0, 99, 113, .07);
+            --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Noto Sans Thai", "Helvetica Neue", system-ui, sans-serif;
+            /* names the rules below use */
+            --fg-color: var(--text); --border-color: var(--pale);
+            --palette-1: var(--teal); --palette-2: var(--cyan); --palette-5: var(--ice);
+            color-scheme: light;
         }
+        * { -webkit-tap-highlight-color: transparent; }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--fg-color);
+            background: var(--page);
+            background-color: #e8f3f5;
+            background-attachment: fixed;
+            color: var(--text);
             font-family: var(--font-family);
+            font-size: 15px;
+            letter-spacing: -0.01em;
+            -webkit-font-smoothing: antialiased;
             margin: 0;
-            padding: 20px;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
         h1, h2, h3 {
-            color: var(--fg-color);
-            font-weight: bold;
+            color: var(--teal);
+            font-weight: 700;
         }
 
-        /* Tabs Styling */
+        /* Top bar and tool tabs (as on the feedback site): thin, translucent, sticky. */
+        .chrome { position: sticky; top: 0; z-index: 20; width: 100%; }
+        .topbar {
+            display: flex; align-items: center; gap: 10px; min-height: 68px;
+            padding: 6px max(22px, env(safe-area-inset-left));
+            background: rgba(255, 255, 255, .72);
+            -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+        }
+        .brand { display: flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; min-width: 0; }
+        .brand-logo { width: 44px; height: 44px; border-radius: 11px; flex: none; background: #fff; box-shadow: 0 1px 4px rgba(0, 99, 113, .15); object-fit: contain; }
+        .brand b { display: block; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .brand small { display: block; font-size: 15px; color: var(--text2); }
+        .tabs {
+            background: rgba(255, 255, 255, .62);
+            -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--sep);
+        }
         .tabs-container {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            width: 100%;
+            gap: 6px;
             max-width: 1450px;
+            margin: 0 auto;
+            padding: 8px 22px;
+            overflow-x: auto;
+            align-items: center;
         }
-
         .tab-btn {
-            background-color: #ffffff;
-            color: var(--palette-1);
-            border: 2px solid var(--palette-1);
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 8px;
+            background: none;
+            color: var(--text2);
+            border: 0;
+            padding: 6px 14px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 980px;
             cursor: pointer;
-            font-weight: bold;
-            transition: all 0.2s;
+            white-space: nowrap;
+            transition: background-color .15s, color .15s;
             margin: 0;
         }
-
         .tab-btn.active {
-            background-color: var(--palette-1);
+            background-color: var(--teal);
             color: #ffffff;
         }
-
         .tab-btn:hover:not(.active) {
-            background-color: var(--palette-5);
+            background-color: var(--fill);
+            color: var(--text);
         }
+        @media (max-width: 640px) { .brand b { font-size: 19px; } .brand-logo { width: 36px; height: 36px; } .topbar { min-height: 56px; } }
 
         /* Layout Configuration */
         .tool-view {
             display: none; /* Hidden by default, managed by JS */
             width: 100%;
             max-width: 1450px;
+            box-sizing: border-box;
+            padding: 24px 22px 64px;
             grid-template-columns: 320px 1fr;
             gap: 20px;
         }
-
         .tool-view.active {
             display: grid;
         }
+        @media (max-width: 900px) { .tool-view.active { grid-template-columns: 1fr; } .sidebar { max-height: none; } }
 
         .sidebar {
             background-color: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            border: 1px solid var(--border-color);
+            padding: 22px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
             max-height: 90vh;
             overflow-y: auto;
         }
 
         .main-content {
             background-color: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            border: 1px solid var(--border-color);
+            padding: 22px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -143,26 +172,28 @@
 
         label {
             font-size: 13px;
-            margin-bottom: 4px;
-            font-weight: bold;
-            color: var(--fg-color);
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: var(--text);
         }
 
         input[type="file"], select, input[type="number"], input[type="color"], button {
             font-family: var(--font-family);
-            padding: 8px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
+            padding: 8px 12px;
+            border: 1px solid var(--pale);
+            border-radius: 12px;
             background-color: #ffffff;
-            color: var(--fg-color);
+            color: var(--text);
             font-size: 14px;
         }
+        select:focus, input[type="number"]:focus, input[type="file"]:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(43, 171, 194, .2); }
 
         input[type="color"] {
             padding: 2px;
             height: 36px;
             cursor: pointer;
             width: 100%;
+            border-radius: 10px;
         }
 
         .color-presets {
@@ -186,47 +217,47 @@
         }
 
         .action-btn {
-            background-color: var(--palette-1);
+            background-color: var(--teal);
             color: #ffffff;
             cursor: pointer;
-            border: none;
-            font-weight: bold;
+            border: 1px solid var(--teal);
+            border-radius: 980px;
+            font-weight: 600;
+            font-size: 15px;
             transition: background-color 0.2s;
             margin-top: 10px;
-            padding: 12px;
+            padding: 11px 18px;
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
         }
-
-        .action-btn:hover {
-            background-color: var(--palette-2);
-        }
+        .action-btn:hover { background-color: #00525e; }
+        .action-btn:disabled { opacity: .4; cursor: default; background-color: var(--teal); }
 
         /* SVG Tool Specifics */
         .filters-container {
             margin-top: 20px;
             padding-top: 15px;
-            border-top: 2px dashed var(--border-color);
+            border-top: 1px solid var(--sep);
         }
 
         .help-text {
-            font-size: 11px;
-            color: #666;
+            font-size: 12px;
+            color: var(--text2);
             margin-bottom: 12px;
             font-weight: normal;
-            line-height: 1.3;
+            line-height: 1.45;
         }
         
         .cb-list-container {
             max-height: 160px;
             overflow-y: auto;
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
+            border: 1px solid var(--sep);
+            border-radius: 10px;
             padding: 6px;
-            background: #fafafa;
+            background: var(--mist);
             display: flex;
             flex-direction: column;
             gap: 4px;
@@ -253,7 +284,7 @@
             display: flex;
             gap: 10px;
             margin-top: 15px;
-            border-top: 2px dashed var(--border-color);
+            border-top: 1px solid var(--sep);
             padding-top: 15px;
         }
         
@@ -289,15 +320,19 @@
 </head>
 <body>
 
-    <h1>TUSU: Finance team | Data Tools</h1>
-
-    <!-- Tabs Navigation -->
-    <div class="tabs-container">
-        <button class="tab-btn active" onclick="switchTab('svgTool', this)">Excel to SVG Tools</button>
-        <button class="tab-btn" onclick="switchTab('wordTool', this)">Excel to Word table Tools</button>
-        <button class="tab-btn" onclick="switchTab('pdfTool', this)">PDF Editing Tools</button>
-        <button class="tab-btn" onclick="switchTab('xlsxTool', this)">Excel Editing (beta)</button>
-        <button class="tab-btn" onclick="switchTab('docxTool', this)">Word Editing (beta)</button>
+    <div class="chrome">
+        <header class="topbar">
+            <a class="brand" href="./"><img class="brand-logo" src="favicon.png" alt="TUSU Finance Team"><span><b>TUSU: Finance team</b><small>Data Tools</small></span></a>
+        </header>
+        <nav class="tabs" aria-label="Tools">
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchTab('svgTool', this)">Excel to SVG Tools</button>
+            <button class="tab-btn" onclick="switchTab('wordTool', this)">Excel to Word table Tools</button>
+            <button class="tab-btn" onclick="switchTab('pdfTool', this)">PDF Editing Tools</button>
+            <button class="tab-btn" onclick="switchTab('xlsxTool', this)">Excel Editing (beta)</button>
+            <button class="tab-btn" onclick="switchTab('docxTool', this)">Word Editing (beta)</button>
+        </div>
+        </nav>
     </div>
 
     <!-- ========================================== -->
