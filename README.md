@@ -1,6 +1,6 @@
 # TUSU Finance Team Tools
 
-Browser-based data tools for the TUSU finance team. Upload an Excel file and turn it into a chart or a Word-ready table. Everything runs in the browser, so nothing is uploaded to a server.
+Browser-based data tools for the TUSU finance team. Turn an Excel file into a chart or a Word-ready table, or mark up a PDF. Everything runs in the browser, so nothing is uploaded to a server.
 
 **Website:** https://tusu-finance-team-tools.web.app
 
@@ -17,16 +17,28 @@ Browser-based data tools for the TUSU finance team. Upload an Excel file and tur
 - Optionally use the first row as the header
 - **Copy** the table to paste into Word, or **download** it as a `.doc` file
 
+### PDF editing
+- Upload a PDF (up to 12 MB)
+- Tools: text box (Thai supported; LINE Seed Sans TH, Noto Sans Thai or Sarabun), highlight text, draw, line, arrow, rectangle
+- Hold Shift for straight lines and squares; select a mark to move it, change its width or colour, or delete it; undo/redo with Ctrl+Z / Ctrl+Y
+- **Save draft** keeps your marks on this device (browser storage) so you can reopen the same file later
+- **Download PDF** saves a marked copy (`<name> (marked).pdf`); the original file is never changed
+
+The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinanceFeedback) (`public/js/markup/pdf-markup.js`).
+
 ## Project structure
 
 ```
-public/index.html   # the whole app (HTML, CSS, JS in one file)
-public/favicon.png  # tab icon
-firebase.json       # Firebase Hosting config
-.firebaserc         # Firebase project: tusu-finance-team-tools
+public/index.html                   # the app page: Excel tools (inline) and the PDF tab
+public/js/pdf-markup.js             # PDF editor module
+public/css/markup.css               # PDF editor styles
+public/fonts/LINESeedSansTH_Rg.ttf  # text box font (SIL Open Font License)
+public/favicon.png                  # tab icon
+firebase.json                       # Firebase Hosting config
+.firebaserc                         # Firebase project: tusu-finance-team-tools
 ```
 
-Libraries are loaded from CDNs: [SheetJS](https://sheetjs.com/) reads the Excel files, [Plotly](https://plotly.com/javascript/) draws the charts, and the font is LINE Seed Sans TH.
+Libraries are loaded from CDNs: [SheetJS](https://sheetjs.com/) reads the Excel files, [Plotly](https://plotly.com/javascript/) draws the charts, and [pdf.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/) show and write PDFs. Fonts: LINE Seed Sans TH, plus Noto Sans Thai and Sarabun from Google Fonts.
 
 ## Run locally
 

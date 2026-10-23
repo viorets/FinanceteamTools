@@ -15,6 +15,9 @@
     
     <!-- Import LINE Seed Sans TH via CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@line/seed-sans-th@latest/css/line-seed-sans-th.css">
+    <!-- PDF editor: text box fonts (Noto Sans Thai, Sarabun) and editor styles -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Sarabun:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/markup.css">
     
     <style>
         /* Theme Configuration based on Coolors Palette */
@@ -292,6 +295,7 @@
     <div class="tabs-container">
         <button class="tab-btn active" onclick="switchTab('svgTool', this)">Excel to SVG Tools</button>
         <button class="tab-btn" onclick="switchTab('wordTool', this)">Excel to Word table Tools</button>
+        <button class="tab-btn" onclick="switchTab('pdfTool', this)">PDF Editing Tools</button>
     </div>
 
     <!-- ========================================== -->
@@ -441,6 +445,31 @@
         <div class="main-content" style="align-items: flex-start;">
             <div id="wordTableOutput">
                 <p style="color:#666; text-align:center; padding-top: 50px;">Upload an Excel file to view the plain text table format.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TOOL 3: PDF EDITING (from TUSUFinanceFeedback) -->
+    <!-- ========================================== -->
+    <div id="pdfTool" class="tool-view">
+        <div class="sidebar">
+            <div class="control-group">
+                <label for="pdfFileInput">Upload PDF File</label>
+                <input type="file" id="pdfFileInput" accept="application/pdf,.pdf" />
+            </div>
+
+            <div class="export-actions">
+                <button class="action-btn" id="pdfDraftBtn" style="flex: 1;" disabled>Save draft</button>
+                <button class="action-btn" id="pdfDownloadBtn" style="flex: 1;" disabled>Download PDF</button>
+            </div>
+            <p class="help-text" id="pdfStatus" style="margin-top: 10px;"></p>
+            <p class="help-text">Tools: text box, highlight text, draw, line, arrow, rectangle. Hold Shift for straight lines and squares. Select a mark to move it, change its width or colour, or delete it. Files up to 12 MB. Drafts are saved on this device only.</p>
+        </div>
+
+        <div class="main-content" style="align-items: stretch;">
+            <div id="pdfEditor" style="height: calc(100vh - 200px); min-height: 500px; width: 100%;">
+                <p style="color:#666; text-align:center; padding-top: 50px;">Upload a PDF to start marking it up.</p>
             </div>
         </div>
     </div>
@@ -989,6 +1018,55 @@
             fileDownload.click();
             document.body.removeChild(fileDownload);
         }
+    </script>
+
+    <!-- TOOL 3 LOGIC: PDF EDITING (editor module from TUSUFinanceFeedback) -->
+    <script type="module">
+        import { openPdfEditor, MAX_BYTES } from './js/pdf-markup.js';
+
+        const $ = (id) => document.getElementById(id);
+        const status = (t) => { $('pdfStatus').textContent = t; };
+        const mb = (n) => `${(n / 1048576).toFixed(2)} MB`;
+        let editor = null; let fileName = ''; let draftKey = '';
+
+        $('pdfFileInput').onchange = async (e) => {
+            const f = e.target.files[0]; e.target.value = '';
+            if (!f) return;
+            if (editor?.isDirty() && !confirm('You have unsaved marks. Open another file anyway?')) return;
+            const bytes = await f.arrayBuffer();
+            fileName = f.name; draftKey = `markup-draft:${f.name}:${bytes.byteLength}`;
+            let draft = null;
+            try { draft = JSON.parse(localStorage.getItem(draftKey) || 'null'); } catch { /* no draft */ }
+            status(`Opening ${f.name} (${mb(bytes.byteLength)})…`);
+            $('pdfDraftBtn').disabled = true; $('pdfDownloadBtn').disabled = true;
+            try {
+                editor = await openPdfEditor($('pdfEditor'), { bytes, name: f.name, draft });
+                status(`${f.name} · ${mb(bytes.byteLength)}${draft ? ' · draft restored' : ''}`);
+                $('pdfDraftBtn').disabled = false; $('pdfDownloadBtn').disabled = false;
+            } catch (err) { editor = null; status(err.message); console.error(err); }
+        };
+
+        $('pdfDraftBtn').onclick = () => {
+            try { localStorage.setItem(draftKey, JSON.stringify(editor.marks())); editor.clean(); status(`Draft saved on this device (${editor.marks().length} marks)`); }
+            catch (err) { status(`Could not save the draft: ${err.message}`); }
+        };
+
+        $('pdfDownloadBtn').onclick = async () => {
+            $('pdfDownloadBtn').disabled = true; status('Writing the marked PDF…');
+            try {
+                const out = await editor.exportPdf();
+                if (out.byteLength > MAX_BYTES) { status(`Marked PDF is ${mb(out.byteLength)}: over the 12 MB limit`); return; }
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
+                a.download = fileName.replace(/\.pdf$/i, '') + ' (marked).pdf';
+                document.body.append(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+                status(`Marked PDF downloaded (${mb(out.byteLength)})`);
+            } catch (err) { status(err.message); console.error(err); }
+            finally { $('pdfDownloadBtn').disabled = false; }
+        };
+
+        addEventListener('beforeunload', (e) => { if (editor?.isDirty()) e.preventDefault(); });
     </script>
 </body>
 </html>
