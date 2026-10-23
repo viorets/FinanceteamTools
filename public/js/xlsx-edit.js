@@ -27,10 +27,64 @@ function rawText(cell) {
   if (typeof v === 'object') return v.richText ? v.richText.map((r) => r.text).join('') : v.text ?? v.error ?? '';
   return String(v);
 }
-// The text a cell shows in the grid: a formula's last calculated result (none stored: blank, as in Excel), else its value.
+// The text a cell shows in the grid: a formula's last calculated result (none stored: blank, as in Excel), else its
+// value, in the cell's number format.
 function shownText(cell) {
-  if (cell.formula) { const r = cell.result; return r == null ? '' : typeof r === 'object' ? r.error ?? '' : String(r); }
+  const v = cell.formula ? cell.result : cell.value;
+  if (typeof v === 'number') return formatNumber(v, cell.numFmt);
+  if (cell.formula) return v == null ? '' : v instanceof Date ? rawText({ value: v }) : typeof v === 'object' ? v.error ?? '' : String(v);
   return rawText(cell);
+}
+// Number formats, the common parts: thousands separator, decimals, percent, negative and zero sections, and text
+// around the number ("฿", "บาท", brackets). Other formats show the plain number.
+function formatNumber(v, fmt) {
+  if (!fmt || fmt === 'General') return String(Math.round(v * 1e10) / 1e10);
+  const sec = fmt.split(';');
+  const f = v < 0 && sec[1] ? sec[1] : v === 0 && sec[2] ? sec[2] : sec[0];
+  const lit = (x) => x.replace(/\[[^\]]*\]/g, '').replace(/"([^"]*)"/g, '$1').replace(/[_*]./g, '').replace(/\\(.)/g, '$1').replace(/\?/g, '');
+  const core = /[#0?][#0?,]*(\.[0#?]+)?%?/.exec(f.replace(/"[^"]*"/g, (q) => ' '.repeat(q.length)));
+  if (!core) return lit(f).trim() || String(v);
+  const dec = (core[1] || '.').length - 1; const pct = core[0].endsWith('%');
+  let s = Math.abs(pct ? v * 100 : v).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: core[0].includes(',') });
+  if (pct) s += '%';
+  return `${v < 0 && !sec[1] ? '-' : ''}${lit(f.slice(0, core.index))}${s}${lit(f.slice(core.index + core[0].length))}`.trim();
+}
+
+// Colours: argb, or a colour of the workbook theme with its tint.
+function themeColors(wb) {
+  const xml = wb._themes?.theme1 || '';
+  return ['lt1', 'dk1', 'lt2', 'dk2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6', 'hlink', 'folHlink']
+    .map((n) => new RegExp(`<a:${n}>[\\s\\S]*?(?:srgbClr val|lastClr)="([0-9A-Fa-f]{6})"`).exec(xml)?.[1] || null);
+}
+function cssColor(c, theme) {
+  const hex = c?.argb ? c.argb.slice(-6) : c?.theme != null ? theme[c.theme] : null;
+  if (!hex) return null;
+  const t = c.tint || 0;
+  const rgb = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)).map((x) => Math.round(t < 0 ? x * (1 + t) : x + (255 - x) * t));
+  return `rgb(${rgb.join(',')})`;
+}
+const BORDER = { thin: '1px solid', hair: '1px solid', medium: '2px solid', thick: '3px solid', double: '3px double', dotted: '1px dotted', dashed: '1px dashed', dashDot: '1px dashed', dashDotDot: '1px dotted', mediumDashed: '2px dashed', mediumDashDot: '2px dashed', mediumDashDotDot: '2px dotted', slantDashDot: '2px dashed' };
+
+// The cell's own look in the grid: font, fill, borders, alignment and wrapping, as in Excel.
+function styleCell(td, cell, theme) {
+  const f = cell.font || {};
+  if (f.name) td.style.fontFamily = `"${f.name}", sans-serif`;
+  if (f.size) td.style.fontSize = `${f.size}pt`;
+  if (f.bold) td.style.fontWeight = 'bold';
+  if (f.italic) td.style.fontStyle = 'italic';
+  const deco = [f.underline && 'underline', f.strike && 'line-through'].filter(Boolean); if (deco.length) td.style.textDecoration = deco.join(' ');
+  const fc = cssColor(f.color, theme); if (fc) td.style.color = fc;
+  if (cell.fill?.type === 'pattern' && cell.fill.pattern !== 'none') { const bg = cssColor(cell.fill.fgColor, theme); if (bg) td.style.background = bg; }
+  const b = cell.border || {};
+  for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+    const e = b[side.toLowerCase()]; if (e?.style) td.style[`border${side}`] = `${BORDER[e.style] || '1px solid'} ${cssColor(e.color, theme) || '#000'}`;
+  }
+  const a = cell.alignment || {};
+  const num = typeof (cell.formula ? cell.result : cell.value) === 'number';
+  td.style.textAlign = a.horizontal && a.horizontal !== 'general' ? ({ centerContinuous: 'center', distributed: 'justify', fill: 'left' }[a.horizontal] || a.horizontal) : num ? 'right' : 'left';
+  td.style.verticalAlign = a.vertical === 'middle' || a.vertical === 'top' ? a.vertical : 'bottom';
+  if (a.wrapText) td.classList.add('xe-wrap');
+  if (a.indent) td.style.paddingLeft = `${6 + a.indent * 9}px`;
 }
 // Typed text -> cell value: "=..." formula, number, date (only where the cell held a date), else text.
 function parseValue(text, cell) {
@@ -59,6 +113,7 @@ export async function openXlsxEditor(root, bytes) {
   const wb = new ExcelJS.Workbook();
   try { await wb.xlsx.load(bytes.slice(0)); } catch { throw new Error('Could not read this file. Only .xlsx files can be edited.'); }
   if (!wb.worksheets.length) throw new Error('This workbook has no sheets.');
+  const theme = themeColors(wb);
   let dirty = false;
 
   root.innerHTML = `<div class="oe"><div class="oe-bar">
@@ -85,25 +140,27 @@ export async function openXlsxEditor(root, bytes) {
     note.textContent = notes.join(' · ');
 
     const table = document.createElement('table'); table.className = 'xe-table';
+    // Column widths as in Excel (width in characters of the default font, about 7 px each).
     const head = table.insertRow(); head.insertCell().className = 'xe-corner';
+    let total = 40;
     for (let c = 1; c <= cols; c++) {
       const th = document.createElement('th'); th.textContent = colName(c);
-      const w = ws.getColumn(c).width; th.style.minWidth = `${Math.round((w || 9) * 7 + 6)}px`;
+      const col = ws.getColumn(c); const px = col.hidden ? 0 : Math.round((col.width || 8.43) * 7 + 5);
+      th.style.width = `${px}px`; total += px; if (col.hidden) th.className = 'xe-hid';
       head.append(th);
     }
+    table.style.width = `${total}px`;
     for (let r = 1; r <= rows; r++) {
       const tr = table.insertRow();
+      const row = ws.getRow(r); if (row.hidden) tr.style.display = 'none'; else if (row.height) tr.style.height = `${row.height}pt`;
       const rh = document.createElement('th'); rh.textContent = r; tr.append(rh);
       for (let c = 1; c <= cols; c++) {
         if (covered.has(`${r}:${c}`)) continue;
         const cell = ws.getCell(r, c); const td = tr.insertCell();
         const s = span.get(`${r}:${c}`); if (s) { td.rowSpan = s[0]; td.colSpan = s[1]; }
         td.dataset.r = r; td.dataset.c = c; td.textContent = shownText(cell);
-        if (cell.font?.bold) td.style.fontWeight = 'bold';
-        if (cell.font?.color?.argb) td.style.color = `#${cell.font.color.argb.slice(2)}`;
-        if (cell.fill?.type === 'pattern' && cell.fill.fgColor?.argb) td.style.background = `#${cell.fill.fgColor.argb.slice(2)}`;
-        if (typeof cell.value === 'number' || cell.formula) td.style.textAlign = 'right';
-        if (cell.alignment?.horizontal) td.style.textAlign = cell.alignment.horizontal;
+        styleCell(td, cell, theme);
+        if (ws.getColumn(c).hidden) td.classList.add('xe-hid');
         if (isProtected && cell.protection?.locked !== false) { td.classList.add('xe-locked'); continue; }
         td.contentEditable = 'true'; td.tabIndex = 0;
       }
@@ -122,6 +179,7 @@ export async function openXlsxEditor(root, bytes) {
       }
       // A formula typed here has no result until Excel calculates it: show the formula itself.
       td.textContent = td.classList.contains('xe-changed') && cell.formula ? `=${cell.formula}` : shownText(cell);
+      styleCell(td, cell, theme); // a number typed into a text cell now aligns right, as in Excel
     });
     table.addEventListener('keydown', (e) => {
       const td = e.target.closest('td[contenteditable]'); if (!td) return;

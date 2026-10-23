@@ -27,15 +27,17 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinanceFeedback) (`public/js/markup/pdf-markup.js`).
 
 ### Excel editing (beta)
-- Upload an `.xlsx`, pick a sheet, and click a cell to edit it (type `=` for a formula; Enter moves down, Esc cancels)
+- Upload an `.xlsx` and pick a sheet: cells show their own fonts, colours, borders, number formats, row heights and column widths
+- Click a cell to edit it (type `=` for a formula; Enter moves down, Esc cancels)
 - Keeps styles, formulas, merged cells, dropdowns, column widths and sheet protection; on a protected sheet, locked cells stay read-only
 - Charts, images and pivot tables are **not** kept
 - Excel recalculates every formula when it opens the downloaded `<name> (edited).xlsx`
 
 ### Word editing (beta)
-- Upload a `.docx` and edit the text of its paragraphs and table cells
+- Upload a `.docx`: it is shown as a page with its own fonts, colours, numbered lists, tables and images
+- Click any paragraph or table cell to change its text; formatting around the edit is kept, and new text takes the style of the text before it
 - Only the text changes: styles, headers, footers, images and page layout stay exactly as they were
-- An edited paragraph takes the style of its first word; headers, footers and text boxes are not editable yet
+- Headers, footers and text boxes are not shown or editable yet
 - Old `.doc` files are not supported
 
 ## Project structure
