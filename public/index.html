@@ -453,6 +453,14 @@
             </div>
 
             <div class="control-group">
+                <label for="wordDetectMode">Detect</label>
+                <select id="wordDetectMode">
+                    <option value="sheets">Whole sheets</option>
+                    <option value="tables">Defined tables only (Excel tables and named ranges)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
                 <label for="sheetSelector">Select Table/Sheet</label>
                 <select id="sheetSelector">
                     <option value="">Upload a file first...</option>
@@ -949,8 +957,10 @@
         // TOOL 2 LOGIC: EXCEL TO WORD TABLE
         // ==========================================
         let wordWorkbook = null;
-        
+        let wordTables = []; // defined tables in the file: {label, sheet, range}
+
         const wordFileInput = document.getElementById('wordFileInput');
+        const wordDetectMode = document.getElementById('wordDetectMode');
         const sheetSelector = document.getElementById('sheetSelector');
         const defineHeaderCheckbox = document.getElementById('defineHeader');
         const wordTableOutput = document.getElementById('wordTableOutput');
@@ -960,6 +970,7 @@
 
         wordFileInput.addEventListener('change', handleWordFileUpload);
         sheetSelector.addEventListener('change', renderWordTable);
+        wordDetectMode.addEventListener('change', fillWordSelector);
         defineHeaderCheckbox.addEventListener('change', renderWordTable);
         
         copyTableBtn.addEventListener('click', copyTableToClipboard);
@@ -973,28 +984,79 @@
             reader.onload = function(e) {
                 const data = new Uint8Array(e.target.result);
                 wordWorkbook = XLSX.read(data, {type: 'array'});
-                
-                // Populate Sheet Selector
-                sheetSelector.innerHTML = '';
-                wordWorkbook.SheetNames.forEach(sheetName => {
-                    sheetSelector.add(new Option(sheetName, sheetName));
-                });
-                
-                if(wordWorkbook.SheetNames.length > 0) {
-                    renderWordTable();
-                }
+                wordTables = findDefinedTables(data, wordWorkbook);
+                fillWordSelector();
             };
             reader.readAsArrayBuffer(file);
         }
 
-        function renderWordTable() {
+        // Excel tables (Insert > Table, read from xl/tables/*.xml in the .xlsx zip) and named ranges (Formulas > Name Manager).
+        function findDefinedTables(data, wb) {
+            const found = [];
+            if (data[0] === 0x50 && data[1] === 0x4b) try { // a zip (.xlsx); .xls and .csv have no table parts
+                const zip = XLSX.CFB.read(data, {type: 'array'});
+                const text = (path) => {
+                    const f = XLSX.CFB.find(zip, '/' + path);
+                    return f ? new TextDecoder().decode(f.content) : null;
+                };
+                const xml = (path) => { const t = text(path); return t ? new DOMParser().parseFromString(t, 'application/xml') : null; };
+                const rels = (path) => {
+                    const dir = path.replace(/[^/]*$/, ''), out = {};
+                    const doc = xml(dir + '_rels/' + path.slice(dir.length) + '.rels');
+                    if (doc) for (const r of doc.getElementsByTagName('Relationship')) {
+                        const t = r.getAttribute('Target');
+                        out[r.getAttribute('Id')] = t.startsWith('/') ? t.slice(1) : new URL(t, 'http://x/' + dir).pathname.slice(1);
+                    }
+                    return out;
+                };
+                const book = xml('xl/workbook.xml'), bookRels = rels('xl/workbook.xml');
+                if (book) for (const s of book.getElementsByTagName('sheet')) {
+                    const sheetPath = bookRels[s.getAttribute('r:id')];
+                    const sheetDoc = sheetPath && xml(sheetPath), sheetRels = sheetPath ? rels(sheetPath) : {};
+                    if (!sheetDoc) continue;
+                    for (const part of sheetDoc.getElementsByTagName('tablePart')) {
+                        const t = xml(sheetRels[part.getAttribute('r:id')] || '')?.documentElement;
+                        if (!t || !t.getAttribute('ref')) continue;
+                        const name = t.getAttribute('displayName') || t.getAttribute('name');
+                        found.push({label: `${name} (${s.getAttribute('name')}!${t.getAttribute('ref')})`, sheet: s.getAttribute('name'), range: t.getAttribute('ref')});
+                    }
+                }
+            } catch (err) { console.warn('Could not read Excel tables', err); }
+            // Named ranges that point at one block of cells; built-in names such as Print_Area are left out.
+            (wb.Workbook?.Names || []).forEach(n => {
+                const m = /^'?(.+?)'?!\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/.exec(n.Ref || '');
+                if (!m || n.Hidden || /^_xlnm\./i.test(n.Name) || !wb.Sheets[m[1].replace(/''/g, "'")]) return;
+                const sheet = m[1].replace(/''/g, "'"), range = `${m[2]}${m[3]}${m[4] ? `:${m[4]}${m[5]}` : ''}`;
+                if (!m[4]) return; // a single cell is not a table
+                found.push({label: `${n.Name} (${sheet}!${range})`, sheet, range});
+            });
+            return found;
+        }
+
+        function fillWordSelector() {
             if (!wordWorkbook) return;
-            
-            const selectedSheet = sheetSelector.value;
-            const worksheet = wordWorkbook.Sheets[selectedSheet];
-            
+            sheetSelector.innerHTML = '';
+            if (wordDetectMode.value === 'tables') {
+                wordTables.forEach((t, i) => sheetSelector.add(new Option(t.label, i)));
+                if (!wordTables.length) {
+                    sheetSelector.add(new Option('No defined tables found', ''));
+                    wordTableOutput.innerHTML = '<p style="color:#666; text-align:center;">No defined tables in this file. Make one in Excel with Insert &gt; Table (Ctrl+T) or Formulas &gt; Define Name, or choose "Whole sheets".</p>';
+                    return;
+                }
+            } else {
+                wordWorkbook.SheetNames.forEach(sheetName => sheetSelector.add(new Option(sheetName, sheetName)));
+            }
+            if (sheetSelector.options.length > 0) renderWordTable();
+        }
+
+        function renderWordTable() {
+            if (!wordWorkbook || sheetSelector.value === '') return;
+
+            const table = wordDetectMode.value === 'tables' ? wordTables[+sheetSelector.value] : null;
+            const worksheet = wordWorkbook.Sheets[table ? table.sheet : sheetSelector.value];
+
             // Get array data formatted as strings to preserve Excel number/percentage formatting (raw: false)
-            let rawArrayData = XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: false});
+            let rawArrayData = XLSX.utils.sheet_to_json(worksheet, table ? {header: 1, raw: false, range: table.range, blankrows: false} : {header: 1, raw: false});
             
             if(rawArrayData.length === 0) {
                 wordTableOutput.innerHTML = '<p style="color:#666; text-align:center;">Sheet is empty.</p>';
