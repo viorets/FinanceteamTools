@@ -4,83 +4,160 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TUSU: Finance team | Tools</title>
+    <!-- Saved appearance (js/themes.js: light, dark or follow device), set before the page draws so it never flashes -->
+    <script>try { var m = localStorage.getItem('site-mode'); if (m === 'dark' || m === 'auto') document.documentElement.dataset.mode = m; } catch (e) {}</script>
+    <link rel="stylesheet" href="css/themes.css">
+    <meta name="theme-color" content="#f0f7fa">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="icon" type="image/png" href="favicon.png?v=2">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
     <!-- SheetJS for reading Excel files -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- Plotly for Data Visualization and SVG export -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     
-    <!-- Import LINE Seed Sans TH via CDN -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@line/seed-sans-th@latest/css/line-seed-sans-th.css">
+    <!-- LINE Seed Sans TH comes from fonts/ (css/markup.css) -->
     <!-- PDF editor: text box fonts (Noto Sans Thai, Sarabun) and editor styles -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Sarabun:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@500;600;700&family=Sarabun:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/markup.css">
     <link rel="stylesheet" href="css/office-edit.css">
+    <link rel="stylesheet" href="css/view-tools.css">
+    <link rel="stylesheet" href="css/gantt.css">
+    <link rel="stylesheet" href="css/md-edit.css">
     
     <style>
         /* Theme Configuration based on Coolors Palette */
-        :root {
-            --bg-color: #f0f7fa; 
-            --fg-color: #1b4965;
-            --table-accent: #5fa8d3;
-            --font-family: 'LINE Seed Sans TH', 'LINE Seed TH', sans-serif;
-            --border-color: #62b6cb;
-            
-            --palette-1: #1b4965;
-            --palette-2: #5fa8d3;
-            --palette-3: #62b6cb;
-            --palette-4: #bee9e8;
-            --palette-5: #cae9ff;
-        }
+        /* Colours and font: css/themes.css (one set per theme). */
 
         body {
             background-color: var(--bg-color);
             color: var(--fg-color);
             font-family: var(--font-family);
+            font-size: 16px;
+            line-height: 1.45;
+            letter-spacing: -0.01em;
+            -webkit-font-smoothing: antialiased;
             margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
+        button, input, select, textarea { letter-spacing: inherit; }
 
+        /* Headings as on the Budget Pitching site: Prompt Bold. */
         h1, h2, h3 {
             color: var(--fg-color);
-            font-weight: bold;
+            font-family: var(--font-display);
+            font-weight: 700;
+            letter-spacing: -.01em;
         }
+        h2 { font-size: 20px; }
+        ::selection { background: rgba(95, 168, 211, .3); background: color-mix(in srgb, var(--accent) 30%, transparent); } /* color-mix: Safari 16.2+ */
+        h1, h2, h3 { text-wrap: balance; }
+        button, select, label, input[type="checkbox"], input[type="color"], .tab-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .skip { position: absolute; left: 12px; top: -48px; z-index: 100; padding: 10px 14px; border-radius: 8px; background: var(--primary); color: var(--on-primary); font-weight: bold; text-decoration: none; }
+        .skip:focus { top: 12px; }
+        .app-main:focus { outline: none; } /* reached by the skip link only; focus moves on to its controls */
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 
-        /* Tabs Styling */
-        .tabs-container {
+        /* App shell: tool navigation in a vertical side bar; on narrow screens (iPad portrait) a bar on top. */
+        .app {
+            display: grid;
+            grid-template-columns: 240px minmax(0, 1fr);
+            min-height: 100vh;
+        }
+        .side {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            box-sizing: border-box;
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 1450px;
+            flex-direction: column;
+            gap: 24px;
+            padding: 20px 14px;
+            border-width: 0 1px 0 0; /* glass surface: css/themes.css */
+            overflow-y: auto;
+            z-index: 10;
         }
-
+        .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
+        .brand img { width: 34px; height: 34px; border-radius: 8px; flex: none; }
+        .brand h1 { margin: 0; font-size: 15px; line-height: 1.25; color: var(--primary); }
+        /* Subtitle in an outlined pill, as under the Budget Pitching brand. */
+        .brand h1 span { display: block; width: fit-content; margin-top: 3px; padding: 0 7px; border: 1px solid var(--border-strong); border-radius: 99px;
+            font-family: var(--font-family); font-size: 11px; font-weight: normal; letter-spacing: 0; color: var(--ink-2); }
+        .tabs-container { display: flex; flex-direction: column; gap: 4px; }
         .tab-btn {
-            background-color: #ffffff;
-            color: var(--palette-1);
-            border: 2px solid var(--palette-1);
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            min-height: 44px;
             margin: 0;
+            padding: 10px 12px;
+            border: 0;
+            border-radius: 10px;
+            background: none;
+            color: var(--palette-1);
+            font: inherit;
+            font-size: 15px;
+            text-align: left;
+            cursor: pointer;
+            transition: background-color .18s ease-out, color .18s ease-out;
         }
+        .tab-btn svg { flex: none; }
+        .tab-btn:hover:not(.active) { background-color: var(--tint); }
+        .tab-btn.active { background-color: var(--primary); color: var(--on-primary); font-weight: 600; }
+        .tab-btn:focus-visible { outline: 2px solid var(--palette-2); outline-offset: 2px; }
+        .tab-btn .beta { margin-left: auto; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: normal; background: var(--tint); }
+        .tab-btn.active .beta { background: rgba(255, 255, 255, .2); }
+        .theme-pick { padding: 0 8px 16px; border-bottom: 1px solid var(--border); }
+        .pick-label, .mode-pick legend { display: block; font-size: 12px; font-weight: bold; color: var(--ink-2); margin: 0 0 4px; padding: 0; }
+        .mode-pick { border: 0; margin: 0 0 12px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+        .mode-pick legend { grid-column: 1 / -1; }
+        .mode-pick label { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; margin: 0; padding: 6px 2px;
+            border-radius: 8px; font-size: 11px; font-weight: normal; color: var(--ink-2); background: var(--surface-2); cursor: pointer; min-height: 44px; box-sizing: border-box; }
+        .mode-pick input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+        .mode-pick label:has(input:checked) { background: var(--primary); color: var(--on-primary); }
+        .mode-pick label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+        /* Chart colours: colour strips only (names in tooltips); the open list is a grid of strips. */
+        .strip { display: flex; flex: 1; height: 18px; border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08); }
+        .strip i { flex: 1; display: block; }
+        .chart-pick { position: relative; }
+        .chart-now { flex: 1; display: flex; min-width: 0; }
+        .chart-pick summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; box-sizing: border-box; border: 1px solid var(--border-strong);
+            border-radius: 8px; background: var(--surface); color: var(--ink-2); cursor: pointer; list-style: none; }
+        .chart-pick summary::-webkit-details-marker { display: none; }
+        .chart-pick summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .chart-pick[open] summary svg { transform: rotate(180deg); }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; padding: 8px; border-radius: 12px; } /* glass: css/themes.css */
+        .chart-opt { position: relative; display: flex; margin: 0; padding: 5px; border-radius: 6px; cursor: pointer; }
+        .chart-opt:hover { background: var(--tint); }
+        .chart-opt input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+        .chart-opt:has(input:checked) { box-shadow: 0 0 0 2px var(--primary); }
+        .chart-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .app-main { min-width: 0; padding: 24px; display: flex; flex-direction: column; align-items: center; }
 
-        .tab-btn.active {
-            background-color: var(--palette-1);
-            color: #ffffff;
-        }
-
-        .tab-btn:hover:not(.active) {
-            background-color: var(--palette-5);
+        @media (max-width: 900px) {
+            .app { grid-template-columns: 1fr; }
+            .side { z-index: 20; height: auto; flex-direction: row; align-items: center; gap: 14px; padding: 8px 12px; border-width: 0 0 1px 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+            .side::-webkit-scrollbar { display: none; } /* swipe or Shift+wheel still scrolls; the open tool is kept in view */
+            .brand { padding: 0; }
+            .brand h1 span { display: none; }
+            .brand h1 { white-space: nowrap; }
+            .tabs-container { flex-direction: row; padding-right: 12px; } /* room to scroll the last tab clear of the edge */
+            .tab-btn { position: relative; width: auto; white-space: nowrap; }
+            /* Only the open tool keeps its name, so it always fits in view; the others show their icon (name in the tooltip). */
+            .tab-btn:not(.active) { padding: 10px; }
+            .tab-btn:not(.active) > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+            .app-main { padding: 16px; }
+            .theme-pick { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; } /* right after the brand, before the tool tabs */
+            .pick-label, .mode-pick legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+            .mode-pick { margin: 0; grid-template-columns: repeat(3, 44px); }
+            .mode-pick span { display: none; }
+            .chart-pick summary { width: 120px; }
+            .chart-grid { position: fixed; top: 64px; right: 12px; z-index: 30; width: 260px; box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
         }
 
         /* Layout Configuration */
@@ -96,22 +173,21 @@
             display: grid;
         }
 
+        /* Tool options: a glass panel (css/themes.css). */
         .sidebar {
-            background-color: #ffffff;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            border: 1px solid var(--border-color);
+            border-radius: 16px;
             max-height: 90vh;
             overflow-y: auto;
         }
 
+        /* The work area stays solid: documents and charts read best on plain paper. */
         .main-content {
-            background-color: #ffffff;
+            background-color: var(--surface);
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 45, 55, .08), 0 1px 2px rgba(0, 45, 55, .05);
+            border: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -142,22 +218,26 @@
             gap: 8px;
         }
 
+        /* Field labels above their controls: 13px, secondary colour (Budget Pitching's stacked labels). */
         label {
             font-size: 13px;
             margin-bottom: 4px;
-            font-weight: bold;
-            color: var(--fg-color);
+            font-weight: normal;
+            color: var(--ink-2);
         }
 
         input[type="file"], select, input[type="number"], input[type="color"], button {
             font-family: var(--font-family);
+            letter-spacing: inherit;
             padding: 8px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            background-color: #ffffff;
+            background-color: var(--surface);
             color: var(--fg-color);
             font-size: 14px;
         }
+        /* Fields at 16px: iPad Safari zooms the whole page into any field with smaller text. */
+        input[type="file"], select, input[type="number"], input[type="text"], textarea { font-size: 16px; }
 
         input[type="color"] {
             padding: 2px;
@@ -187,11 +267,13 @@
         }
 
         .action-btn {
-            background-color: var(--palette-1);
-            color: #ffffff;
+            background-color: var(--primary);
+            color: var(--on-primary);
             cursor: pointer;
             border: none;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 15px;
+            border-radius: 10px;
             transition: background-color 0.2s;
             margin-top: 10px;
             padding: 12px;
@@ -203,8 +285,9 @@
         }
 
         .action-btn:hover {
-            background-color: var(--palette-2);
+            background-color: var(--primary-hover);
         }
+        .action-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
         /* SVG Tool Specifics */
         .filters-container {
@@ -214,8 +297,8 @@
         }
 
         .help-text {
-            font-size: 11px;
-            color: #666;
+            font-size: 12px;
+            color: var(--ink-2);
             margin-bottom: 12px;
             font-weight: normal;
             line-height: 1.3;
@@ -224,10 +307,10 @@
         .cb-list-container {
             max-height: 160px;
             overflow-y: auto;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border);
             border-radius: 4px;
             padding: 6px;
-            background: #fafafa;
+            background: var(--surface-2);
             display: flex;
             flex-direction: column;
             gap: 4px;
@@ -262,44 +345,74 @@
             margin-top: 0;
         }
 
-        #wordTableOutput {
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background: #fff;
-        }
+        /* Excel to Word table (js/word-table.js) */
+        .wt-main { align-items: flex-start !important; justify-content: flex-start !important; background: var(--surface-2); }
+        .wt-paper { width: 100%; min-height: 240px; box-sizing: border-box; padding: 32px; background: #ffffff; color: #000000; box-shadow: 0 2px 10px rgba(0, 0, 0, .12); overflow: auto; }
+        .wt-empty { color: #5d6f7a; text-align: center; margin: 60px auto; max-width: 44ch; line-height: 1.5; }
+        .wt-label { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+        .wt-gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; align-items: center; }
+        .wt-group { grid-column: 1 / -1; font-size: 11px; color: var(--ink-2); margin-top: 4px; }
+        .wt-tile { display: grid; place-items: center; height: 46px; padding: 4px; border: 1px solid var(--border); border-radius: 6px; background: #ffffff; cursor: pointer; }
+        .wt-tile[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+        .wt-tile:hover { border-color: var(--border-strong); }
+        .wt-tile table { pointer-events: none; }
+        .wt-style-name { margin: 6px 0 0; }
+        .wt-opts { border: 0; padding: 0; margin: 0 0 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+        .wt-opts legend { font-size: 13px; font-weight: bold; padding: 0; margin-bottom: 6px; }
+        .wt-opts label { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: normal; min-height: 32px; cursor: pointer; }
+        .wt-opts input { width: 18px; height: 18px; margin: 0; accent-color: var(--primary); }
+        .wt-more { grid-template-columns: 1fr; }
+        .wt-accents { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .wt-swatch { width: 30px; height: 30px; padding: 0; border: 2px solid var(--surface); border-radius: 6px; box-shadow: 0 0 0 1px var(--border); cursor: pointer; }
+        .wt-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--primary); }
+        .wt-accent-pick { display: grid; grid-template-columns: 44px 1fr; gap: 8px; align-items: center; }
+        .wt-accent-pick input[type="color"] { width: 44px; }
+        .wt-accent-pick .hex-in { margin: 0; width: 100%; }
+        .wt-size { max-width: 96px; }
+        .export-actions .action-btn:disabled { opacity: .45; cursor: default; }
 
-        /* Plain table styling specifically to ensure it copies clearly to word */
-        .plain-html-table {
-            border-collapse: collapse;
-            width: 100%;
-            font-family: Arial, sans-serif;
-            font-size: 11pt;
-            color: #000;
-        }
-        .plain-html-table th, .plain-html-table td {
-            border: 1px solid #000;
-            padding: 5px;
-            text-align: left;
-        }
-        .plain-html-table th {
-            background-color: #f2f2f2;
-            font-weight: bold;
+        /* Form controls: visible keyboard focus in every theme. */
+        input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        /* HEX field under each chart colour box (js/hex-color.js). */
+        .control-group .hex-in { margin-top: 6px; width: 100%; }
+
+        /* Narrower than a laptop (iPad, PC split screen): the tool's options sit above it. */
+        @media (max-width: 1279px) {
+            .tool-view { grid-template-columns: 1fr; }
+            .sidebar { max-height: none; }
         }
     </style>
 </head>
 <body>
 
-    <h1>TUSU: Finance team | Data Tools</h1>
+    <a class="skip" href="#main">Skip to the tool</a>
+    <div class="app">
+    <nav class="side" aria-label="Tools">
+        <div class="brand"><img src="favicon.png?v=2" alt="" width="34" height="34"><h1>TUSU: Finance team <span>Data Tools</span></h1></div>
+        <div class="theme-pick">
+            <fieldset class="mode-pick" id="modePick"><legend>Appearance</legend>
+                <label title="Light"><input type="radio" name="mode" value="light"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><span>Light</span></label>
+                <label title="Dark"><input type="radio" name="mode" value="dark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg><span>Dark</span></label>
+                <label title="Follow this device"><input type="radio" name="mode" value="auto"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span>Device</span></label>
+            </fieldset>
+            <span class="pick-label" id="chartLbl">Chart colours</span>
+            <details class="chart-pick" id="chartPick">
+                <summary><span class="chart-now"></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+                <div class="chart-grid" role="radiogroup" aria-labelledby="chartLbl"></div>
+            </details>
+        </div>
 
-    <!-- Tabs Navigation -->
-    <div class="tabs-container">
-        <button class="tab-btn active" onclick="switchTab('svgTool', this)">Excel to SVG Tools</button>
-        <button class="tab-btn" onclick="switchTab('wordTool', this)">Excel to Word table Tools</button>
-        <button class="tab-btn" onclick="switchTab('pdfTool', this)">PDF Editing Tools</button>
-        <button class="tab-btn" onclick="switchTab('xlsxTool', this)">Excel Editing (beta)</button>
-        <button class="tab-btn" onclick="switchTab('docxTool', this)">Word Editing (beta)</button>
-    </div>
+        <div class="tabs-container" role="tablist" aria-orientation="vertical">
+            <button type="button" class="tab-btn active" role="tab" aria-selected="true" aria-controls="svgTool" onclick="switchTab('svgTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V8M18 17v-8"/></svg><span>Excel to SVG Tools</span></button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="wordTool" onclick="switchTab('wordTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg><span>Excel to Word table Tools</span></button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="pdfTool" onclick="switchTab('pdfTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 17 .8-2.6 4.6-4.6 1.8 1.8-4.6 4.6z"/></svg><span>PDF Editing Tools</span></button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="ganttTool" onclick="switchTab('ganttTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4v16h18"/><path d="M7 8h6M10 12h8M8 16h5"/></svg><span>Gantt Chart Creator</span></button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="xlsxTool" onclick="switchTab('xlsxTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg><span>Excel Editing</span><span class="beta">beta</span></button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="docxTool" onclick="switchTab('docxTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><span>Word Editing</span><span class="beta">beta</span></button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="mdTool" onclick="switchTab('mdTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15V9l2.5 3L11 9v6M16 9v6M13.5 12.5 16 15l2.5-2.5"/></svg><span>Markdown Editing</span></button>
+        </div>
+    </nav>
+    <main class="app-main" id="main" tabindex="-1">
 
     <!-- ========================================== -->
     <!-- TOOL 1: EXCEL TO SVG (Existing Application)  -->
@@ -364,9 +477,19 @@
                 </select>
             </div>
 
+            <div class="control-group">
+                <label for="chartFont">Chart font</label>
+                <select id="chartFont"><option>LINE Seed Sans TH</option></select>
+            </div>
+
             <div class="control-group checkbox-group">
                 <input type="checkbox" id="dashXAxis" checked />
                 <label for="dashXAxis" style="margin: 0; cursor: pointer;">Enable Dashed X-Axis Gridlines</label>
+            </div>
+
+            <div class="control-group checkbox-group">
+                <input type="checkbox" id="gradientFill" />
+                <label for="gradientFill" style="margin: 0; cursor: pointer;">Gradient fill (bars, areas, slices)</label>
             </div>
 
             <div class="control-row">
@@ -410,47 +533,7 @@
     <!-- ========================================== -->
     <!-- TOOL 2: EXCEL TO WORD TABLE (New Tool)       -->
     <!-- ========================================== -->
-    <div id="wordTool" class="tool-view">
-        <div class="sidebar">
-            <div class="control-group">
-                <label for="wordFileInput">Upload Excel File</label>
-                <input type="file" id="wordFileInput" accept=".xlsx, .xls, .csv" />
-            </div>
-
-            <div class="control-group">
-                <label for="sheetSelector">Select Table/Sheet</label>
-                <select id="sheetSelector">
-                    <option value="">Upload a file first...</option>
-                </select>
-            </div>
-
-            <div class="control-group checkbox-group" style="margin-top: 15px;">
-                <input type="checkbox" id="defineHeader" checked />
-                <label for="defineHeader" style="margin: 0; cursor: pointer;">Define first row as HEADER</label>
-            </div>
-
-            <div class="export-actions">
-                <button class="action-btn" id="copyTableBtn" style="flex: 1;" title="Copy transformed table">
-                    <!-- Copy Icon SVG -->
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    Copy
-                </button>
-                <button class="action-btn" id="exportDocxBtn" style="flex: 1;" title="Download as .doc">
-                    Download .doc
-                </button>
-            </div>
-            <p class="help-text" style="margin-top: 10px;">Note: Download uses a widely compatible .doc format ensuring Word reads the HTML table cleanly.</p>
-        </div>
-
-        <div class="main-content" style="align-items: flex-start;">
-            <div id="wordTableOutput">
-                <p style="color:#666; text-align:center; padding-top: 50px;">Upload an Excel file to view the plain text table format.</p>
-            </div>
-        </div>
-    </div>
+    <div id="wordTool" class="tool-view"></div> <!-- js/word-table.js -->
 
     <!-- ========================================== -->
     <!-- TOOL 3: PDF EDITING (from TUSUFinanceFeedback) -->
@@ -466,8 +549,9 @@
                 <button class="action-btn" id="pdfDraftBtn" style="flex: 1;" disabled>Save draft</button>
                 <button class="action-btn" id="pdfDownloadBtn" style="flex: 1;" disabled>Download PDF</button>
             </div>
-            <p class="help-text" id="pdfStatus" style="margin-top: 10px;"></p>
+            <p class="help-text" id="pdfStatus" role="status" style="margin-top: 10px;"></p>
             <p class="help-text">Tools: text box, highlight text, draw, line, arrow, rectangle. Hold Shift for straight lines and squares. Select a mark to move it, change its width or colour, or delete it. Files up to 12 MB. Drafts are saved on this device only.</p>
+            <p class="help-text">Text box: select letters and press <b>B</b>, <i>I</i>, <u>U</u>, <s>S</s> or the highlighter (Ctrl+B / I / U, Ctrl+Shift+X). Typing <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜. Highlight colour and opacity sit under the Highlight tool. Zoom with Ctrl + mouse wheel, a pinch, or − / +. Full screen puts the tools on top.</p>
         </div>
 
         <div class="main-content" style="align-items: stretch;">
@@ -487,10 +571,22 @@
                 <input type="file" id="xlsxFileInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
             </div>
             <div class="export-actions">
-                <button class="action-btn" id="xlsxDownloadBtn" style="flex: 1;" disabled>Download .xlsx</button>
+                <button class="action-btn" id="xlsxDraftBtn" style="flex: 1;" disabled>Save draft</button>
+                <button class="action-btn" id="xlsxDownloadBtn" style="flex: 1;" disabled>Download</button>
             </div>
-            <p class="help-text" id="xlsxStatus" style="margin-top: 10px;"></p>
-            <p class="help-text">Click a cell to edit it. Type <b>=</b> to start a formula; Enter moves down, Esc cancels. Styles, formulas, merged cells and sheet protection are kept; charts, images and pivot tables are not. Formulas calculate live as you edit; click any cell to see its formula in the formula bar.</p>
+            <div class="control-group" style="margin-top: 8px;">
+                <label for="xlsxFormat">Download as</label>
+                <select id="xlsxFormat">
+                    <option value="xlsx">Excel workbook (.xlsx)</option>
+                    <option value="csv">CSV UTF-8, comma (.csv): this sheet</option>
+                    <option value="tsv">Tab-separated (.tsv): this sheet</option>
+                    <option value="utf16">Unicode text, UTF-16 (.txt): this sheet</option>
+                    <option value="json">JSON, header row as keys (.json): this sheet</option>
+                    <option value="html">Web page table (.html): this sheet</option>
+                </select>
+            </div>
+            <p class="help-text" id="xlsxStatus" role="status" style="margin-top: 10px;"></p>
+            <p class="help-text">Click a cell, then type (F2 or double-click edits it). Drag or Shift+click to select a range; copy and paste work with Excel. Drag the small square to fill a series. The ribbon formats cells (Format as table uses the chart colour themes), inserts rows and columns, sorts, filters and freezes panes; the Name Box jumps to an address; sheets are tabs at the bottom. Charts, images and pivot tables are not kept. Save draft keeps your edits on this device; Download as also gives this sheet as CSV UTF-8, TSV, Unicode text, JSON or HTML.</p>
         </div>
         <div class="main-content" style="align-items: stretch; min-width: 0;">
             <div id="xlsxEditor" style="height: calc(100vh - 200px); min-height: 500px; width: 100%; min-width: 0;">
@@ -509,10 +605,11 @@
                 <input type="file" id="docxFileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
             </div>
             <div class="export-actions">
+                <button class="action-btn" id="docxDraftBtn" style="flex: 1;" disabled>Save draft</button>
                 <button class="action-btn" id="docxDownloadBtn" style="flex: 1;" disabled>Download .docx</button>
             </div>
-            <p class="help-text" id="docxStatus" style="margin-top: 10px;"></p>
-            <p class="help-text">The document is shown with its own fonts, colours, tables, lists and images. Click any paragraph or table cell to change its text; the formatting around your edit is kept, and new text takes the style of the text before it. Everything else in the file (headers, footers, images, page layout) stays as it was. Headers, footers and text boxes are not shown yet.</p>
+            <p class="help-text" id="docxStatus" role="status" style="margin-top: 10px;"></p>
+            <p class="help-text">The page is editable like Word: the ribbon sets font, size, bold, colour, highlight, alignment, lists, spacing and paragraph styles. Enter starts a new paragraph. Find &amp; export finds and replaces text and exports PDF, .txt, .md or .html. Insert draws text boxes, lines, arrows, rectangles and pen strokes on the page; they are saved as Word drawings. Modify… (or right-click a style) changes a style; ticked styles are remembered in this browser for your other documents. Save draft keeps your edits on this device. Headers and footers are not shown.</p>
         </div>
         <div class="main-content" style="align-items: stretch; min-width: 0;">
             <div id="docxEditor" style="height: calc(100vh - 200px); min-height: 500px; width: 100%; min-width: 0;">
@@ -521,27 +618,60 @@
         </div>
     </div>
 
+    <!-- ========================================== -->
+    <!-- TOOL 6: GANTT CHART CREATOR (js/gantt.js)  -->
+    <!-- ========================================== -->
+    <div id="ganttTool" class="tool-view"></div>
+
+    <!-- ========================================== -->
+    <!-- TOOL 7: MARKDOWN EDITING (js/md-edit.js)   -->
+    <!-- ========================================== -->
+    <div id="mdTool" class="tool-view"></div>
+
+    </main>
+    </div>
+
     <!-- Global Application Logic -->
     <script>
         // --- TAB MANAGEMENT ---
+        // Narrow screens: the top bar scrolls sideways; keep the open tool's tab fully in view, clear of the bar's padding.
+        function showTab(b) {
+            const s = b.closest('.side'); if (s.scrollWidth <= s.clientWidth) return;
+            const r = b.getBoundingClientRect(), sr = s.getBoundingClientRect();
+            if (r.right > sr.right - 12) s.scrollLeft += r.right - sr.right + 12; else if (r.left < sr.left + 12) s.scrollLeft -= sr.left + 12 - r.left;
+        }
         function switchTab(tabId, btnElement) {
             // Update active states for views
             document.querySelectorAll('.tool-view').forEach(view => view.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             
             // Update active states for buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => { btn.classList.remove('active'); btn.setAttribute('aria-selected', 'false'); });
             btnElement.classList.add('active');
+            btnElement.setAttribute('aria-selected', 'true');
+            showTab(btnElement);
+            // The open tool is in the address (#pdf, #gantt …), so a link or a reload opens it again.
+            const hash = '#' + tabId.replace(/Tool$/, '');
+            if (location.hash !== hash) history.replaceState(null, '', hash);
         }
+
+        // Tool names as tooltips: on narrow screens only the open tool shows its name.
+        document.querySelectorAll('.tab-btn').forEach((b) => { b.title = b.querySelector('span').textContent; });
+        // Open the tool named in the address (#svg, #word, #pdf, #gantt, #xlsx, #docx, #md).
+        (() => { const b = document.querySelector(`[aria-controls="${location.hash.slice(1)}Tool"]`); if (b) switchTab(b.getAttribute('aria-controls'), b); })();
+        // Web fonts widen the tab names after the first layout: keep the open tool in view once they have loaded.
+        const keepTab = () => showTab(document.querySelector('.tab-btn.active'));
+        document.fonts?.ready.then(keepTab); addEventListener('load', keepTab);
 
         // ==========================================
         // TOOL 1 LOGIC: EXCEL TO SVG (Original Code)
         // ==========================================
-        const themeColors = ["#1b4965", "#5fa8d3", "#62b6cb", "#bee9e8", "#cae9ff"];
-        const treemapColors = ["#1b4965", "#3a7a9e", "#5fa8d3", "#62b6cb", "#8fcad6", "#bee9e8", "#cae9ff"];
+        // Chart colours follow the site theme (js/themes.js calls applyChartTheme); these are the default theme's.
+        let themeColors = ["#1b4965", "#5fa8d3", "#62b6cb", "#bee9e8", "#cae9ff"];
+        let treemapColors = ["#1b4965", "#3a7a9e", "#5fa8d3", "#62b6cb", "#8fcad6", "#bee9e8", "#cae9ff"];
         const themeBg = "#ffffff";
-        const themeFg = "#1b4965";
-        const themeFont = "'LINE Seed Sans TH', 'LINE Seed TH', sans-serif";
+        let themeFg = "#1b4965";
+        let themeFont = "'LINE Seed Sans TH', 'LINE Seed TH', sans-serif"; // set by the Chart font select (module script below)
 
         let rawData = [];
         let filteredData = [];
@@ -563,6 +693,9 @@
         
         const labelPositionSelect = document.getElementById('labelPosition');
         const dashXAxisCheckbox = document.getElementById('dashXAxis');
+        const gradientCheckbox = document.getElementById('gradientFill');
+        try { gradientCheckbox.checked = localStorage.getItem('chart-gradient') === '1'; } catch { /* storage off */ }
+        gradientCheckbox.addEventListener('change', () => { try { localStorage.setItem('chart-gradient', gradientCheckbox.checked ? '1' : '0'); } catch { /* not kept */ } });
         const dynamicFiltersContainer = document.getElementById('dynamicFilters');
         const exportSvgBtn = document.getElementById('exportSvgBtn');
         const labelFontSizeInput = document.getElementById('labelFontSize');
@@ -571,29 +704,46 @@
         const legendFontColorInput = document.getElementById('legendFontColor');
 
         function createPresets(container, inputElement) {
+            container.replaceChildren();
             themeColors.forEach(color => {
                 const swatch = document.createElement('div');
                 swatch.className = 'color-swatch';
                 swatch.style.backgroundColor = color;
                 swatch.addEventListener('click', () => {
                     inputElement.value = color;
-                    updateChart();
+                    inputElement.dispatchEvent(new Event('change')); // redraws the chart and updates the HEX field
                 });
                 container.appendChild(swatch);
             });
         }
         createPresets(presets1, val1ColorInput);
         createPresets(presets2, val2ColorInput);
+        // A theme sets the preset swatches and the colour values: series 1 and 2, label and legend text.
+        window.setChartFont = (family) => { themeFont = family; if (typeof rawData !== 'undefined' && rawData.length) updateChart(); };
+        window.applyChartTheme = (t) => {
+            themeColors = t.presets || t.chart.slice(0, 5);
+            treemapColors = t.chart.slice();
+            themeFg = t.ink;
+            createPresets(presets1, val1ColorInput);
+            createPresets(presets2, val2ColorInput);
+            [[val1ColorInput, t.chart[0]], [val2ColorInput, t.chart[1]], [labelFontColorInput, t.ink], [legendFontColorInput, t.ink]]
+                .forEach(([el, c]) => { el.value = c; el.dispatchEvent(new Event('change')); });
+        };
 
         fileInput.addEventListener('change', handleFileUpload);
         
         const updateTriggers = [
             chartTypeSelect, xAxisSelect, yAxisSelect, yAxis2Select, 
             val1ColorInput, val2ColorInput, labelPositionSelect, 
-            dashXAxisCheckbox, labelFontSizeInput, labelFontColorInput, 
+            dashXAxisCheckbox, gradientCheckbox, labelFontSizeInput, labelFontColorInput, 
             legendFontSizeInput, legendFontColorInput
         ];
         
+        // Colour boxes redraw live while their colour is dragged (scrubbed), at most once a frame.
+        let liveFrame = 0;
+        [val1ColorInput, val2ColorInput, labelFontColorInput, legendFontColorInput].forEach(el => el.addEventListener('input', () => {
+            cancelAnimationFrame(liveFrame); liveFrame = requestAnimationFrame(updateChart);
+        }));
         updateTriggers.forEach(el => {
             el.addEventListener('change', () => {
                 if(el === chartTypeSelect) {
@@ -898,173 +1048,28 @@
                 }
             };
 
-            Plotly.newPlot('chart', traces, layout, {responsive: true, displayModeBar: false});
-        }
-
-        function exportSVG() {
-            Plotly.downloadImage('chart', {
-                format: 'svg',
-                width: 1000,
-                height: 700,
-                filename: 'analytics_chart_export'
+            const gd = document.getElementById('chart');
+            Plotly.newPlot(gd, traces, layout, {responsive: true, displayModeBar: false}).then(() => {
+                // Gradient fill (js/gradient.js): Plotly redraws on resize, so it is applied again after every draw.
+                gd.removeAllListeners?.('plotly_afterplot');
+                const paint = () => { if (gradientCheckbox.checked) window.chartGradient?.(gd.querySelector('.main-svg')); };
+                gd.on('plotly_afterplot', paint); paint();
             });
         }
 
-        // ==========================================
-        // TOOL 2 LOGIC: EXCEL TO WORD TABLE
-        // ==========================================
-        let wordWorkbook = null;
-        
-        const wordFileInput = document.getElementById('wordFileInput');
-        const sheetSelector = document.getElementById('sheetSelector');
-        const defineHeaderCheckbox = document.getElementById('defineHeader');
-        const wordTableOutput = document.getElementById('wordTableOutput');
-        
-        const copyTableBtn = document.getElementById('copyTableBtn');
-        const exportDocxBtn = document.getElementById('exportDocxBtn');
-
-        wordFileInput.addEventListener('change', handleWordFileUpload);
-        sheetSelector.addEventListener('change', renderWordTable);
-        defineHeaderCheckbox.addEventListener('change', renderWordTable);
-        
-        copyTableBtn.addEventListener('click', copyTableToClipboard);
-        exportDocxBtn.addEventListener('click', exportToDocx);
-
-        function handleWordFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                wordWorkbook = XLSX.read(data, {type: 'array'});
-                
-                // Populate Sheet Selector
-                sheetSelector.innerHTML = '';
-                wordWorkbook.SheetNames.forEach(sheetName => {
-                    sheetSelector.add(new Option(sheetName, sheetName));
-                });
-                
-                if(wordWorkbook.SheetNames.length > 0) {
-                    renderWordTable();
-                }
-            };
-            reader.readAsArrayBuffer(file);
+        async function exportSVG() {
+            const opts = { format: 'svg', width: 1000, height: 700, filename: 'analytics_chart_export' };
+            if (!gradientCheckbox.checked || !window.chartGradient) return Plotly.downloadImage('chart', opts);
+            // Plotly draws the export afresh, so the gradient goes into the exported SVG before it is saved.
+            const url = await Plotly.toImage('chart', opts);
+            const doc = new DOMParser().parseFromString(decodeURIComponent(url.slice(url.indexOf(',') + 1)), 'image/svg+xml');
+            window.chartGradient(doc.documentElement);
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(doc)], { type: 'image/svg+xml' }));
+            a.download = opts.filename + '.svg'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
         }
 
-        function renderWordTable() {
-            if (!wordWorkbook) return;
-            
-            const selectedSheet = sheetSelector.value;
-            const worksheet = wordWorkbook.Sheets[selectedSheet];
-            
-            // Get array data formatted as strings to preserve Excel number/percentage formatting (raw: false)
-            let rawArrayData = XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: false});
-            
-            if(rawArrayData.length === 0) {
-                wordTableOutput.innerHTML = '<p style="color:#666; text-align:center;">Sheet is empty.</p>';
-                return;
-            }
-
-            // 1. Filter out completely empty rows
-            rawArrayData = rawArrayData.filter(row => 
-                row.some(cell => cell !== undefined && cell !== null && cell.toString().trim() !== "")
-            );
-
-            // 2. Find the actual maximum number of columns that contain data
-            let maxCols = 0;
-            rawArrayData.forEach(row => {
-                if (row.length > maxCols) {
-                    maxCols = row.length;
-                }
-            });
-
-            const useHeader = defineHeaderCheckbox.checked;
-            
-            let html = '<table class="plain-html-table">';
-            
-            rawArrayData.forEach((row, index) => {
-                html += '<tr>';
-                
-                // 3. Iterate only up to the highest column index containing data
-                for (let i = 0; i < maxCols; i++) {
-                    const cellValue = (row[i] !== undefined && row[i] !== null) ? row[i] : "";
-                    
-                    if (index === 0 && useHeader) {
-                        html += `<th>${cellValue}</th>`;
-                    } else {
-                        html += `<td>${cellValue}</td>`;
-                    }
-                }
-                
-                html += '</tr>';
-            });
-            
-            html += '</table>';
-            wordTableOutput.innerHTML = html;
-        }
-
-        async function copyTableToClipboard() {
-            const tableEl = wordTableOutput.querySelector('table');
-            if (!tableEl) {
-                alert('No table available to copy.');
-                return;
-            }
-
-            try {
-                // We use ClipboardItem to strictly declare it as HTML so Word reads the styling
-                const htmlStr = tableEl.outerHTML;
-                const blobHtml = new Blob([htmlStr], { type: "text/html" });
-                const blobText = new Blob([tableEl.innerText], { type: "text/plain" });
-
-                const data = [new ClipboardItem({
-                    ["text/html"]: blobHtml,
-                    ["text/plain"]: blobText
-                })];
-
-                await navigator.clipboard.write(data);
-                alert('Table successfully copied! You can now paste it into Microsoft Word.');
-            } catch (err) {
-                // Fallback for older browsers
-                const selection = window.getSelection();
-                const range = document.createRange();
-                range.selectNodeContents(tableEl);
-                selection.removeAllRanges();
-                selection.addRange(range);
-                
-                try {
-                    document.execCommand('copy');
-                    alert('Table copied (using fallback method)! Paste into Word.');
-                } catch (e) {
-                    alert('Copy failed. Please select the table manually and press Ctrl+C.');
-                }
-                selection.removeAllRanges();
-            }
-        }
-
-        function exportToDocx() {
-            const tableEl = wordTableOutput.querySelector('table');
-            if (!tableEl) {
-                alert('No table available to export.');
-                return;
-            }
-
-            // Word-specific XML and HTML headers required to enforce a document view
-            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Exported Table</title></head><body>";
-            const footer = "</body></html>";
-            
-            const sourceHTML = header + tableEl.outerHTML + footer;
-            
-            const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
-            const fileDownload = document.createElement("a");
-            
-            document.body.appendChild(fileDownload);
-            fileDownload.href = source;
-            // .doc extension is universally readable by MS Word without throwing HTML corruption errors
-            fileDownload.download = 'Table_Export.doc'; 
-            fileDownload.click();
-            document.body.removeChild(fileDownload);
-        }
+        // Tool 2 (Excel to Word table): js/word-table.js
     </script>
 
     <!-- TOOL 3-5 LOGIC: PDF EDITING (editor module from TUSUFinanceFeedback), EXCEL and WORD EDITING (prototypes) -->
@@ -1072,6 +1077,33 @@
         import { openPdfEditor, MAX_BYTES } from './js/pdf-markup.js';
         import { openXlsxEditor } from './js/xlsx-edit.js';
         import { openDocxEditor } from './js/docx-edit.js';
+        import { pairHex } from './js/hex-color.js';
+        import { actionMenu } from './js/view-tools.js';
+        import { openMd } from './js/md-edit.js';
+        import { openGantt } from './js/gantt.js';
+        import { openWordTable } from './js/word-table.js';
+        import { gradientize } from './js/gradient.js';
+        window.chartGradient = gradientize;
+        import { viewControls, currentTheme, CHART_FONTS, fontStack } from './js/themes.js';
+        // Chart font for Excel to SVG: kept in this browser; its faces load before the chart redraws.
+        {
+            const sel = document.getElementById('chartFont');
+            sel.innerHTML = CHART_FONTS.map((f) => `<option>${f}</option>`).join('');
+            let saved = null; try { saved = localStorage.getItem('chart-font'); } catch { /* storage off */ }
+            if (CHART_FONTS.includes(saved)) sel.value = saved;
+            const apply = async () => {
+                await Promise.all(['400', '700'].map((w) => document.fonts.load(`${w} 14px "${sel.value}"`).catch(() => {})));
+                window.setChartFont(fontStack(sel.value));
+            };
+            sel.addEventListener('change', () => { try { localStorage.setItem('chart-font', sel.value); } catch { /* not kept */ } apply(); });
+            apply();
+        }
+        viewControls(document.getElementById('modePick'), document.getElementById('chartPick'));
+        // The chart tool takes the theme's colour values now and whenever the theme changes.
+        window.applyChartTheme(currentTheme());
+        addEventListener('site-theme', (e) => window.applyChartTheme(e.detail));
+        // Every chart colour box also takes a HEX code.
+        document.querySelectorAll('#svgTool input[type="color"]').forEach(pairHex);
 
         const $ = (id) => document.getElementById(id);
         const status = (t) => { $('pdfStatus').textContent = t; };
@@ -1099,6 +1131,7 @@
                 editor = await openPdfEditor($('pdfEditor'), { bytes, name: f.name, draft });
                 status(`${f.name} · ${mb(bytes.byteLength)}${draft ? ' · draft restored' : ''}`);
                 $('pdfDraftBtn').disabled = false; $('pdfDownloadBtn').disabled = false;
+                barActions($('pdfEditor'), 'mk', () => $('pdfDraftBtn').click(), () => $('pdfDownloadBtn').click());
             } catch (err) { editor = null; status(err.message); console.error(err); }
         };
 
@@ -1118,36 +1151,78 @@
             finally { $('pdfDownloadBtn').disabled = false; }
         };
 
+        // Save draft and Download in each editor's own bar (they work in full screen); `more` lists other formats,
+        // shown as a menu under the bar's Download button.
+        function barActions(root, p, onDraft, onDownload, more = null) {
+            const d = root.querySelector(`#${p}-draft`), dl = root.querySelector(`#${p}-dl`);
+            if (d) d.onclick = onDraft;
+            if (!dl) return;
+            if (!more) { dl.onclick = onDownload; return; }
+            dl.onclick = () => actionMenu(dl, more, onDownload);
+        }
+
+        // Excel and Word drafts: the edited file itself, kept in this browser (IndexedDB: files can be several MB).
+        const drafts = {
+            db: null,
+            open() { return this.db ||= new Promise((res, rej) => { const q = indexedDB.open('tusu-drafts', 1); q.onupgradeneeded = () => q.result.createObjectStore('files'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
+            async run(mode, fn) { const db = await this.open(); return new Promise((res, rej) => { const tx = db.transaction('files', mode); const q = fn(tx.objectStore('files')); tx.oncomplete = () => res(q?.result); tx.onerror = () => rej(tx.error); }); },
+            get(key) { return this.run('readonly', (s) => s.get(key)).catch(() => null); },
+            put(key, v) { return this.run('readwrite', (s) => s.put(v, key)); },
+        };
+
         // Excel and Word tabs: open a file, edit, download an edited copy (the original is never changed).
         const office = {};
+        const XLSX_FORMATS = [['xlsx', 'Excel workbook (.xlsx)', 'Every sheet, formatting and formulas'], ['csv', 'CSV UTF-8 (.csv)', 'This sheet, comma-separated, as shown'],
+            ['tsv', 'Tab-separated (.tsv)', 'This sheet, as shown'], ['utf16', 'Unicode text (.txt)', 'This sheet, tab-separated, UTF-16'],
+            ['json', 'JSON (.json)', 'This sheet, header row as keys'], ['html', 'Web page (.html)', 'This sheet as a table']];
         function bindOffice(kind, open, mime) {
             const say = (t) => { $(`${kind}Status`).textContent = t; };
-            const btn = $(`${kind}DownloadBtn`);
-            let name = '';
+            const btn = $(`${kind}DownloadBtn`); const draftBtn = $(`${kind}DraftBtn`); const fmt = $(`${kind}Format`);
+            let name = ''; let key = '';
             $(`${kind}FileInput`).onchange = async (e) => {
                 const f = e.target.files[0]; e.target.value = '';
                 if (!f) return;
                 if (office[kind]?.isDirty() && !confirm('You have unsaved changes. Open another file anyway?')) return;
-                name = f.name; btn.disabled = true; say(`Opening ${f.name} (${mb(f.size)})…`);
+                name = f.name; key = `${kind}:${f.name}:${f.size}`; btn.disabled = true; draftBtn.disabled = true; say(`Opening ${f.name} (${mb(f.size)})…`);
+                let bytes = await f.arrayBuffer(); let fromDraft = false;
+                const d = await drafts.get(key);
+                if (d && confirm(`A draft of ${f.name} saved on ${new Date(d.at).toLocaleString()} is on this device. Open the draft?\n\nCancel opens the file as uploaded.`)) { bytes = d.bytes; fromDraft = true; }
                 try {
-                    office[kind] = await open($(`${kind}Editor`), await f.arrayBuffer());
-                    say(`${f.name} · ${mb(f.size)}`); btn.disabled = false;
+                    office[kind] = await open($(`${kind}Editor`), bytes);
+                    say(`${f.name} · ${mb(f.size)}${fromDraft ? ' · draft restored' : ''}`); btn.disabled = false; draftBtn.disabled = false;
+                    barActions($(`${kind}Editor`), kind === 'xlsx' ? 'xe' : 'de', () => draftBtn.click(), (v) => { if (v && fmt) fmt.value = v; btn.click(); }, kind === 'xlsx' ? XLSX_FORMATS : null);
                 } catch (err) { office[kind] = null; say(err.message); console.error(err); }
+            };
+            draftBtn.onclick = async () => {
+                draftBtn.disabled = true; say('Saving the draft…');
+                try { const out = await office[kind].save(); await drafts.put(key, { bytes: out, at: Date.now() }); say(`Draft saved on this device (${mb(out.byteLength)}). Open the same file again to continue from it.`); }
+                catch (err) { say(`Could not save the draft: ${err.message}`); console.error(err); }
+                finally { draftBtn.disabled = false; }
             };
             btn.onclick = async () => {
                 btn.disabled = true; say('Writing the edited file…');
                 try {
-                    const out = await office[kind].save();
-                    download(out, name.replace(/\.[^.]+$/, '') + ` (edited).${kind}`, mime);
-                    say(`Edited file downloaded (${mb(out.byteLength)})`);
+                    const base = name.replace(/\.[^.]+$/, '');
+                    if (fmt && fmt.value !== 'xlsx') {
+                        const x = office[kind].exportAs(fmt.value);
+                        download(x.data, `${base} - ${x.sheet}.${x.ext}`.replace(/[\\/:*?"<>|]/g, '_'), x.mime);
+                        say(`${x.sheet} downloaded as .${x.ext}`);
+                    } else {
+                        const out = await office[kind].save();
+                        download(out, base + ` (edited).${kind}`, mime);
+                        say(`Edited file downloaded (${mb(out.byteLength)})`);
+                    }
                 } catch (err) { say(err.message); console.error(err); }
                 finally { btn.disabled = false; }
             };
         }
+        openGantt($('ganttTool'), { download });
+        const md = openMd($('mdTool'), { download });
+        openWordTable($('wordTool'), { download });
         bindOffice('xlsx', openXlsxEditor, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         bindOffice('docx', openDocxEditor, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
-        addEventListener('beforeunload', (e) => { if (editor?.isDirty() || office.xlsx?.isDirty() || office.docx?.isDirty()) e.preventDefault(); });
+        addEventListener('beforeunload', (e) => { if (editor?.isDirty() || office.xlsx?.isDirty() || office.docx?.isDirty() || md.isDirty()) e.preventDefault(); });
     </script>
 </body>
 </html>

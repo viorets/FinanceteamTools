@@ -1,0 +1,504 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10T22:25:54+07:00",
+  "title": "Design System: TUSU Finance Team Tools",
+  "extensions": {
+    "colorMeta": {
+      "deep-navy": {
+        "role": "primary",
+        "displayName": "Deep Navy",
+        "canonical": "#1b4965",
+        "tonalRamp": [
+          "#192933",
+          "#274a5f",
+          "#316c90",
+          "#368fc6",
+          "#68a7cd",
+          "#9abfd6",
+          "#c7d9e4",
+          "#eff3f6"
+        ]
+      },
+      "deep-navy-hover": {
+        "role": "primary",
+        "displayName": "Deep Navy (hover)",
+        "canonical": "#24597a",
+        "tonalRamp": [
+          "#1a2932",
+          "#294a5e",
+          "#346b8d",
+          "#3a8dc1",
+          "#6ba6ca",
+          "#9cbfd4",
+          "#c7d8e3",
+          "#eff3f5"
+        ]
+      },
+      "tusu-teal": {
+        "role": "primary",
+        "displayName": "TUSU Teal",
+        "canonical": "#00758f",
+        "tonalRamp": [
+          "#10343c",
+          "#136274",
+          "#0e95b3",
+          "#01cdfa",
+          "#44d2f2",
+          "#84d9ec",
+          "#bce5ee",
+          "#ecf6f8"
+        ]
+      },
+      "sky-accent": {
+        "role": "secondary",
+        "displayName": "Sky Accent",
+        "canonical": "#5fa8d3",
+        "tonalRamp": [
+          "#1a2a33",
+          "#284b5f",
+          "#326d8f",
+          "#3790c5",
+          "#69a8cc",
+          "#9ac0d6",
+          "#c7d9e3",
+          "#eff3f6"
+        ]
+      },
+      "lagoon-border": {
+        "role": "secondary",
+        "displayName": "Lagoon Border",
+        "canonical": "#62b6cb",
+        "tonalRamp": [
+          "#1b2d31",
+          "#2b525c",
+          "#37798a",
+          "#3fa3bc",
+          "#6fb5c7",
+          "#9ec8d2",
+          "#c9dde2",
+          "#eff4f5"
+        ]
+      },
+      "mist-tint": {
+        "role": "neutral",
+        "displayName": "Mist Tint",
+        "canonical": "#e6f2f8",
+        "tonalRamp": [
+          "#1a2a33",
+          "#284c5f",
+          "#32708f",
+          "#3895c4",
+          "#6aabcc",
+          "#9bc2d5",
+          "#c7dae3",
+          "#eff3f6"
+        ]
+      },
+      "morning-bg": {
+        "role": "neutral",
+        "displayName": "Morning Background",
+        "canonical": "#f0f7fa",
+        "tonalRamp": [
+          "#1b2b31",
+          "#2b4d5c",
+          "#37718a",
+          "#3f97bc",
+          "#6facc6",
+          "#9ec2d2",
+          "#c9dae2",
+          "#eff3f5"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#262626",
+          "#434343",
+          "#616161",
+          "#7e7e7e",
+          "#9b9b9b",
+          "#b8b8b8",
+          "#d5d5d5",
+          "#f2f2f2"
+        ]
+      },
+      "quiet-fill": {
+        "role": "neutral",
+        "displayName": "Quiet Fill",
+        "canonical": "#eef5f8",
+        "tonalRamp": [
+          "#1d2a2f",
+          "#2f4b58",
+          "#3e6e83",
+          "#4a92b2",
+          "#76a9bf",
+          "#a2c1ce",
+          "#cbd9e0",
+          "#f0f3f5"
+        ]
+      },
+      "slate-ink": {
+        "role": "neutral",
+        "displayName": "Slate Ink",
+        "canonical": "#3d5a6c",
+        "tonalRamp": [
+          "#20282c",
+          "#364751",
+          "#4a6677",
+          "#5b86a0",
+          "#83a1b3",
+          "#a9bbc6",
+          "#ced7dc",
+          "#f1f3f4"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#d5e3e9",
+        "tonalRamp": [
+          "#1f292d",
+          "#344952",
+          "#476b7a",
+          "#578da5",
+          "#80a6b6",
+          "#a8bec8",
+          "#cdd8dd",
+          "#f0f3f4"
+        ]
+      },
+      "alert-red": {
+        "role": "error",
+        "displayName": "Alert Red",
+        "canonical": "#b3261e",
+        "tonalRamp": [
+          "#361816",
+          "#662521",
+          "#9b2c26",
+          "#d72e25",
+          "#d9635d",
+          "#dd9793",
+          "#e7c5c3",
+          "#f6efee"
+        ]
+      },
+      "alert-tint": {
+        "role": "error",
+        "displayName": "Alert Tint",
+        "canonical": "#fdecee",
+        "tonalRamp": [
+          "#381419",
+          "#6b1c25",
+          "#a31e2d",
+          "#e31931",
+          "#e15465",
+          "#e28e98",
+          "#e9c1c6",
+          "#f7eeef"
+        ]
+      },
+      "sheet-green": {
+        "role": "tertiary",
+        "displayName": "Sheet Green",
+        "canonical": "#1a7f45",
+        "tonalRamp": [
+          "#183524",
+          "#23633f",
+          "#2a9758",
+          "#2bd071",
+          "#61d492",
+          "#96dab3",
+          "#c5e6d3",
+          "#eef6f2"
+        ]
+      },
+      "night-black": {
+        "role": "neutral",
+        "displayName": "Night Black",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "#262626",
+          "#434343",
+          "#616161",
+          "#7e7e7e",
+          "#9b9b9b",
+          "#b8b8b8",
+          "#d5d5d5",
+          "#f2f2f2"
+        ]
+      },
+      "night-surface": {
+        "role": "neutral",
+        "displayName": "Night Surface",
+        "canonical": "#1c1c1e",
+        "tonalRamp": [
+          "#252527",
+          "#424245",
+          "#5e5e63",
+          "#797982",
+          "#98989e",
+          "#b6b6ba",
+          "#d4d4d6",
+          "#f2f2f2"
+        ]
+      },
+      "night-raised": {
+        "role": "neutral",
+        "displayName": "Night Raised",
+        "canonical": "#2c2c2e",
+        "tonalRamp": [
+          "#262627",
+          "#424244",
+          "#5f5f62",
+          "#7b7b80",
+          "#99999d",
+          "#b7b7b9",
+          "#d5d5d6",
+          "#f2f2f2"
+        ]
+      },
+      "night-ink": {
+        "role": "neutral",
+        "displayName": "Night Ink",
+        "canonical": "#f5f5f7",
+        "tonalRamp": [
+          "#242429",
+          "#3e3e49",
+          "#57576a",
+          "#70708c",
+          "#9191a5",
+          "#b2b2be",
+          "#d2d2d8",
+          "#f2f2f3"
+        ]
+      },
+      "night-ink-2": {
+        "role": "neutral",
+        "displayName": "Night Ink 2",
+        "canonical": "#a1a1a6",
+        "tonalRamp": [
+          "#262627",
+          "#424245",
+          "#5e5e63",
+          "#7a7a81",
+          "#98989d",
+          "#b7b7b9",
+          "#d4d4d6",
+          "#f2f2f2"
+        ]
+      },
+      "night-border": {
+        "role": "neutral",
+        "displayName": "Night Border",
+        "canonical": "#38383a",
+        "tonalRamp": [
+          "#262627",
+          "#434344",
+          "#5f5f62",
+          "#7b7b80",
+          "#99999c",
+          "#b7b7b9",
+          "#d5d5d6",
+          "#f2f2f2"
+        ]
+      },
+      "night-border-strong": {
+        "role": "neutral",
+        "displayName": "Night Border Strong",
+        "canonical": "#545458",
+        "tonalRamp": [
+          "#262627",
+          "#424245",
+          "#5f5f62",
+          "#7b7b81",
+          "#99999d",
+          "#b7b7b9",
+          "#d5d5d6",
+          "#f2f2f2"
+        ]
+      },
+      "night-alert": {
+        "role": "error",
+        "displayName": "Night Alert",
+        "canonical": "#ff453a",
+        "tonalRamp": [
+          "#3c1310",
+          "#741813",
+          "#b3170e",
+          "#fa0f01",
+          "#f24d44",
+          "#ec8a84",
+          "#eebfbc",
+          "#f8edec"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section titles inside tools (Prompt 700)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Brand line in the side navigation."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Navigation, buttons, inputs (16px for inputs)."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Form labels above fields."
+      },
+      "ribbon-label": {
+        "displayName": "Ribbon label",
+        "purpose": "Group names under ribbon groups."
+      },
+      "output": {
+        "displayName": "Output",
+        "purpose": "Text inside exported charts, Gantt charts and PDF text boxes."
+      }
+    },
+    "shadows": [
+      {
+        "name": "glass-ambient",
+        "value": "inset 0 1px 0 rgba(255,255,255,.85), 0 8px 32px rgba(0,45,55,.10), 0 1px 2px rgba(0,45,55,.06)",
+        "purpose": "Every glass surface: rim on the top edge plus one soft ambient shadow."
+      },
+      {
+        "name": "work-area",
+        "value": "0 8px 32px rgba(0,45,55,.08), 0 1px 2px rgba(0,45,55,.05)",
+        "purpose": "The solid tool work area."
+      },
+      {
+        "name": "page-on-desk",
+        "value": "0 2px 10px rgba(0,0,0,.15)",
+        "purpose": "Word and PDF pages inside an editor."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-change",
+        "value": "0.18s ease-out",
+        "purpose": "Hover and selected fills on navigation and buttons; removed under reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stack-panels",
+        "value": "1279px"
+      },
+      {
+        "name": "top-nav",
+        "value": "900px"
+      }
+    ],
+    "glass": {
+      "blur": "blur(16px) saturate(160%)",
+      "tintLight": "linear-gradient(135deg, rgba(255,255,255,.74), rgba(229,240,241,.58))",
+      "tintDark": "linear-gradient(135deg, rgba(44,44,46,.62), rgba(28,28,30,.55))",
+      "solidFallbackLight": "#f4fafb",
+      "solidFallbackDark": "#1c1c1e"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one strong action in an options panel (Download, Save draft).",
+      "html": "<button class=\"ds-btn-primary\">Download</button>",
+      "css": ".ds-btn-primary{background:#1b4965;color:#fff;border:0;border-radius:10px;padding:12px 24px;font:600 15px -apple-system,\"Segoe UI\",\"Noto Sans Thai\",sans-serif;cursor:pointer;transition:background-color .2s}.ds-btn-primary:hover{background:#24597a}.ds-btn-primary:focus-visible{outline:2px solid #5fa8d3;outline-offset:2px}"
+    },
+    {
+      "name": "Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "A tool in the side navigation; the open tool is filled Deep Navy.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-i ds-on\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M3 9h18M3 15h18M9 3v18\"/></svg><span>Excel Editing</span><span class=\"ds-beta\">beta</span></button><button class=\"ds-nav-i\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M3 4v16h18\"/><path d=\"M7 8h6M10 12h8M8 16h5\"/></svg><span>Gantt Chart Creator</span></button></nav>",
+      "css": ".ds-nav{display:grid;gap:4px;width:240px}.ds-nav-i{display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 12px;border:0;border-radius:10px;background:none;color:#1b4965;font:15px -apple-system,\"Segoe UI\",\"Noto Sans Thai\",sans-serif;text-align:left;cursor:pointer;transition:background-color .18s ease-out}.ds-nav-i:hover:not(.ds-on){background:#e6f2f8}.ds-nav-i.ds-on{background:#1b4965;color:#fff;font-weight:600}.ds-nav-i:focus-visible{outline:2px solid #5fa8d3;outline-offset:2px}.ds-beta{margin-left:auto;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:400;background:#e6f2f8;color:#1b4965}.ds-on .ds-beta{background:rgba(255,255,255,.2);color:#fff}"
+    },
+    {
+      "name": "Ribbon",
+      "kind": "custom",
+      "refersTo": "ribbon-button",
+      "description": "Signature editor toolbar: tabs, then groups of icon buttons with a small group label, on glass.",
+      "html": "<div class=\"ds-rb\"><div class=\"ds-rb-tabs\"><button class=\"ds-rb-tab ds-on\">Home</button><button class=\"ds-rb-tab\">Insert</button><button class=\"ds-rb-tab\">View</button></div><div class=\"ds-rb-pan\"><div class=\"ds-rb-grp\"><div class=\"ds-rb-items\"><button class=\"ds-rb-btn\" aria-pressed=\"true\"><b style=\"font:700 15px Georgia,serif\">B</b></button><button class=\"ds-rb-btn\"><i style=\"font:italic 15px Georgia,serif\">I</i></button><button class=\"ds-rb-btn\"><u style=\"font:15px Georgia,serif\">U</u></button></div><span class=\"ds-rb-l\">Font</span></div><div class=\"ds-rb-grp\"><div class=\"ds-rb-items\"><button class=\"ds-rb-btn\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M3 6h18M3 12h12M3 18h16\"/></svg></button><button class=\"ds-rb-btn\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M3 6h18M6 12h12M4 18h16\"/></svg></button></div><span class=\"ds-rb-l\">Alignment</span></div></div></div>",
+      "css": ".ds-rb{display:inline-block;padding:8px 12px;border-radius:16px;background:linear-gradient(135deg,rgba(255,255,255,.74),rgba(229,240,241,.58));border:1px solid rgba(255,255,255,.65);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 8px 32px rgba(0,45,55,.10);backdrop-filter:blur(16px) saturate(160%);font-family:-apple-system,\"Segoe UI\",\"Noto Sans Thai\",sans-serif;color:#1b4965}.ds-rb-tabs{display:flex;gap:2px;margin-bottom:4px}.ds-rb-tab{padding:4px 12px;min-height:30px;border:0;border-radius:8px;background:none;color:#3d5a6c;font:13px inherit;cursor:pointer}.ds-rb-tab.ds-on{background:#1b4965;color:#fff;font-weight:600}.ds-rb-pan{display:flex}.ds-rb-grp{display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 8px;border-right:1px solid #d5e3e9}.ds-rb-grp:last-child{border-right:0}.ds-rb-items{display:flex;gap:3px}.ds-rb-btn{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:36px;border:0;border-radius:8px;background:none;color:#1b4965;cursor:pointer}.ds-rb-btn:hover{background:#e6f2f8}.ds-rb-btn[aria-pressed=true]{background:#e6f2f8;box-shadow:inset 0 0 0 1px #62b6cb}.ds-rb-btn:focus-visible,.ds-rb-tab:focus-visible{outline:2px solid #5fa8d3;outline-offset:1px}.ds-rb-l{font-size:10.5px;color:#3d5a6c;line-height:1}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Labelled field in an options panel; 16px text so iPad does not zoom.",
+      "html": "<label class=\"ds-field\"><span>Chart title</span><input class=\"ds-input\" placeholder=\"e.g. Budget plan 2026…\"></label>",
+      "css": ".ds-field{display:grid;gap:4px;width:260px;font:700 12px -apple-system,\"Segoe UI\",\"Noto Sans Thai\",sans-serif;color:#3d5a6c}.ds-input{height:38px;padding:0 10px;border:1px solid #62b6cb;border-radius:8px;background:#fff;color:#1b4965;font:400 16px -apple-system,\"Segoe UI\",\"Noto Sans Thai\",sans-serif}.ds-input:focus-visible{outline:none;box-shadow:0 0 0 2px #5fa8d3}"
+    },
+    {
+      "name": "Glass Panel with Paper",
+      "kind": "card",
+      "refersTo": "document-paper",
+      "description": "The Glass Desk in one view: a glass options panel beside white paper.",
+      "html": "<div class=\"ds-desk\"><div class=\"ds-glass\"><b>Options</b><p>Frosted CI glass</p></div><div class=\"ds-paper\"><b>Document</b><p>Always white paper</p></div></div>",
+      "css": ".ds-desk{display:flex;gap:16px;padding:24px;background:radial-gradient(40vmax 40vmax at 8% 6%,rgba(0,117,143,.22),transparent 70%),linear-gradient(160deg,#f4fafb,#cbe2e9);font-family:-apple-system,\"Segoe UI\",\"Noto Sans Thai\",sans-serif;color:#1b4965}.ds-glass{width:180px;padding:20px;border-radius:16px;background:linear-gradient(135deg,rgba(255,255,255,.74),rgba(229,240,241,.58));border:1px solid rgba(255,255,255,.65);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 8px 32px rgba(0,45,55,.10);backdrop-filter:blur(16px) saturate(160%)}.ds-paper{flex:1;padding:20px;border-radius:16px;background:#fff;border:1px solid #d5e3e9;box-shadow:0 8px 32px rgba(0,45,55,.08),0 1px 2px rgba(0,45,55,.05)}.ds-desk p{margin:6px 0 0;color:#3d5a6c;font-size:13px}"
+    },
+    {
+      "name": "Beta Chip",
+      "kind": "chip",
+      "refersTo": "chip-beta",
+      "description": "Marks a tool still in beta.",
+      "html": "<span class=\"ds-chip\">beta</span>",
+      "css": ".ds-chip{display:inline-block;padding:2px 7px;border-radius:999px;background:#e6f2f8;color:#1b4965;font:11px -apple-system,\"Segoe UI\",sans-serif}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Glass Desk",
+    "overview": "The site is a desk. The tools (side navigation, options panels, editor toolbars, pop-ups) are sheets of frosted glass tinted with the team's CI, resting over a calm teal backdrop. The work itself (PDF pages, Word pages, Excel grids, charts, the Markdown preview) is solid white paper in the middle of the desk, in both light and dark mode, because that is what the output will look like in a report. The glass frames the paper; it never covers it.\n\nThe mood is calm and precise. Controls have soft 8–16px corners and quiet hairline borders, each panel has one strong primary action in Deep Navy, and the interface keeps its voice low so the document stays loudest. Density is that of an office tool: ribbons, groups and 36–40px icon buttons. Every control is still finger-sized on iPad.\n\nThai is first-class: Noto Sans Thai sits in every UI font stack, and output files use LINE Seed Sans TH. Dark mode is not a tinted navy; it is black and greys with white controls, in the manner of Apple's product pages.",
+    "keyCharacteristics": [
+      "Frosted, CI-tinted glass for the frame; solid white paper for every document and chart.",
+      "One primary action per panel, in Deep Navy (light) or white (dark).",
+      "Office-style ribbon toolbars that float over the document and stay in place in full screen.",
+      "Soft, consistent corners: 8px controls, 10px buttons, 12px documents, 16px panels.",
+      "Chart colour themes change chart values only, never the interface."
+    ],
+    "rules": [
+      {
+        "name": "The Paper Stays White Rule",
+        "body": "Documents, grids, charts and previews are white (#ffffff) in every appearance mode. Dark mode darkens the desk and the glass, never the paper.",
+        "section": "colors"
+      },
+      {
+        "name": "The Values-Only Theme Rule",
+        "body": "Chart colour themes (TUSU Finance and the 17 others) set chart, Gantt, Word-table and Format-as-table colours. They never recolour the interface tokens.",
+        "section": "colors"
+      },
+      {
+        "name": "The 16px Input Rule",
+        "body": "Every text field, select and textarea is at least 16px so iPad Safari does not zoom when it is focused.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Light Rule",
+        "body": "Light comes from the top: the only highlight is the 1px rim on the top edge of glass. No glows, no coloured shadows.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep every document, grid, chart and preview on white paper (#ffffff) in both modes.",
+      "Do use one Deep Navy primary button per panel; everything else is quiet.",
+      "Do put new editor actions in the floating ribbon, so they also work in full screen.",
+      "Do give every control a 2px Sky Accent focus ring and at least 40px of touch target on iPad.",
+      "Do pair every colour picker with a HEX field.",
+      "Do use LINE Seed Sans TH (or the chosen chart font) for text that goes into an output file."
+    ],
+    "donts": [
+      "Don't let chart colour themes recolour the interface.",
+      "Don't tint dark mode navy: it is black, greys and white controls.",
+      "Don't use the browser's own full-screen API (Edge's scareware blocker flags it); fill the window instead.",
+      "Don't add glows, coloured shadows or gradient text; depth comes from the glass and one ambient shadow.",
+      "Don't set inputs smaller than 16px."
+    ]
+  }
+}

@@ -1,0 +1,108 @@
+/* Interface colours, read by every stylesheet. Appearance (side navigation): Light, Dark or Follow device, set on
+   <html data-mode> by js/themes.js (and by a one-line script in <head> before the page draws). Chart colour themes
+   (theme-factory) change chart colour values only, never these. Documents (PDF pages, Word pages, Excel grids, chart
+   previews) stay white like paper in both modes. UI themes per theme-factory theme are on hold: see the plan doc's
+   "UI themes (on hold)" tab. */
+:root {
+  /* Type as on the Budget Pitching site: system UI font (SF Pro on Apple devices) with Noto Sans Thai; Prompt for headings.
+     Charts, Gantt charts and PDF text boxes keep LINE Seed Sans TH: those are the team's output files. */
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Noto Sans Thai", "Helvetica Neue", system-ui, sans-serif;
+  --font-display: "Prompt", var(--font-family);
+  --bg: #f0f7fa;          /* page */
+  --surface: #ffffff;     /* panels, inputs */
+  --surface-2: #eef5f8;   /* table heads, quiet fills, the desk behind documents */
+  --ink: #1b4965;         /* text, headings */
+  --ink-2: #3d5a6c;       /* secondary text */
+  --primary: #1b4965;     /* primary buttons, open tab */
+  --primary-hover: #24597a;
+  --on-primary: #ffffff;
+  --accent: #5fa8d3;      /* focus rings, secondary marks */
+  --tint: #e6f2f8;        /* hover and selected fills */
+  --border: #d5e3e9;      /* quiet borders, dividers */
+  --border-strong: #62b6cb; /* inputs, panels */
+  --danger: #b3261e;
+  --danger-tint: #fdecee;
+  color-scheme: light;
+  /* Older names used across the page. */
+  --bg-color: var(--bg); --fg-color: var(--ink); --border-color: var(--border-strong);
+  --palette-1: var(--primary); --palette-2: var(--accent); --palette-3: var(--border-strong); --palette-4: var(--border); --palette-5: var(--tint);
+}
+/* Dark: black and greys with white controls, as on Apple's product pages; monochrome, no tint. Chart colours are separate. */
+:root[data-mode="dark"] {
+  --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --ink: #f5f5f7; --ink-2: #a1a1a6;
+  --primary: #f5f5f7; --primary-hover: #ffffff; --on-primary: #000000; --accent: #d1d1d6; --tint: #2c2c2e;
+  --border: #38383a; --border-strong: #545458; --danger: #ff453a; --danger-tint: #3a1d1b; color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-mode="auto"] {
+    --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --ink: #f5f5f7; --ink-2: #a1a1a6;
+    --primary: #f5f5f7; --primary-hover: #ffffff; --on-primary: #000000; --accent: #d1d1d6; --tint: #2c2c2e;
+    --border: #38383a; --border-strong: #545458; --danger: #ff453a; --danger-tint: #3a1d1b; color-scheme: dark;
+  }
+}
+
+/* ---------- Tinted glass frame ----------
+   Frosted, CI-tinted glass on the frame only: side navigation, tool options panels, editor toolbars, the chart colour
+   pop-up. Documents, charts and tables stay solid white paper. Glass needs colour behind it, so a calm CI backdrop
+   (gradient + three soft shapes, painted with radial gradients: no blur filter) sits fixed behind the page. One light
+   direction (from the top): a bright rim on the top edge. Without backdrop-filter, or when the device asks for less
+   transparency, the glass turns solid. */
+:root {
+  --glass-tint: linear-gradient(135deg, rgba(255, 255, 255, .74), rgba(229, 240, 241, .58));
+  --glass-blur: blur(16px) saturate(160%);
+  --glass-border: rgba(255, 255, 255, .65);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .85);
+  --glass-shadow: 0 8px 32px rgba(0, 45, 55, .10), 0 1px 2px rgba(0, 45, 55, .06);
+  --glass-solid: #f4fafb;
+  --backdrop:
+    radial-gradient(42vmax 42vmax at 8% 6%, rgba(0, 117, 143, .22), transparent 70%),
+    radial-gradient(38vmax 38vmax at 92% 42%, rgba(77, 159, 177, .25), transparent 70%),
+    radial-gradient(46vmax 36vmax at 40% 108%, rgba(1, 69, 85, .14), transparent 70%),
+    linear-gradient(160deg, #f4fafb, #e5f0f1 45%, #cbe2e9);
+}
+:root[data-mode="dark"] {
+  --glass-tint: linear-gradient(135deg, rgba(44, 44, 46, .62), rgba(28, 28, 30, .55));
+  --glass-blur: blur(20px) saturate(120%);
+  --glass-border: rgba(255, 255, 255, .09);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, .55);
+  --glass-solid: #1c1c1e;
+  --glass-bar-tint: linear-gradient(135deg, rgba(36, 36, 38, .94), rgba(22, 22, 24, .92)); /* bars float over white paper */
+  --backdrop:
+    radial-gradient(48vmax 40vmax at 50% -12%, rgba(255, 255, 255, .07), transparent 70%),
+    radial-gradient(40vmax 40vmax at 100% 100%, rgba(255, 255, 255, .03), transparent 70%),
+    linear-gradient(180deg, #0a0a0a, #000 60%);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-mode="auto"] {
+    --glass-tint: linear-gradient(135deg, rgba(44, 44, 46, .62), rgba(28, 28, 30, .55));
+    --glass-blur: blur(20px) saturate(120%);
+    --glass-border: rgba(255, 255, 255, .09);
+    --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .08);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, .55);
+    --glass-solid: #1c1c1e;
+    --glass-bar-tint: linear-gradient(135deg, rgba(36, 36, 38, .94), rgba(22, 22, 24, .92)); /* bars float over white paper */
+    --backdrop:
+      radial-gradient(48vmax 40vmax at 50% -12%, rgba(255, 255, 255, .07), transparent 70%),
+      radial-gradient(40vmax 40vmax at 100% 100%, rgba(255, 255, 255, .03), transparent 70%),
+      linear-gradient(180deg, #0a0a0a, #000 60%);
+  }
+}
+/* The backdrop: fixed behind everything (a pseudo-element, since iPad Safari ignores background-attachment: fixed). */
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: var(--backdrop); }
+/* Glass surfaces. Inputs and buttons inside keep their own solid backgrounds, so form text keeps full contrast. */
+.glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+}
+/* Editor bars float over white documents: in dark mode they take a denser tint so light text keeps its contrast. */
+.mk-bar, .oe-bar { background: var(--glass-bar-tint, var(--glass-tint)); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu { background: var(--glass-solid); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

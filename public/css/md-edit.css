@@ -1,0 +1,30 @@
+/* Markdown editor (js/md-edit.js): toolbar on top (tinted glass, in the flow), then the text and the formatted page
+   side by side; stacked on narrow screens. The page's own look (.md-doc) is set by the module, the same on screen and in
+   the downloads. */
+.md-main { align-items: stretch !important; min-width: 0; }
+.md { height: calc(100vh - 200px); min-height: 520px; width: 100%; min-width: 0; gap: 8px; }
+.md .md-bar { position: relative; top: 0; left: 0; right: 0; flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
+.md-panes { --md-z: 1; flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; touch-action: pan-x pan-y; }
+.md-panes[data-view="edit"] { grid-template-columns: 1fr; } .md-panes[data-view="edit"] .md-prev { display: none; }
+.md-panes[data-view="preview"] { grid-template-columns: 1fr; } .md-panes[data-view="preview"] .md-src { display: none; }
+.md-src { box-sizing: border-box; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 20px 22px; resize: none; border: 1px solid var(--border-strong); border-radius: 12px;
+  background: var(--surface); color: var(--ink); font: calc(15px * var(--md-z)) / 1.6 ui-monospace, "SF Mono", Menlo, Consolas, "Noto Sans Thai", monospace; tab-size: 2; outline: none; }
+.md-src:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.md-prev { min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #fff; } /* white paper in both modes */
+.md-prev .md-doc { font-size: calc(16px * var(--md-z)); }
+.md-prev .md-doc li > input[type="checkbox"] { cursor: pointer; }
+.md-foot { display: flex; justify-content: space-between; gap: 12px; padding: 4px 6px 0; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.md-side input[type="text"] { font: inherit; font-size: 16px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; color: var(--fg-color); background: var(--surface); width: 100%; box-sizing: border-box; }
+.md.oe-full .md-panes { min-height: 0; }
+.md.oe-full { height: 100vh; height: 100dvh; }
+/* Text / Preview switch: narrow screens show one pane at a time (js/md-edit.js), full height, instead of two halves. */
+.md-switch { display: none; }
+@media (max-width: 900px) {
+  .md-switch { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--tint); align-self: center; }
+  .md-switch button { min-width: 96px; min-height: 40px; margin: 0; padding: 0 16px; border: 0; border-radius: 8px; background: none; color: var(--ink-2); font: inherit; font-size: 15px; cursor: pointer; }
+  .md-switch button[aria-selected="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+  .md-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #md-v-split { display: none; }
+  .md-panes[data-view="split"] { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  .md-prev .md-doc { padding: 24px 20px; }
+}
