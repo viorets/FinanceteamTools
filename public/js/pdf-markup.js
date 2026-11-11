@@ -9,7 +9,9 @@
 // Zoom: Ctrl/⌘ + mouse wheel, trackpad or finger pinch, or the − / + buttons. Pages are drawn only while near the
 // visible area, so long files and high zoom stay inside iPad Safari's canvas memory limit.
 import { normHex, pairHex } from './hex-color.js';
-import { fontStack, textWriter } from './pdf-realtext.js';
+import { fontStack, siteFont, textWriter } from './pdf-realtext.js';
+import { pageParagraphs } from './pdf-text.js';
+import { removeText } from './pdf-redact.js';
 import { ICON, clampZoom, floatBar, fullScreen, pinchZoom, viewBar, zoomAround } from './view-tools.js';
 
 const PDFJS_BASE = Promise.withResolvers ? 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/' : 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/legacy/build/';
@@ -30,7 +32,7 @@ const MAX_CANVAS_PX = 8e6; // pixels per page canvas (iPad Safari: 16.7M per can
 // Typed arrows: the text before the caret is replaced when ">" is typed. "—>" is "-->" after iPad smart punctuation.
 const ARROWS = { '-->': '→', '==>': '➜', '—>': '→' };
 const TOOLS = [
-  ['select', 'Select', 'เลือก'], ['text', 'Text box', 'กล่องข้อความ'], ['highlight', 'Highlight', 'ไฮไลต์'],
+  ['select', 'Select', 'เลือก'], ['edit', 'Edit text', 'แก้ข้อความ'], ['text', 'Text box', 'กล่องข้อความ'], ['highlight', 'Highlight', 'ไฮไลต์'],
   ['pen', 'Draw', 'วาด'], ['line', 'Line', 'เส้น'], ['arrow', 'Arrow', 'ลูกศร'], ['rect', 'Rectangle', 'สี่เหลี่ยม'],
 ];
 // Text formats: [execCommand name, run key, button face, English, Thai]
@@ -272,8 +274,18 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
           const b = document.createElement('div');
           b.className = `mk-box${st.sel === m.id ? ' on' : ''}`; b.dataset.id = m.id;
           runsOf(m).forEach((r) => b.append(runNode(r)));
-          b.style.cssText = `left:${m.x * p.scale}px;top:${m.y * p.scale}px;color:${m.color};font-size:${m.size * p.scale}px;font-family:${fontStack(fontOf(m))};line-height:${TEXT.lineHeight}`;
+          b.style.cssText = `left:${m.x * p.scale}px;top:${m.y * p.scale}px;color:${m.color};font-size:${m.size * p.scale}px;font-family:${fontStack(fontOf(m))};line-height:${m.lh || TEXT.lineHeight}`
+            + (m.wrap ? `;width:${m.wrap * p.scale}px;white-space:pre-wrap` : '') + (m.align ? `;text-align:${m.align}` : '');
+          if (m.cover) { // an edited paragraph: the original is hidden under the page's own background colour
+            const c = document.createElement('div'); c.className = 'mk-cover'; const [x, y, w, h] = m.cover.box;
+            c.style.cssText = `left:${x * p.scale}px;top:${y * p.scale}px;width:${w * p.scale}px;height:${h * p.scale}px;background:${m.cover.bg}`;
+            p.boxes.append(c);
+          }
           p.boxes.append(b);
+          if (m.cover) { // a PDF cannot move the text below down: say so when the edit needs more room than it had
+            const over = b.offsetHeight > (m.cover.box[3] + m.size * 0.6) * p.scale;
+            b.classList.toggle('mk-over', over); b.title = over ? 'Longer than the original: it may overlap the text below' : '';
+          }
           return;
         }
         const g = svgEl('g', { 'data-id': m.id, class: `mk-mark${st.sel === m.id ? ' on' : ''}` });
@@ -289,13 +301,13 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   // Which controls show: text (text tool, a picked or open text box), highlight, shape, or none.
   function mode() {
     const m = selMark();
-    if (st.tool === 'text' || m?.type === 'text' || editingBox()) return 'text';
+    if (st.tool === 'text' || st.tool === 'edit' || m?.type === 'text' || editingBox()) return 'text';
     if (st.tool === 'highlight' || m?.type === 'highlight') return 'highlight';
     if (m || ['pen', 'line', 'arrow', 'rect'].includes(st.tool)) return 'shape';
     return '';
   }
   // The colour box is about text while the Text box tool is on or a text box is picked, else about shapes.
-  function textMode() { return st.tool === 'text' || selMark()?.type === 'text'; }
+  function textMode() { return st.tool === 'text' || st.tool === 'edit' || selMark()?.type === 'text'; }
   function refreshBar() {
     const m = selMark();
     mk.dataset.mode = mode();
@@ -476,6 +488,12 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const pel = tgt?.closest('.mk-page'); if (!pel) return;
     const p = pages[+pel.dataset.page]; const pt = at(p, e);
     if (st.tool === 'highlight') return; // the text layer selects; pointerup turns the selection into a highlight
+    if (st.tool === 'edit') { // click a paragraph of the PDF to edit it in place
+      const hit = tgt.closest('.mk-box');
+      if (hit) { st.sel = hit.dataset.id; paint(); editBox(p, hit.dataset.id, false, [e.clientX, e.clientY]); e.preventDefault(); return; }
+      e.preventDefault(); editAt(p, pt).catch((err) => console.error(err));
+      return;
+    }
     if (st.tool === 'text') {
       const hit = tgt.closest('.mk-box');
       if (hit) { st.sel = hit.dataset.id; paint(); editBox(p, hit.dataset.id, false, [e.clientX, e.clientY]); e.preventDefault(); return; }
@@ -608,9 +626,70 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     b.onblur = () => {
       b.onblur = null; b.classList.remove('editing'); b.contentEditable = 'false';
       m.runs = readRuns(b); m.text = m.runs.map((x) => x.t).join('');
-      if (!m.text.trim()) { st.marks = st.marks.filter((x) => x.id !== id); if (st.sel === id) st.sel = null; }
+      if (!m.text.trim() && !m.cover) { st.marks = st.marks.filter((x) => x.id !== id); if (st.sel === id) st.sel = null; } // an emptied edit deletes the paragraph
       changed();
     };
+  }
+
+  // ---------- Edit text ----------
+  // The paragraph under point pt (page units) becomes a text box in its place: its text, the nearest site font, its
+  // size, line spacing and colour; the original is covered on screen and removed from the downloaded PDF.
+  async function editAt(p, pt) {
+    const paras = await (p.paras ||= pageParagraphs(p.page));
+    const pad = 2; const u = paras.findLast(({ box: [x, y, w, h] }) => pt[0] >= x - pad && pt[0] <= x + w + pad && pt[1] >= y - pad && pt[1] <= y + h + pad);
+    if (!u) return;
+    const n = pages.indexOf(p); const key = `${n}:${u.box.map((v) => v.toFixed(1)).join(',')}`;
+    const had = st.marks.find((m) => m.cover?.key === key);
+    if (had) { st.sel = had.id; paint(); editBox(p, had.id); return; }
+    const font = siteFont(u.fam); await loadFonts([font]);
+    const { ink, bg } = sampleColours(p, u.box);
+    const c = document.createElement('canvas').getContext('2d'); c.font = `${u.size}px ${fontStack(font)}`;
+    const mt = c.measureText('Hg'); const asc = mt.fontBoundingBoxAscent ?? u.size * 0.8; const desc = mt.fontBoundingBoxDescent ?? u.size * 0.25;
+    const lh = u.lines > 1 ? u.lh : TEXT.lineHeight;
+    snapshot();
+    const m = {
+      id: uid(), page: n, type: 'text', x: u.align ? u.col[0] : u.box[0] + 1, y: u.first - ((lh * u.size - asc - desc) / 2 + asc), align: u.align,
+      runs: u.runs.map((r) => ({ t: r.t, ...(r.b ? { b: 1 } : {}), ...(r.i ? { i: 1 } : {}) })), text: u.text, color: ink, size: u.size, font, lh,
+      // wrap width: a paragraph keeps its own width; one line may run to the page's text margin; centred text
+      // stays centred in the page's text column
+      wrap: u.align ? u.col[1] - u.col[0] : u.lines > 1 ? u.box[2] + u.size * 0.3 : Math.max(u.box[2], u.col[1] - u.box[0]) + u.size * 0.3,
+      cover: { key, box: u.box, bg, rects: u.rects.map(([x0, y0, x1, y1]) => [x0 - u.size * 0.8, y0, x1, y1]) },
+    };
+    st.marks.push(m); st.sel = m.id; changed(); editBox(p, m.id, true);
+  }
+  // The text and background colours under a box, from the drawn page: the darkest and the most common light pixels.
+  function sampleColours(p, [x, y, w, h]) {
+    const cv = p.canvas; const k = cv.width / p.w; const fall = { ink: '#000000', bg: '#ffffff' };
+    if (!cv.width) return fall;
+    try {
+      const d = cv.getContext('2d').getImageData(Math.max(0, x * k), Math.max(0, y * k), Math.max(1, w * k), Math.max(1, h * k)).data;
+      const px = []; for (let i = 0; i < d.length; i += 16) px.push([d[i], d[i + 1], d[i + 2], 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]]);
+      px.sort((a, b) => a[3] - b[3]);
+      const avg = (list) => `#${[0, 1, 2].map((j) => Math.round(list.reduce((s, q) => s + q[j], 0) / list.length).toString(16).padStart(2, '0')).join('')}`;
+      return { ink: avg(px.slice(0, Math.max(1, px.length * 0.04))), bg: avg(px.slice(Math.floor(px.length * 0.6))) };
+    } catch { return fall; }
+  }
+  // An edited paragraph's runs with its line breaks where the screen wraps them (the PDF has no wrapping).
+  function wrapRuns(m) {
+    const runs = runsOf(m); const pv = pages[m.page]; const box = pv?.boxes.querySelector(`[data-id="${m.id}"]`);
+    if (!box) return runs;
+    const breaks = new Set(); let off = 0; let top = null; const r = document.createRange();
+    const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+    for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+      for (const { segment, index } of (seg ? [...seg.segment(t.data)] : [...t.data].map((s, i) => ({ segment: s, index: i })))) {
+        if (segment === '\n') { top = null; off += 1; continue; }
+        r.setStart(t, index); r.setEnd(t, index + segment.length); const rect = r.getClientRects()[0];
+        if (rect) { if (top != null && rect.top > top + rect.height / 2) breaks.add(off); top = rect.top; }
+        off += segment.length;
+      }
+    }
+    const out = []; off = 0;
+    for (const run of runs) {
+      let t = '';
+      for (const ch of run.t) { if (breaks.has(off)) t = `${t.replace(/ $/, '')}\n`; t += ch; off++; }
+      out.push({ ...run, t });
+    }
+    return out;
   }
 
   setTool('select');
@@ -624,8 +703,20 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const { rgb, LineCapStyle } = PDFLib;
     const hex = (c) => { const [r, g, b] = rgbOf(c); return rgb(r / 255, g / 255, b / 255); };
     const outPages = out.getPages();
+    const P0 = (n, [x, y]) => { const pg = outPages[n]; const { x: ox, y: oy } = pg.getMediaBox ? pg.getMediaBox() : { x: 0, y: 0 }; return { x: ox + x, y: oy + pages[n].h - y }; };
     // Text boxes as real text (searchable, copyable); a box whose font cannot be embedded is drawn as a picture.
     const writer = st.marks.some((m) => m.type === 'text') ? await textWriter(out, PDFLib) : null;
+    // Edited paragraphs: their old text is removed from the page (search and copy no longer find it); where it cannot
+    // be removed (text inside a form XObject), it is covered with the page's background colour.
+    const edits = st.marks.filter((m) => m.type === 'text' && m.cover); let covered = 0;
+    for (const n of [...new Set(edits.map((m) => m.page))]) {
+      const mine = edits.filter((m) => m.page === n); const areas = mine.flatMap((m) => m.cover.rects);
+      const hits = removeText(out, PDFLib, n, areas); let k = 0;
+      for (const m of mine) {
+        const got = m.cover.rects.map(() => hits[k++]);
+        if (got.some((h) => !h)) { covered++; const [x, y, w, h] = m.cover.box; const a = P0(n, [x, y + h]); outPages[n].drawRectangle({ x: a.x, y: a.y, width: w, height: h, color: hex(m.cover.bg) }); }
+      }
+    }
     // Highlights first, so every other mark (and the page's ink, through multiply) sits on top of them.
     const order = [...st.marks.filter((m) => m.type === 'highlight'), ...st.marks.filter((m) => m.type !== 'highlight')];
     for (const m of order) {
@@ -647,7 +738,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
           pg.drawRectangle({ x: a.x, y: a.y, width: w, height: h, color: hex(m.color || HIGHLIGHT), opacity: m.opacity ?? HL_OPACITY, blendMode: PDFLib.BlendMode?.Multiply });
         });
       }
-      if (m.type === 'text' && m.text.trim() && await writer.draw(pg, { ...m, runs: runsOf(m) }, (x, y) => P([x, y]), { lineHeight: TEXT.lineHeight, fontFamily: fontOf })) continue;
+      if (m.type === 'text' && m.text.trim() && await writer.draw(pg, { ...m, runs: m.wrap ? wrapRuns(m) : runsOf(m) }, (x, y) => P([x, y]), { lineHeight: m.lh || TEXT.lineHeight, fontFamily: fontOf })) continue;
       if (m.type === 'text' && m.text.trim()) {
         const png = await textPng(m);
         const img = await out.embedPng(png.bytes);
@@ -656,6 +747,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       }
     }
     exportNotes = writer ? [...writer.notes] : [];
+    if (covered) exportNotes.push(`${covered} edited paragraph${covered > 1 ? 's' : ''} could not be removed from the page (the PDF draws ${covered > 1 ? 'them' : 'it'} in a way this tool cannot change), so ${covered > 1 ? 'they were' : 'it was'} covered instead`);
     return out.save();
   }
   let exportNotes = [];

@@ -48,7 +48,7 @@ const LIST = /^\s*(?:([•●▪■◦○◆❖➢➤►✓✔\-–—*·])|(\d{
 
 // One page -> lines (top to bottom). A line is cells (split at wide gaps); a cell is runs { t, b, i }.
 // items: text items from OCR (js/pdf-ocr.js) instead of the page's own text.
-async function pageLines(page, items = null) {
+async function pageLines(page, items = null, { findGrids = true } = {}) {
   const ops = await page.getOperatorList(); // also loads the fonts, so their names (Bold, Italic) can be read
   const tc = items ? { items, styles: {} } : await page.getTextContent();
   // A font that writes ำ where า belongs (TH Sarabun bold in Word's PDF export: "กิจกำร"): it has many ำ and no า.
@@ -73,10 +73,10 @@ async function pageLines(page, items = null) {
     if (swapAm(it.fontName)) it = { ...it, str: it.str.replace(/ำ/g, 'า') };
     const prev = chunks[chunks.length - 1];
     if (prev && MARKS.test(it.str) && Math.abs(prev.y - f) < size * 0.6) { prev.runs.push({ t: it.str, b: st.b, i: st.i }); prev.x2 = Math.max(prev.x2, e + it.width); continue; }
-    chunks.push({ x: e, x2: e + it.width, y: f, size, runs: [{ t: it.str, b: st.b, i: st.i }] });
+    chunks.push({ x: e, x2: e + it.width, y: f, size, fam: st.family, runs: [{ t: it.str, b: st.b, i: st.i }] });
   }
   // Bordered tables: the page's ruling lines give the cell grid; text inside a grid goes to its cells.
-  const tables = gridTables(rulesOf(ops, vp)).map((t) => ({ ...t, cells: t.ys.slice(1).map(() => t.xs.slice(1).map(() => [])) }));
+  const tables = (findGrids ? gridTables(rulesOf(ops, vp)) : []).map((t) => ({ ...t, cells: t.ys.slice(1).map(() => t.xs.slice(1).map(() => [])) }));
   const rest = [];
   for (const ch of chunks) {
     const cx = (ch.x + ch.x2) / 2; const cy = ch.y + ch.size * 0.3;
@@ -122,7 +122,7 @@ function linesOf(chunks, vp) {
     ln.cells = []; let cell = null; let last = null;
     for (const ch of ln.items) {
       const gap = last ? ch.x - last.x2 : 0;
-      if (!cell || gap > ln.size * 3 || (gap > ln.size * 0.9 && edge(ch.x))) { cell = { x: ch.x, x2: ch.x2, runs: [] }; ln.cells.push(cell); }
+      if (!cell || gap > ln.size * 3 || (gap > ln.size * 0.9 && edge(ch.x))) { cell = { x: ch.x, x2: ch.x2, runs: [], fam: ch.fam }; ln.cells.push(cell); }
       else if (gap > ln.size * 0.18 && !/\s$/.test(last.runs.at(-1).t) && !/^\s/.test(ch.runs[0].t)) cell.runs.push({ t: ' ', b: false, i: false });
       cell.runs.push(...ch.runs); cell.x2 = Math.max(cell.x2, ch.x2); last = ch;
     }
@@ -554,4 +554,49 @@ export async function pdfFonts(doc, max = 5) {
     });
   }
   return [...out];
+}
+
+// ---------- paragraphs to edit (PDF markup "Edit text") ----------
+// The page's text as editable units: a paragraph (lines of one size that follow at normal spacing under each other),
+// or one table cell line. Each unit: { text, runs, fam, size, lh (line height / size), box: [x, y, w, h] page units
+// (top-left origin) covering the letters with their marks, first: first baseline (page units from the top),
+// rects: [[x0, y0, x1, y1]] per line in PDF space (what to remove from the page), lines }.
+export async function pageParagraphs(page) {
+  const { lines, height } = await pageLines(page, null, { findGrids: false });
+  const units = []; const right = Math.max(0, ...lines.map((l) => l.x2)); // the text's right edge on this page
+  const left = Math.min(...lines.map((l) => l.x), right);
+  for (const ln of lines) {
+    for (const c of ln.cells) {
+      const seg = { x: c.x, x2: c.x2, y: ln.y, size: ln.size, runs: c.runs, fam: c.fam, text: c.text };
+      const u = ln.cells.length === 1 && !LIST.test(c.text) && units.findLast((v) => {
+        const last = v.segs.at(-1); const gap = last.y - seg.y;
+        return !v.closed && v.single && Math.abs(last.size - seg.size) < seg.size * 0.15 && gap > 0 && gap < seg.size * 1.9
+          && seg.x < v.x2 && seg.x2 > v.x
+          && (Math.abs(seg.x - v.left) < seg.size * 3 || (v.segs.length === 1 && seg.x < v.left && v.left - seg.x < seg.size * 6)); // or under an indented first line
+      });
+      if (u) {
+        const last = u.segs.at(-1);
+        u.segs.push(seg); u.x = Math.min(u.x, seg.x); u.x2 = Math.max(u.x2, seg.x2); u.left = Math.min(u.left, seg.x);
+      } else units.push({ segs: [seg], x: seg.x, x2: seg.x2, left: seg.x, single: ln.cells.length === 1 });
+      // a line that stops well short of the text's right edge ends its paragraph (a last line, a salutation)
+      if (ln.cells.length === 1 && seg.x2 < right - seg.size * 4) (u || units.at(-1)).closed = true;
+    }
+    // units that did not continue on this line are finished
+    units.forEach((u) => { if (u.segs.at(-1).y > ln.y + ln.size * 2) u.closed = true; });
+  }
+  return units.map((u) => {
+    const s0 = u.segs[0]; const sl = u.segs.at(-1); const size = s0.size;
+    const gaps = u.segs.slice(1).map((sg, i) => u.segs[i].y - sg.y);
+    const lh = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length / size : 1.35;
+    const runs = u.segs.slice(1).reduce((a, sg) => joinRuns(a, sg.runs), u.segs[0].runs);
+    const top = height - (s0.y + size * 1.05); const bottom = height - (sl.y - size * 0.42);
+    return {
+      text: runs.map((r) => r.t).join(''), runs, fam: s0.fam || '', size, lh, first: height - s0.y,
+      box: [u.x - 1, top, u.x2 - u.x + 2, bottom - top],
+      rects: u.segs.map((sg) => [sg.x - 1, sg.y - sg.size * 0.42, sg.x2 + 1, sg.y + sg.size * 1.05]),
+      lines: u.segs.length, col: [left, right],
+      // centred: every line sits in the middle of the page's text column
+      align: u.segs.every((sg) => sg.x - left > sg.size * 2 && Math.abs((sg.x - left) - (right - sg.x2)) < sg.size * 1.5) ? 'center' : null,
+    };
+  });
 }

@@ -34,6 +34,7 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 
 ### PDF editing
 - Open a PDF (up to 12 MB) from the card or by dropping it on the page
+- **Edit text**: click a paragraph of the PDF (or a table cell line) and type over it. It opens in place with the nearest site font (the same font when the site has it), its size, line spacing and colour (taken from the page); a centred line stays centred; the original is covered on screen. In the downloaded PDF the old words are **removed** from the page's drawing instructions (`public/js/pdf-redact.js`), so search and copy find only the new text, and the new text is written as real text with the same line breaks as on screen. Where removal is not possible (text inside a form XObject) the old text is covered instead and the status line says so. An edit that needs more room than the original gets an amber outline (a PDF cannot move the text below down). Emptying an edit deletes the paragraph
 - Tools: text box (Thai supported; LINE Seed Sans TH, Noto Sans Thai, Sarabun, TH Sarabun New, TH SarabunPSK, EucrosiaUPC, Times New Roman, Arial or Georgia), highlight text, draw, line, arrow, rectangle
 - Text boxes are rich text: select letters and press **B**, *I*, U, S or the highlighter (Ctrl+B / I / U, Ctrl+Shift+X); click anywhere in a box to edit there; typing `-->` gives → and `==>` gives ➜
 - Highlights have their own colour (with HEX entry) and opacity, and sit behind the text (multiply), on screen and in the PDF; letters inside text boxes can be highlighted too
@@ -94,7 +95,7 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 |---|---|---|
 | Chart from Excel | Sharp SVG charts in the team colours; Thai labels embedded (LINE Seed Sans TH) | Needs a tidy table; other fonts are only named in the SVG |
 | Excel to Word table | Word table styles; copy into Word or download a real .docx; wide form sheets become readable question/answer blocks | Values only, formulas become results; very wide sheets cannot stay one table |
-| PDF editing | Thai rich text boxes, highlights, shapes, drafts, full screen; PDF text to Word or Markdown with tables and Thai repairs | Adds marks on top: cannot edit the PDF's own text or fill form fields; 12 MB limit; OCR is slower and can miss small tone marks; slides, posters and borderless figure tables convert roughly; Canva's lost tone marks are not detected |
+| PDF editing | Edit the PDF's own text (old words removed, Thai shaped); Thai rich text boxes, highlights, shapes, drafts, full screen; PDF text to Word or Markdown with tables and Thai repairs | Edited text does not move the text below; scanned pages cannot be edited yet; no form filling; 12 MB limit; OCR is slower and can miss small tone marks; slides, posters and borderless figure tables convert roughly; Canva's lost tone marks are not detected |
 | Gantt Chart Creator | Quick Gantt or timeline from typed tasks or Excel; PNG/SVG match the preview | No dependencies or critical path; tasks stay in this browser |
 | Excel editing (beta) | Excel-like ribbon, live formulas, no size limit, Format as table, many export formats | Charts, images and pivot tables are dropped; filtered-out rows hidden on screen only |
 | Markdown editing | Fast writing with a live preview; Excel ranges paste as tables; .md, .html, Word, PDF downloads | PDF goes through the print window; images must be web addresses (no upload); Word file is .doc (web format) |
@@ -121,6 +122,7 @@ public/js/rich-text.js              # typed arrows and editing helpers
 public/js/pdf-text.js               # PDF text to blocks (headings, lists, tables, Thai repairs), Markdown and .docx
 public/js/pdf-ocr.js                # OCR for scanned or damaged pages (PaddleOCR + onnxruntime-web)
 public/js/pdf-realtext.js           # text boxes as real, shaped Thai text in the PDF; font faces and fallbacks
+public/js/pdf-redact.js             # removes text in given areas from a page's content stream (Edit text)
 public/fonts/                       # embeddable fonts (OFL / GPL): Sarabun, Noto Sans Thai, TH Sarabun New, TH SarabunPSK, LINE Seed Sans TH
 public/models/ocr/                  # PaddleOCR detection and Thai recognition models (ONNX)
 public/vendor/ort/                  # onnxruntime-web 1.20.1 (served from this site)

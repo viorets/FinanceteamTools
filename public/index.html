@@ -603,7 +603,7 @@
                 <div class="ed-empty">
                     <svg class="ed-ic" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 17 .8-2.6 4.6-4.6 1.8 1.8-4.6 4.6z"/></svg>
                     <h2>Mark up a PDF</h2>
-                    <p>Add text, highlights, lines, arrows and drawings, then download a marked copy, or turn the PDF's text into Word or Markdown. The original file is not changed.</p>
+                    <p>Edit the PDF's own text, add text, highlights, lines, arrows and drawings, then download a marked copy, or turn the PDF's text into Word or Markdown. The original file is not changed.</p>
                     <button type="button" class="action-btn ed-open" data-open="pdf">Open a file</button>
                     <p class="ed-limit">PDF up to 12 MB · or drop it here · drafts stay on this device</p>
                     <p class="help-text ed-help">Text box: select letters and press <b>B</b>, <i>I</i>, <u>U</u>, <s>S</s> or the highlighter (Ctrl+B / I / U, Ctrl+Shift+X). Typing <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜. Hold Shift for straight lines and squares. Zoom with Ctrl + mouse wheel, a pinch, or − / +.</p>
@@ -1141,7 +1141,7 @@
         import { markSaved } from './js/ribbon.js';
         import { openMd } from './js/md-edit.js';
         import { pdfToBlocks, blocksToMd, blocksToDocx, pdfFonts } from './js/pdf-text.js';
-        import { FACES } from './js/pdf-realtext.js';
+        import { FACES, siteFont } from './js/pdf-realtext.js';
         import { ocrPage } from './js/pdf-ocr.js';
         import { openGantt } from './js/gantt.js';
         import { openWordTable } from './js/word-table.js';
@@ -1210,15 +1210,16 @@
         // as drawn, but text added here, and text written into the PDF, uses the nearest font the site has.
         const fontKey = (n) => n.toLowerCase().replace(/[^a-z0-9]/g, '');
         const SITE_FONTS = new Set(Object.keys(FACES).map(fontKey));
-        const nearestFont = (n) => (/upc|psk|new$|thai|angsana|cordia|browallia|leelawadee|tahoma|kanit|prompt|mitr|sarabun|th /i.test(n) ? 'TH Sarabun New'
-            : /times|georgia|cambria|garamond|serif|book|minion/i.test(n) ? 'Times New Roman' : 'Arial');
+        const nearestFont = siteFont; // the same choice Edit text makes
         async function fontCaution(doc, name) {
-            const missing = (await pdfFonts(doc)).filter((n) => !SITE_FONTS.has(fontKey(n)));
+            const fonts = await pdfFonts(doc); const missing = fonts.filter((n) => !SITE_FONTS.has(fontKey(n)));
             if (!missing.length || editor?.doc !== doc) return;
             const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-            await noticeBox('This PDF uses fonts the site does not have',
-                `<p>${esc(name)} uses ${missing.length > 1 ? 'these fonts' : 'this font'}:</p><ul>${missing.map((n) => `<li><b>${esc(n)}</b>: the nearest here is ${nearestFont(n)}</li>`).join('')}</ul>`
-                + '<p>The pages still show the original fonts. Text you add in a text box uses a font from the Font list, so it may look different from the text around it. Word downloads keep the font names; Word uses them if they are on the computer.</p>',
+            // every font found, so the ones the site has are seen too (TH Sarabun New ✓, Aptos: nearest Arial)
+            const row = (n) => (missing.includes(n) ? `<li><b>${esc(n)}</b>: not on this site; the nearest here is ${nearestFont(n)}</li>` : `<li><b>${esc(n)}</b>: on this site ✓</li>`);
+            await noticeBox(missing.length > 1 ? `${missing.length} fonts in this PDF are not on the site` : `${missing[0]} is not on the site`,
+                `<p>Fonts in ${esc(name)}${doc.numPages > 5 ? ' (first 5 pages)' : ''}:</p><ul>${[...missing, ...fonts.filter((n) => !missing.includes(n))].map(row).join('')}</ul>`
+                + '<p>The pages still show the original fonts. Text you add or edit uses a font from the Font list, so where a font is missing it may look different from the text around it. Word downloads keep the font names; Word uses them if they are on the computer.</p>',
                 [{ v: true, label: 'OK', primary: true }], { tone: 'warn' });
         }
 
@@ -1279,7 +1280,7 @@
         // An editor's file actions, wherever they sit: the File tab (Open…, Save draft, Download) and the quick icons
         // beside zoom (which also work in full screen). `more` lists download formats, shown as a menu. A saved
         // draft shows its time beside Save draft.
-        const TIPS = {pdf: "<ul><li>Tools: text box, highlight text, draw, line, arrow, rectangle. Hold <kbd>Shift</kbd> for straight lines and squares.</li><li>Select a mark to move it, change its width or colour, or delete it.</li><li>In a text box: <kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> highlight; <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜.</li><li>Zoom with <kbd>Ctrl</kbd> + mouse wheel, a pinch, or − / +. Undo <kbd>Ctrl</kbd>+<kbd>Z</kbd>, redo <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li><li><b>Download as</b> gives the marked PDF, or the PDF's own text as Word (.docx) or Markdown, with headings, lists and tables. <b>Open in Markdown editor</b> lets you check and edit it first. Scanned pages, and pages whose Thai is damaged inside the PDF, are read by OCR on this device (the Thai OCR models, about 20 MB, load the first time).</li><li>Files up to 12 MB. Drafts stay on this device; the original file is never changed.</li></ul>", xlsx: "<ul><li>Click a cell and type; <kbd>F2</kbd> or a double-click edits it. <kbd>Enter</kbd> / <kbd>Tab</kbd> / arrows move, <kbd>Esc</kbd> cancels.</li><li>Drag or <kbd>Shift</kbd>+click to select a range; <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> work with Excel and Google Sheets.</li><li>Drag the small square at the corner to fill a series. The Name Box jumps to an address such as B12.</li><li>Formulas calculate live; Formulas tab lists the functions. Sheets are tabs at the bottom.</li><li>Download as gives the workbook, or this sheet as CSV UTF-8, TSV, Unicode text, JSON or HTML. Charts, images and pivot tables are not kept.</li></ul>", docx: "<ul><li>Edit the page as in Word. <kbd>Enter</kbd> starts a paragraph, <kbd>Shift</kbd>+<kbd>Enter</kbd> a line break; in a list <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> change the level.</li><li><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>; <kbd>Ctrl</kbd>+<kbd>F</kbd> find, <kbd>Ctrl</kbd>+<kbd>H</kbd> replace.</li><li>Right-click a style (or Modify…) to change it; ticked styles are remembered in this browser.</li><li>Insert draws text boxes, lines, arrows, rectangles and pen strokes, saved as Word drawings.</li><li>Headers and footers are kept in the file but not shown here.</li></ul>"};
+        const TIPS = {pdf: "<ul><li>Tools: <b>Edit text</b> (click a paragraph of the PDF and type over it; the old words are removed from the downloaded PDF, so search finds only the new text), text box, highlight text, draw, line, arrow, rectangle. Hold <kbd>Shift</kbd> for straight lines and squares.</li><li>Select a mark to move it, change its width or colour, or delete it.</li><li>In a text box: <kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> highlight; <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜.</li><li>Zoom with <kbd>Ctrl</kbd> + mouse wheel, a pinch, or − / +. Undo <kbd>Ctrl</kbd>+<kbd>Z</kbd>, redo <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li><li><b>Download as</b> gives the marked PDF, or the PDF's own text as Word (.docx) or Markdown, with headings, lists and tables. <b>Open in Markdown editor</b> lets you check and edit it first. Scanned pages, and pages whose Thai is damaged inside the PDF, are read by OCR on this device (the Thai OCR models, about 20 MB, load the first time).</li><li>Files up to 12 MB. Drafts stay on this device; the original file is never changed.</li></ul>", xlsx: "<ul><li>Click a cell and type; <kbd>F2</kbd> or a double-click edits it. <kbd>Enter</kbd> / <kbd>Tab</kbd> / arrows move, <kbd>Esc</kbd> cancels.</li><li>Drag or <kbd>Shift</kbd>+click to select a range; <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> work with Excel and Google Sheets.</li><li>Drag the small square at the corner to fill a series. The Name Box jumps to an address such as B12.</li><li>Formulas calculate live; Formulas tab lists the functions. Sheets are tabs at the bottom.</li><li>Download as gives the workbook, or this sheet as CSV UTF-8, TSV, Unicode text, JSON or HTML. Charts, images and pivot tables are not kept.</li></ul>", docx: "<ul><li>Edit the page as in Word. <kbd>Enter</kbd> starts a paragraph, <kbd>Shift</kbd>+<kbd>Enter</kbd> a line break; in a list <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> change the level.</li><li><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>; <kbd>Ctrl</kbd>+<kbd>F</kbd> find, <kbd>Ctrl</kbd>+<kbd>H</kbd> replace.</li><li>Right-click a style (or Modify…) to change it; ticked styles are remembered in this browser.</li><li>Insert draws text boxes, lines, arrows, rectangles and pen strokes, saved as Word drawings.</li><li>Headers and footers are kept in the file but not shown here.</li></ul>"};
         function barActions(root, p, { open, draft, download: dl, more = null, tips = '' }) {
             const on = (id, fn) => { const b = root.querySelector(`#${id}`); if (b) b.onclick = fn; };
             const h = root.querySelector(`#${p}-help`); if (h && tips) helpPop(h, tips);

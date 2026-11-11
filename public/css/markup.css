@@ -100,3 +100,8 @@
 .mk-steps { padding: 18px 22px; }
 .mk-steps .ic { vertical-align: -2px; }
 .mk-lock { display: flex; gap: 6px; align-items: center; }
+
+/* Edit text (v3): the original paragraph is covered with the page's own colour while it is being replaced. */
+.mk-cover { position: absolute; pointer-events: none; }
+.mk[data-tool="edit"] .mk-page { cursor: text; }
+.mk-box.mk-over { outline: 2px dashed #d97706; outline-offset: 2px; }

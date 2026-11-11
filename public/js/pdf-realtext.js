@@ -97,6 +97,9 @@ export async function textWriter(pdf, PDFLib) {
     for (const [i, line] of lines.entries()) {
       const base = m.y + i * lh + (lh - asc - desc) / 2 + asc; // baseline, as CSS places it (and textPng)
       let x = m.x;
+      if (m.align === 'center' && m.wrap) { // centred in the box's width, as on screen
+        const lw = line.reduce((s, r) => { ctx.font = css(r); return s + ctx.measureText(r.t).width; }, 0); x += (m.wrap - lw) / 2;
+      }
       for (const r of line) {
         ctx.font = css(r); const w = ctx.measureText(r.t).width;
         if (r.hl) { const [p, q] = [at(x, base - asc), at(x + w, base + desc)]; pg.drawRectangle({ x: p.x, y: q.y, width: q.x - p.x, height: p.y - q.y, color: rgbOf(PDFLib, hexRgb(r.hl)), opacity: r.ha ?? 0.45, blendMode: PDFLib.BlendMode?.Multiply }); }
@@ -192,4 +195,13 @@ async function place(pg, f, t, p, size, color, PDFLib) {
   if (f.synthB) ops.push(setTextRenderingMode(PDFLib.TextRenderingMode.Fill));
   ops.push(endText(), popGraphicsState());
   pg.pushOperators(...ops);
+}
+
+// The site's font for a font name found in a PDF: the same family when the site has it, else the nearest
+// ("Angsana New" -> TH Sarabun New, "Cambria" -> Times New Roman, "Aptos" -> Arial).
+const fkey = (n) => String(n).toLowerCase().replace(/[^a-z0-9]/g, '');
+export function siteFont(name) {
+  const hit = Object.keys(FACES).find((f) => fkey(f) === fkey(name)); if (hit) return hit;
+  return /upc|psk|new$|thai|angsana|cordia|browallia|leelawadee|tahoma|kanit|prompt|mitr|sarabun|th /i.test(name) ? 'TH Sarabun New'
+    : /times|georgia|cambria|garamond|serif|book|minion/i.test(name) ? 'Times New Roman' : 'Arial';
 }
