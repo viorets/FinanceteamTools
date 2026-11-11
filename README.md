@@ -6,10 +6,12 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 
 ## Tools
 
-### Excel to SVG
-- Upload an `.xlsx` / `.xls` file and pick a chart type
-- Choose the grouping field (X axis) and up to two value fields (the second one is drawn over the first)
-- Set colors, data label position, label and legend font size and color, and dashed X-axis gridlines
+### Chart from Excel
+- Open an `.xlsx`, `.xls` or `.csv` file (first sheet; the first row holds the column names), or **Try an example** (a monthly budget and actual)
+- Options in three groups: **Data** (chart type, categories, values, second values drawn over the first, filter rows), **Style** (colours, gradient, dashed grid lines) and **Text** (font, value labels, label and legend size and colour); Style and Text stay folded until opened
+- **Download SVG** sits above the chart; on iPad and narrow windows the chart comes first and the options under it
+- Text categories (months, weeks, names) keep the order of the rows in the file; numbers are sorted. Bar, pie and treemap sort largest first
+- A file that cannot be read, an empty sheet or a one-column sheet gets a clear message; so does a filter that leaves no rows
 - **Gradient fill**: bars, area fills, pie/donut slices and treemap tiles fade from their colour to a lighter tint, on screen and in the SVG (plain `fill="url(#…)"`, so PowerPoint and Canva read it)
 - Filter the rows, then export the chart as **SVG**
 
@@ -80,7 +82,7 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 
 | Tool | Strong at | Watch for |
 |---|---|---|
-| Excel to SVG | Sharp SVG charts in the team colours; Thai labels embedded (LINE Seed Sans TH) | Needs a tidy table; other fonts are only named in the SVG |
+| Chart from Excel | Sharp SVG charts in the team colours; Thai labels embedded (LINE Seed Sans TH) | Needs a tidy table; other fonts are only named in the SVG |
 | Excel to Word table | Word table styles; copy into Word or download a real .docx; wide form sheets become readable question/answer blocks | Values only, formulas become results; very wide sheets cannot stay one table |
 | PDF editing | Thai rich text boxes, highlights, shapes, drafts, full screen | Adds marks on top: cannot edit the PDF's own text or fill form fields; 12 MB limit |
 | Gantt Chart Creator | Quick Gantt or timeline from typed tasks or Excel; PNG/SVG match the preview | No dependencies or critical path; tasks stay in this browser |
@@ -103,7 +105,7 @@ public/css/view-tools.css           # their styles, and the HEX field
 public/js/hex-color.js              # HEX entry beside every colour picker
 public/js/word-table.js             # Excel to Word table with Word table styles
 public/js/ribbon.js                 # ribbon (tabs + groups) for the Excel, Word and Markdown editors
-public/js/gradient.js               # gradient fill for the charts (Gantt, Excel to SVG)
+public/js/gradient.js               # gradient fill for the charts (Gantt, Chart from Excel)
 public/js/xlsx-core.js              # spreadsheet helpers: formats, styles, reference shifting, TEXT() fix
 public/js/rich-text.js              # typed arrows and editing helpers
 public/js/themes.js                 # appearance (light/dark/device) and chart colour themes

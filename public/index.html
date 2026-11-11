@@ -289,12 +289,34 @@
         }
         .action-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-        /* SVG Tool Specifics */
-        .filters-container {
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 2px dashed var(--border-color);
-        }
+        /* Chart from Excel: options grouped as Data / Style / Text; Download above the chart; a first-screen card. */
+        .cx-side { overflow-x: hidden; }
+        .cx-group { min-width: 0; margin: 0 0 12px; padding: 0; border: 0; }
+        .cx-group + .cx-group { padding-top: 12px; border-top: 1px solid var(--border); }
+        .cx-group legend, .cx-group summary { padding: 0; margin-bottom: 10px; font-size: 16px; font-weight: 700; color: var(--ink); }
+        .cx-group summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; gap: 6px; list-style: none; }
+        .cx-group summary::-webkit-details-marker { display: none; }
+        .cx-group summary::after { content: ""; width: 7px; height: 7px; margin-left: 4px; border: solid var(--ink-2); border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-2px); transition: transform .15s ease-out; }
+        .cx-group[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
+        .cx-group summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+        .cx-hint { margin: 6px 0 0; }
+        .cx-sub { display: block; font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+        .cx-muted { margin: 0; font-size: 13px; color: var(--ink-2); }
+        .control-row > .control-group { min-width: 0; }
+        .filters-container { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+        .cx-main { flex-direction: column; align-items: stretch; justify-content: flex-start; min-width: 0; }
+        .cx-bar { margin-bottom: 4px; }
+        .cx-status { margin: 0 0 8px; min-height: 1.4em; font-size: 13px; color: var(--ink-2); }
+        .cx-status.cx-error { color: var(--danger); font-weight: 600; }
+        .cx-stage { min-width: 0; }
+        .cx-empty { max-width: 32rem; margin: 48px auto; padding: 32px 24px; text-align: center; border: 1.5px dashed var(--border-strong); border-radius: 16px; }
+        .cx-empty .ed-ic { color: var(--primary); }
+        .cx-empty h3 { margin: 8px 0 6px; font-size: 20px; color: var(--ink); }
+        .cx-empty p { margin: 0 0 4px; font-size: 15px; line-height: 1.5; color: var(--ink-2); }
+        .cx-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 16px 0 10px; }
+        .cx-acts .action-btn { width: auto; margin: 0; padding: 12px 24px; }
+        /* Stacked (iPad, split screen): the chart and Download come first, the options under them. */
+        @media (max-width: 1279px) { .cx-main { order: -1; } }
 
         .help-text {
             font-size: 12px;
@@ -422,7 +444,7 @@
         </div>
 
         <div class="tabs-container" role="tablist" aria-orientation="vertical">
-            <button type="button" class="tab-btn active" role="tab" aria-selected="true" aria-controls="svgTool" onclick="switchTab('svgTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V8M18 17v-8"/></svg><span>Excel to SVG Tools</span></button>
+            <button type="button" class="tab-btn active" role="tab" aria-selected="true" aria-controls="svgTool" onclick="switchTab('svgTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V8M18 17v-8"/></svg><span>Chart from Excel</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="wordTool" onclick="switchTab('wordTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg><span>Excel to Word table Tools</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="pdfTool" onclick="switchTab('pdfTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 17 .8-2.6 4.6-4.6 1.8 1.8-4.6 4.6z"/></svg><span>PDF Editing Tools</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="ganttTool" onclick="switchTab('ganttTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4v16h18"/><path d="M7 8h6M10 12h8M8 16h5"/></svg><span>Gantt Chart Creator</span></button>
@@ -434,118 +456,133 @@
     <main class="app-main" id="main" tabindex="-1">
 
     <!-- ========================================== -->
-    <!-- TOOL 1: EXCEL TO SVG (Existing Application)  -->
+    <!-- TOOL 1: CHART FROM EXCEL (Plotly → SVG)      -->
     <!-- ========================================== -->
     <div id="svgTool" class="tool-view active">
-        <!-- Controls Sidebar -->
-        <div class="sidebar">
-            <div class="control-group">
-                <label for="fileInput">Upload Excel File</label>
-                <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" />
-            </div>
-
-            <div class="control-group">
-                <label for="chartType">Chart Type</label>
-                <select id="chartType">
-                    <option value="line">Line Chart</option>
-                    <option value="area">Area Chart (1 Value)</option>
-                    <option value="area2" selected>Area Chart (2 Values)</option>
-                    <option value="combo">Line + Area Combo</option>
-                    <option value="bar">Bar Chart</option>
-                    <option value="treemap">Tree Chart (Treemap)</option>
-                    <option value="donut">Donut Chart</option>
-                    <option value="pie">Pie Chart</option>
-                    <option value="scatter">Scatter Plot</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label for="xAxis">Grouping Field (X Axis / Category)</label>
-                <select id="xAxis"></select>
-            </div>
-
-            <div class="control-group">
-                <label for="yAxis">Value Field 1</label>
-                <select id="yAxis"></select>
-            </div>
-
-            <div class="control-group" id="yAxis2Group">
-                <label for="yAxis2">Value Field 2 (Overlay)</label>
-                <select id="yAxis2"></select>
-            </div>
-
-            <div class="control-row">
+        <!-- Options: Data first (the only part needed to get a chart), then Style and Text, folded until wanted. -->
+        <div class="sidebar cx-side">
+            <fieldset class="cx-group">
+                <legend>Data</legend>
                 <div class="control-group">
-                    <label>Color - Value 1</label>
-                    <div class="color-presets" id="presets1"></div>
-                    <input type="color" id="val1Color" value="#1b4965" />
-                </div>
-                <div class="control-group" id="colorGroup2">
-                    <label>Color - Value 2</label>
-                    <div class="color-presets" id="presets2"></div>
-                    <input type="color" id="val2Color" value="#5fa8d3" />
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label for="labelPosition">Data Labels</label>
-                <select id="labelPosition">
-                    <option value="none">Hidden</option>
-                    <option value="inside">Inside Chart</option>
-                    <option value="outside" selected>Outside Chart</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label for="chartFont">Chart font</label>
-                <select id="chartFont"><option>LINE Seed Sans TH</option></select>
-            </div>
-
-            <div class="control-group checkbox-group">
-                <input type="checkbox" id="dashXAxis" checked />
-                <label for="dashXAxis" style="margin: 0; cursor: pointer;">Enable Dashed X-Axis Gridlines</label>
-            </div>
-
-            <div class="control-group checkbox-group">
-                <input type="checkbox" id="gradientFill" />
-                <label for="gradientFill" style="margin: 0; cursor: pointer;">Gradient fill (bars, areas, slices)</label>
-            </div>
-
-            <div class="control-row">
-                <div class="control-group">
-                    <label for="labelFontSize">Label Size</label>
-                    <input type="number" id="labelFontSize" value="14" min="8" max="40" />
+                    <label for="fileInput">Excel or CSV file</label>
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" />
+                    <p class="help-text cx-hint">First sheet; the first row holds the column names.</p>
                 </div>
                 <div class="control-group">
-                    <label for="labelFontColor">Label Color</label>
-                    <input type="color" id="labelFontColor" value="#1b4965" />
+                    <label for="chartType">Chart type</label>
+                    <select id="chartType">
+                        <option value="line">Line</option>
+                        <option value="area">Area (1 value)</option>
+                        <option value="area2" selected>Area (2 values)</option>
+                        <option value="combo">Line + area</option>
+                        <option value="bar">Bar</option>
+                        <option value="treemap">Treemap</option>
+                        <option value="donut">Donut</option>
+                        <option value="pie">Pie</option>
+                        <option value="scatter">Scatter</option>
+                    </select>
                 </div>
-            </div>
-
-            <div class="control-row">
                 <div class="control-group">
-                    <label for="legendFontSize">Legend Size</label>
-                    <input type="number" id="legendFontSize" value="12" min="8" max="40" />
+                    <label for="xAxis">Categories (X axis)</label>
+                    <select id="xAxis" disabled></select>
                 </div>
                 <div class="control-group">
-                    <label for="legendFontColor">Legend Color</label>
-                    <input type="color" id="legendFontColor" value="#1b4965" />
+                    <label for="yAxis">Values</label>
+                    <select id="yAxis" disabled></select>
                 </div>
-            </div>
-
-            <button class="action-btn" id="exportSvgBtn">Export Chart as SVG</button>
-
-            <div class="filters-container">
-                <h3 style="margin-top: 0; margin-bottom: 2px; font-size: 16px;">Filters</h3>
-                <p class="help-text">Tick boxes to filter data. Leave all unticked to show all data.</p>
-                <div id="dynamicFilters">
-                    <p style="font-size: 12px; color: #666;">Load data to view filters.</p>
+                <div class="control-group" id="yAxis2Group">
+                    <label for="yAxis2">Second values (drawn over the first)</label>
+                    <select id="yAxis2" disabled></select>
                 </div>
-            </div>
+                <div class="filters-container">
+                    <span class="cx-sub">Filter rows</span>
+                    <p class="help-text">Tick values to keep only those rows; nothing ticked shows every row.</p>
+                    <div id="dynamicFilters">
+                        <p class="cx-muted">Open a file to filter its rows.</p>
+                    </div>
+                </div>
+            </fieldset>
+
+            <details class="cx-group">
+                <summary>Style</summary>
+                <div class="control-row">
+                    <div class="control-group">
+                        <label>Colour, values</label>
+                        <div class="color-presets" id="presets1"></div>
+                        <input type="color" id="val1Color" value="#1b4965" aria-label="Colour, values" />
+                    </div>
+                    <div class="control-group" id="colorGroup2">
+                        <label>Colour, second values</label>
+                        <div class="color-presets" id="presets2"></div>
+                        <input type="color" id="val2Color" value="#5fa8d3" aria-label="Colour, second values" />
+                    </div>
+                </div>
+                <div class="control-group checkbox-group">
+                    <input type="checkbox" id="gradientFill" />
+                    <label for="gradientFill">Gradient fill (bars, areas, slices)</label>
+                </div>
+                <div class="control-group checkbox-group">
+                    <input type="checkbox" id="dashXAxis" checked />
+                    <label for="dashXAxis">Dashed vertical grid lines</label>
+                </div>
+            </details>
+
+            <details class="cx-group">
+                <summary>Text</summary>
+                <div class="control-group">
+                    <label for="chartFont">Chart font</label>
+                    <select id="chartFont"><option>LINE Seed Sans TH</option></select>
+                </div>
+                <div class="control-group">
+                    <label for="labelPosition">Value labels</label>
+                    <select id="labelPosition">
+                        <option value="none">Hidden</option>
+                        <option value="inside">Inside the bars or slices</option>
+                        <option value="outside" selected>Outside</option>
+                    </select>
+                </div>
+                <div class="control-row">
+                    <div class="control-group">
+                        <label for="labelFontSize">Label size</label>
+                        <input type="number" id="labelFontSize" value="14" min="8" max="40" />
+                    </div>
+                    <div class="control-group">
+                        <label for="labelFontColor">Label colour</label>
+                        <input type="color" id="labelFontColor" value="#1b4965" />
+                    </div>
+                </div>
+                <div class="control-row">
+                    <div class="control-group">
+                        <label for="legendFontSize">Legend size</label>
+                        <input type="number" id="legendFontSize" value="12" min="8" max="40" />
+                    </div>
+                    <div class="control-group">
+                        <label for="legendFontColor">Legend colour</label>
+                        <input type="color" id="legendFontColor" value="#1b4965" />
+                    </div>
+                </div>
+            </details>
         </div>
 
-        <div class="main-content">
-            <div id="chart"></div>
+        <div class="main-content cx-main">
+            <div class="gc-bar cx-bar">
+                <h2 class="gc-h">Chart</h2>
+                <button type="button" class="gc-btn gc-primary" id="exportSvgBtn" disabled>Download SVG</button>
+            </div>
+            <p class="cx-status" id="chartStatus" role="status"></p>
+            <div class="cx-stage">
+                <div class="cx-empty" id="chartEmpty">
+                    <svg class="ed-ic" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V8M18 17v-8"/></svg>
+                    <h3>Make a chart from an Excel sheet</h3>
+                    <p>Pick a sheet with column names in the first row, such as months and amounts. The chart takes the team colours, and the SVG pastes sharp into Word, PowerPoint and Canva.</p>
+                    <div class="cx-acts">
+                        <button type="button" class="action-btn" id="chartOpen">Open a file</button>
+                        <button type="button" class="gc-btn" id="chartExample">Try an example</button>
+                    </div>
+                    <p class="cx-muted">.xlsx, .xls or .csv · the file stays on this device</p>
+                </div>
+                <div id="chart" hidden></div>
+            </div>
         </div>
     </div>
 
@@ -754,28 +791,47 @@
         
         exportSvgBtn.addEventListener('click', exportSVG);
 
+        // Status line above the chart; errors in red.
+        const chartStatus = (t, err = false) => { const el = document.getElementById('chartStatus'); el.textContent = t; el.classList.toggle('cx-error', err); };
+        // Rows (one object per row, keyed by the first row's names) from a file or the example: fields, filters, chart.
+        function loadRows(rows, label) {
+            rows = rows.filter(r => Object.values(r).some(v => v !== '' && v != null));
+            if (!rows.length) { chartStatus(`${label}: the first sheet has no rows under its column names.`, true); return false; }
+            rawData = rows; filteredData = [...rawData]; columns = Object.keys(rawData[0]);
+            if (columns.length < 2) { chartStatus(`${label}: a chart needs at least two columns (names and values); this sheet has one.`, true); return false; }
+            [xAxisSelect, yAxisSelect, yAxis2Select].forEach(s => { s.disabled = false; });
+            document.getElementById('chartEmpty').hidden = true; document.getElementById('chart').hidden = false; exportSvgBtn.disabled = false;
+            populateDropdowns(); buildFilters(); updateChart();
+            chartStatus(`${label} · ${rawData.length.toLocaleString()} rows, ${columns.length} columns`);
+            return true;
+        }
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-
+            chartStatus(`Opening ${file.name}…`);
             const reader = new FileReader();
+            reader.onerror = () => chartStatus(`${file.name} could not be read. Try saving it again, then open it once more.`, true);
             reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, {type: 'array'});
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                
-                rawData = XLSX.utils.sheet_to_json(worksheet);
-                filteredData = [...rawData];
-
-                if (rawData.length > 0) {
-                    columns = Object.keys(rawData[0]);
-                    populateDropdowns();
-                    buildFilters();
-                    updateChart();
+                try {
+                    const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    if (!worksheet) throw new Error('no sheet');
+                    loadRows(XLSX.utils.sheet_to_json(worksheet), file.name);
+                } catch (err) {
+                    console.error(err);
+                    chartStatus(`${file.name} is not an Excel or CSV file this tool can read. Open an .xlsx, .xls or .csv file.`, true);
                 }
             };
             reader.readAsArrayBuffer(file);
         }
+        // First screen: open a file, or load an example budget to see how it works.
+        document.getElementById('chartOpen').onclick = () => fileInput.click();
+        document.getElementById('chartExample').onclick = () => {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const budget = [120, 120, 135, 135, 140, 150, 150, 155, 160, 160, 170, 180];
+            const actual = [112, 126, 129, 141, 138, 152, 147, 161, 158, 166, 171, 175];
+            loadRows(months.map((m, i) => ({ Month: m, 'Budget (฿)': budget[i] * 1000, 'Actual (฿)': actual[i] * 1000, Quarter: `Q${Math.floor(i / 3) + 1}` })), 'Example: monthly budget and actual');
+        };
 
         function populateDropdowns() {
             xAxisSelect.innerHTML = '';
@@ -849,7 +905,7 @@
             });
             
             if(dynamicFiltersContainer.innerHTML === '') {
-                dynamicFiltersContainer.innerHTML = '<p style="font-size: 12px; color: #666;">No non-calculatable categorical fields found to filter.</p>';
+                dynamicFiltersContainer.innerHTML = '<p class="cx-muted">No text columns to filter by (only numbers).</p>';
             }
         }
 
@@ -877,7 +933,8 @@
             if (['bar', 'treemap', 'pie', 'donut'].includes(chartType)) {
                 sortedKeys.sort((a, b) => grouped[b] - grouped[a]);
             } else {
-                sortedKeys.sort((a, b) => isNaN(a) ? a.localeCompare(b) : parseFloat(a) - parseFloat(b));
+                // Numbers in order; text (months, weeks, names) keeps the order of the rows in the file, as Excel does.
+                if (sortedKeys.every(k => k.trim() !== '' && !isNaN(k))) sortedKeys.sort((a, b) => parseFloat(a) - parseFloat(b));
             }
             
             return {
@@ -894,10 +951,14 @@
         }
 
         function updateChart() {
+            if (rawData.length === 0) return; // nothing opened yet: the first-screen card stays
             if (filteredData.length === 0) {
-                document.getElementById('chart').innerHTML = '<p style="color:#666;">No data to display.</p>';
+                Plotly.purge('chart'); exportSvgBtn.disabled = true;
+                chartStatus('No rows match the ticked filters. Untick some values to bring rows back.', true);
                 return;
             }
+            exportSvgBtn.disabled = false;
+            if (document.getElementById('chartStatus').classList.contains('cx-error')) chartStatus(`${filteredData.length.toLocaleString()} of ${rawData.length.toLocaleString()} rows shown`);
 
             const type = chartTypeSelect.value;
             const xCol = xAxisSelect.value;
@@ -1082,7 +1143,7 @@
         import { gradientize } from './js/gradient.js';
         window.chartGradient = gradientize;
         import { viewControls, currentTheme, CHART_FONTS, fontStack } from './js/themes.js';
-        // Chart font for Excel to SVG: kept in this browser; its faces load before the chart redraws.
+        // Chart font for Chart from Excel: kept in this browser; its faces load before the chart redraws.
         {
             const sel = document.getElementById('chartFont');
             sel.innerHTML = CHART_FONTS.map((f) => `<option>${f}</option>`).join('');
