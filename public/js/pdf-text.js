@@ -354,7 +354,7 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
       const m = LIST.exec(l.text);
       const allBold = runs.every((r) => r.b || !r.t.trim());
       if (level) {
-        if (cur?.type === 'h' && cur.level === level && gap < lead * 1.6) { cur.runs = joinRuns(cur.runs, runs); return; }
+        if (cur?.type === 'h' && cur.level === level && gap < Math.max(lead * 1.6, l.size * 1.8)) { cur.runs = joinRuns(cur.runs, runs); return; } // a title over two lines (big type, bigger gap)
         close(); carry = null; cur = { type: 'h', level, runs }; return;
       }
       if (m) {
@@ -369,7 +369,7 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
       const newPara = !cur || cur.type === 'h' || broke
         || (cur.type === 'li' ? l.x <= cur.x + l.size * 0.3 : l.x > left + l.size * 0.9 || (prev && prev.x2 < right - l.size * 4));
       if (!cur && carry && !l.cells[0].runs[0]?.b && l.x <= left + l.size * 0.9 && blocks.at(-1) === carry) { cur = blocks.pop(); cur.runs = joinRuns(cur.runs, runs); return; }
-      if (newPara) { close(); cur = { type: 'p', runs, bold: allBold, lines: 1 }; return; }
+      if (newPara) { close(); cur = { type: 'p', runs, bold: allBold, lines: 1, at: { pg: pi, y: l.y, size: l.size } }; return; }
       cur.runs = joinRuns(cur.runs, runs); cur.lines = (cur.lines || 1) + 1;
     });
     close(); closeTable(); flushGrids(-Infinity);
@@ -379,7 +379,18 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
   // A short, all-bold, one-line paragraph is a sub-heading.
   blocks.forEach((b) => { delete b.page; });
   const sub = Math.min(big.length + 1, 4);
-  blocks.forEach((b) => { if (b.type === 'p' && b.bold && b.lines === 1 && b.runs.map((r) => r.t).join('').trim().length < 80) { b.type = 'h'; b.level = sub; } });
+  // Two such lines straight after each other, same size and at line spacing, are one title over two lines.
+  let prevSub = null;
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    if (!(b.type === 'p' && b.bold && b.lines === 1 && b.runs.map((r) => r.t).join('').trim().length < 80)) { prevSub = null; continue; }
+    const p = prevSub?.at; const at = b.at;
+    if (p && at && p.pg === at.pg && Math.abs(p.size - at.size) < 0.5 && p.y - at.y > 0 && p.y - at.y < at.size * 1.8) {
+      prevSub.runs = joinRuns(prevSub.runs, b.runs); prevSub.at = at; blocks.splice(i--, 1); continue;
+    }
+    b.type = 'h'; b.level = sub; prevSub = b;
+  }
+  blocks.forEach((b) => { delete b.at; });
   // Word's PDF export can also drop ำ outright ("กาไร" for กำไร); fixed on whole paragraphs, as a word may span pieces.
   blocks.forEach((b) => (b.rows ? b.rows.flat() : [b.runs]).forEach((rs) => rs.forEach((r) => { r.t = r.t.replace(LOST_AM, (w) => AM_WORDS[w]); })));
   const fam = {}; pages.forEach((p) => Object.entries(p.fonts).forEach(([k, v]) => { fam[k] = (fam[k] || 0) + v; }));
