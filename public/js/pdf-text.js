@@ -583,12 +583,17 @@ export async function pageParagraphs(page, items = null) {
   const { lines, height } = await pageLines(page, items, { findGrids: false });
   const units = []; const right = Math.max(0, ...lines.map((l) => l.x2)); // the text's right edge on this page
   const left = Math.min(...lines.map((l) => l.x), right);
+  // OCR lines of an uneven scan sit a little off their places: let the line gap be up to 1.35 × the page's usual
+  // line pitch as well as 1.9 × the type size, so their paragraphs hold together
+  const ocr = !!items?.some((i) => i.fontName === 'ocr');
+  const pitches = lines.slice(1).map((l, i) => lines[i].y - l.y).filter((g) => g > 0).sort((a, b) => a - b);
+  const pitch = ocr ? pitches[Math.floor(pitches.length / 2)] || 0 : 0;
   for (const ln of lines) {
     for (const c of ln.cells) {
       const seg = { x: c.x, x2: c.x2, y: ln.y, size: ln.size, runs: c.runs, fam: c.fam, text: c.text };
       const u = ln.cells.length === 1 && !LIST.test(c.text) && units.findLast((v) => {
         const last = v.segs.at(-1); const gap = last.y - seg.y;
-        return !v.closed && v.single && Math.abs(last.size - seg.size) < seg.size * 0.15 && gap > 0 && gap < seg.size * 1.9
+        return !v.closed && v.single && Math.abs(last.size - seg.size) < seg.size * 0.15 && gap > 0 && gap < Math.max(seg.size * 1.9, pitch * 1.35)
           && seg.x < v.x2 && seg.x2 > v.x
           && (Math.abs(seg.x - v.left) < seg.size * 3 || (v.segs.length === 1 && seg.x < v.left && v.left - seg.x < seg.size * 6)); // or under an indented first line
       });

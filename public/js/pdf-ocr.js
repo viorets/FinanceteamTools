@@ -40,17 +40,39 @@ export async function ocrPage(page, onProgress = () => {}) {
   const ctx = cv.getContext('2d', { willReadFrequently: true });
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
   await page.render({ canvasContext: ctx, viewport: vp }).promise;
-  const boxes = await detect(m, cv);
-  const items = [];
+  const all = await detect(m, cv);
+  // Detection sometimes cuts a few marks off a line into a small box of their own, between two lines; read alone
+  // they give stray "lines" ("ะ*", "9") that split paragraphs. A box under ~half the usual height that lies in
+  // the band of a full-height box it overlaps is such a piece.
+  const hOf = (b) => b.y1 - b.y0; const med = mid(all.map(hOf));
+  const full = all.filter((b) => hOf(b) >= med * 0.55);
+  const boxes = all.filter((b) => hOf(b) >= med * 0.55 || !full.some((o) => o.x0 < b.x1 && b.x0 < o.x1 && b.y0 < o.y1 + med * 0.5 && b.y1 > o.y0 - med * 0.5));
+  const read = [];
   for (const b of boxes) {
     const str = (await recognise(m, cv, b)).trim();
     if (!str) continue;
     const [x0, y0] = vp.convertToPdfPoint(b.x0, b.y1); const [x1, y1] = vp.convertToPdfPoint(b.x1, b.y0);
-    const h = Math.abs(y1 - y0); const size = h * 0.72; // the box covers marks above and below the letters
-    items.push({ str, transform: [size, 0, 0, size, Math.min(x0, x1), Math.min(y0, y1) + h * 0.22], width: Math.abs(x1 - x0), height: size, fontName: 'ocr' });
+    const h = Math.abs(y1 - y0);
+    read.push({ str, x: Math.min(x0, x1), w: Math.abs(x1 - x0), mid: (y0 + y1) / 2, size: h * 0.72 }); // the box covers marks above and below
   }
-  return items;
+  // A box's height depends on which marks its words happen to have, so sizes and baselines jump from line to line
+  // and body lines read as headings or new paragraphs. Boxes on one line share its size and middle; sizes within
+  // half of the page's usual size are that size (a box's height says little about its type size: a title without
+  // marks measures like body text). Baseline: the box middle less 0.39 × size (a full Thai line box).
+  const body = mid(read.map((r) => r.size));
+  const lines = [];
+  [...read].sort((a, b) => b.mid - a.mid).forEach((r) => {
+    const ln = lines.at(-1);
+    if (ln && Math.abs(ln[0].mid - r.mid) < body * 0.5) ln.push(r); else lines.push([r]);
+  });
+  for (const ln of lines) {
+    let size = mid(ln.map((r) => r.size)); if (Math.abs(size / body - 1) < 0.5) size = body;
+    const y = mid(ln.map((r) => r.mid)) - size * 0.39;
+    ln.forEach((r) => { r.size = size; r.y = y; });
+  }
+  return read.map((r) => ({ str: r.str, transform: [r.size, 0, 0, r.size, r.x, r.y], width: r.w, height: r.size, fontName: 'ocr' }));
 }
+const mid = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 
 // ---------- detection (DB): probability map -> line boxes ----------
 async function detect({ ort, det }, cv) {
