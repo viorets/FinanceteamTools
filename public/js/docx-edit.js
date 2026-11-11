@@ -395,6 +395,7 @@ export async function openDocxEditor(root, bytes) {
         { btn: 'de-al', icon: RI.left, title: 'Align left', toggle: true }, { btn: 'de-ac', icon: RI.center, title: 'Center', toggle: true }, { btn: 'de-ar', icon: RI.right, title: 'Align right', toggle: true }, { btn: 'de-aj', icon: RI.justify, title: 'Justify', toggle: true },
         { select: 'de-line', title: 'Line spacing', options: [['', 'Spacing…'], ['240', '1.0'], ['276', '1.15'], ['360', '1.5'], ['480', '2.0']], width: 96 }] },
       { label: 'Styles', items: [{ html: '<div class="de-gal" id="de-gal" role="group" aria-label="Paragraph styles"></div>' }] },
+      { label: 'New text', items: [{ btn: 'de-me-edit', icon: '', text: 'Edit', title: 'Edit: new text takes the format of the text before it', toggle: true }, { btn: 'de-me-markup', icon: '', text: 'Markup', title: 'Markup: new text takes the Font colour, so your changes stand out', toggle: true }] },
     ] },
     { tab: 'Insert', groups: [
       { label: 'Draw on the page', items: [{ btn: 'de-t-text', icon: RI.select, title: 'Type in the document', toggle: true }, { btn: 'de-t-textbox', icon: RI.textbox, title: 'Text box', toggle: true }, { btn: 'de-t-pen', icon: RI.pen, title: 'Draw', toggle: true },
@@ -803,7 +804,15 @@ export async function openDocxEditor(root, bytes) {
   page.addEventListener('beforeinput', (e) => {
     // Tab in a list paragraph changes its level, as in Word.
     if (e.inputType === 'insertText' && e.data === '\t') { /* handled in keydown */ }
+    // Markup: what is typed takes the Font colour (written into the file as that run's colour); Edit keeps the format
+    // of the text before it. Headers and footers always keep the file's format.
+    if (markup && /^insert(Text|CompositionText|FromPaste|ReplacementText)$/.test(e.inputType) && getSelection().isCollapsed) { exec('styleWithCSS', true); exec('foreColor', $('#de-fc').value); exec('styleWithCSS', false); }
   });
+  let markup = (() => { try { return localStorage.getItem('de-markup') === '1'; } catch { return false; } })();
+  const showMode = () => { setPressed(rb, 'de-me-edit', !markup); setPressed(rb, 'de-me-markup', markup); };
+  $('#de-me-edit').onclick = () => { markup = false; try { localStorage.setItem('de-markup', '0'); } catch { /* not kept */ } showMode(); status('Edit: new text takes the format of the text before it'); };
+  $('#de-me-markup').onclick = () => { markup = true; try { localStorage.setItem('de-markup', '1'); } catch { /* not kept */ } showMode(); status(`Markup: new text is in the Font colour (${$('#de-fc').value})`); };
+  showMode();
   page.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') { const d = paraOf(getSelection().anchorNode); if (d?.dataset.num) { e.preventDefault(); indentCmd(e.shiftKey ? -1 : 1); return; } e.preventDefault(); exec('insertText', '\t'); return; }
     if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); exec('insertLineBreak'); return; }

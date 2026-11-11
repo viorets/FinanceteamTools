@@ -58,6 +58,9 @@ export const RI = {
 let say = (en) => en;
 export const setRibbonLang = (t) => { say = (en) => (TH_LABELS[en] ? t(en, TH_LABELS[en]) : en); };
 const TH_LABELS = {
+  "New text": "ข้อความใหม่", "Edit": "แก้ไข", "Markup": "มาร์กอัป",
+  "Edit: new text takes the format of the text before it": "แก้ไข: ข้อความใหม่ใช้รูปแบบของข้อความก่อนหน้า",
+  "Markup: new text takes the Font colour, so your changes stand out": "มาร์กอัป: ข้อความใหม่ใช้สีตัวอักษรที่เลือก ให้เห็นการแก้ไขชัด",
   "Align left": "จัดชิดซ้าย",
   "Align right": "จัดชิดขวา",
   "Alignment": "การจัดแนว",
