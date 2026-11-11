@@ -77,3 +77,18 @@ input[type="color"] { touch-action: none; }
 .rb-tab.rb-file[aria-selected="true"] { color: var(--on-primary); }
 .rb-note { align-self: center; min-width: 0; padding: 0 4px; font-size: 12px; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rb-note:empty { display: none; }
+
+/* Alert window (js/view-tools.js noticeBox), after TUSUFinanceFeedback's Apple-style alert. */
+.vt-modal-back { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .3); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.vt-modal { box-sizing: border-box; width: 100%; max-width: 440px; max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px; border-radius: 20px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px rgba(0, 0, 0, .22); }
+.vt-modal-ic { display: block; margin-bottom: 8px; color: #b45309; }
+.vt-modal h2 { margin: 0 0 8px; font-size: 18px; line-height: 1.35; }
+.vt-modal p { margin: 8px 0; color: var(--ink-2); font-size: 15px; line-height: 1.55; }
+.vt-modal ul { margin: 8px 0; padding-left: 20px; font-size: 15px; line-height: 1.55; }
+.vt-modal-acts { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.vt-modal-btn { min-height: 44px; padding: 0 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.vt-modal-btn.primary { border-color: transparent; background: var(--primary); color: var(--on-primary); }
+.vt-modal-btn:hover { filter: brightness(.96); }
+.vt-modal-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-color-scheme: dark) { :root:not([data-mode="light"]) .vt-modal-ic { color: #fbbf24; } }
+:root[data-mode="dark"] .vt-modal-ic { color: #fbbf24; }

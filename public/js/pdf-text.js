@@ -156,7 +156,7 @@ function addLine(out, l, prev, wide) {
 // pdf.js operator numbers used here (pdf.js 4.x OPS).
 const OPS = { save: 10, restore: 11, transform: 12, moveTo: 13, lineTo: 14, curveTo: 15, curveTo2: 16, curveTo3: 17, closePath: 18,
   rectangle: 19, stroke: 20, closeStroke: 21, fill: 22, eoFill: 23, fillStroke: 24, eoFillStroke: 25, closeFillStroke: 26,
-  closeEOFillStroke: 27, endPath: 28, paintFormXObjectBegin: 74, paintFormXObjectEnd: 75, paintImageXObject: 85,
+  closeEOFillStroke: 27, endPath: 28, setFont: 37, paintFormXObjectBegin: 74, paintFormXObjectEnd: 75, paintImageXObject: 85,
   paintInlineImageXObject: 86, paintImageXObjectRepeat: 88, constructPath: 91 };
 export const PDF_OPS = OPS; // checked against the loaded pdf.js in testing
 const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
@@ -513,4 +513,19 @@ export async function blocksToDocx(blocks, { JSZip, font = '', size = 14, page =
   zip.file('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/></Relationships>');
   zip.file('word/document.xml', doc); zip.file('word/styles.xml', styles); zip.file('word/numbering.xml', numbering);
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+}
+
+// ---------- fonts the PDF uses ----------
+// Family names of the fonts used on the first `max` pages ("TH Sarabun New", "Angsana New", ...), symbol fonts left out.
+export async function pdfFonts(doc, max = 5) {
+  const out = new Set();
+  for (let n = 1; n <= Math.min(doc.numPages, max); n++) {
+    const page = await doc.getPage(n); const ops = await page.getOperatorList();
+    ops.fnArray.forEach((fn, i) => {
+      if (fn !== OPS.setFont) return;
+      let f = null; try { f = page.commonObjs.get(ops.argsArray[i][0]); } catch { /* not loaded */ }
+      const fam = familyOf(f?.name || ''); if (fam && !/symbol|dingbat|webding|math/i.test(fam)) out.add(fam);
+    });
+  }
+  return [...out];
 }

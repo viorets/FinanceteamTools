@@ -9,6 +9,7 @@
 // Zoom: Ctrl/⌘ + mouse wheel, trackpad or finger pinch, or the − / + buttons. Pages are drawn only while near the
 // visible area, so long files and high zoom stay inside iPad Safari's canvas memory limit.
 import { normHex, pairHex } from './hex-color.js';
+import { fontStack, textWriter } from './pdf-realtext.js';
 import { ICON, clampZoom, floatBar, fullScreen, pinchZoom, viewBar, zoomAround } from './view-tools.js';
 
 const PDFJS_BASE = Promise.withResolvers ? 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/' : 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/legacy/build/';
@@ -18,9 +19,10 @@ const PDFLIB = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.mi
 export const MAX_BYTES = 12 * 1024 * 1024; // marked files: 12 MB (decided 20 Oct)
 // Text box default (decided 20 Oct): LINE Seed Sans TH, 11 pt, #990000, clear background, no border.
 export const TEXT = { font: 'LINE Seed Sans TH', size: 11, color: '#990000', lineHeight: 1.35 };
-// Fonts a text box can use. Noto Sans Thai and Sarabun come from Google Fonts (index.html), LINE Seed Sans TH from
-// fonts/, Georgia and Arial from the system (Thai letters in them fall back to the system Thai font).
-export const FONTS = ['LINE Seed Sans TH', 'Noto Sans Thai', 'Sarabun', 'Georgia', 'Arial'];
+// Fonts a text box can use (js/pdf-realtext.js FACES: files and the fallback for letters a font lacks). All but
+// Georgia are written into the PDF as real text; Georgia boxes stay a picture. EucrosiaUPC and Times New Roman are
+// the computer's own fonts on screen.
+export const FONTS = ['LINE Seed Sans TH', 'Noto Sans Thai', 'Sarabun', 'TH Sarabun New', 'TH SarabunPSK', 'EucrosiaUPC', 'Times New Roman', 'Arial', 'Georgia'];
 const fontOf = (m) => m.font || TEXT.font; // text boxes from v2.12 drafts have no font: the old default
 const HIGHLIGHT = '#ffe14d';
 const HL_OPACITY = 0.45; // highlights from older drafts have no colour or opacity: these
@@ -270,7 +272,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
           const b = document.createElement('div');
           b.className = `mk-box${st.sel === m.id ? ' on' : ''}`; b.dataset.id = m.id;
           runsOf(m).forEach((r) => b.append(runNode(r)));
-          b.style.cssText = `left:${m.x * p.scale}px;top:${m.y * p.scale}px;color:${m.color};font-size:${m.size * p.scale}px;font-family:"${fontOf(m)}";line-height:${TEXT.lineHeight}`;
+          b.style.cssText = `left:${m.x * p.scale}px;top:${m.y * p.scale}px;color:${m.color};font-size:${m.size * p.scale}px;font-family:${fontStack(fontOf(m))};line-height:${TEXT.lineHeight}`;
           p.boxes.append(b);
           return;
         }
@@ -622,6 +624,8 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const { rgb, LineCapStyle } = PDFLib;
     const hex = (c) => { const [r, g, b] = rgbOf(c); return rgb(r / 255, g / 255, b / 255); };
     const outPages = out.getPages();
+    // Text boxes as real text (searchable, copyable); a box whose font cannot be embedded is drawn as a picture.
+    const writer = st.marks.some((m) => m.type === 'text') ? await textWriter(out, PDFLib) : null;
     // Highlights first, so every other mark (and the page's ink, through multiply) sits on top of them.
     const order = [...st.marks.filter((m) => m.type === 'highlight'), ...st.marks.filter((m) => m.type !== 'highlight')];
     for (const m of order) {
@@ -643,6 +647,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
           pg.drawRectangle({ x: a.x, y: a.y, width: w, height: h, color: hex(m.color || HIGHLIGHT), opacity: m.opacity ?? HL_OPACITY, blendMode: PDFLib.BlendMode?.Multiply });
         });
       }
+      if (m.type === 'text' && m.text.trim() && await writer.draw(pg, { ...m, runs: runsOf(m) }, (x, y) => P([x, y]), { lineHeight: TEXT.lineHeight, fontFamily: fontOf })) continue;
       if (m.type === 'text' && m.text.trim()) {
         const png = await textPng(m);
         const img = await out.embedPng(png.bytes);
@@ -650,17 +655,19 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
         pg.drawImage(img, { x: a.x, y: a.y, width: png.w, height: png.h });
       }
     }
+    exportNotes = writer ? [...writer.notes] : [];
     return out.save();
   }
+  let exportNotes = [];
 
-  return { marks: () => structuredClone(st.marks), isDirty: () => st.dirty, clean: () => { st.dirty = false; }, exportPdf, name, doc };
+  return { marks: () => structuredClone(st.marks), isDirty: () => st.dirty, clean: () => { st.dirty = false; }, exportPdf, notes: () => exportNotes, name, doc };
 }
 
 // A text box drawn by the browser at 4x (so Thai vowels and tone marks are placed correctly), as PNG bytes, its size
 // in page units and oy, how far above the box's top the image starts. Lines are laid out as CSS does: each line is
 // line-height tall, with the font's ascent + descent centred in it. Highlights are filled first, under all letters.
 async function textPng(m) {
-  const k = 4; const px = m.size * k; const lh = m.size * TEXT.lineHeight * k; const fam = `"${fontOf(m)}"`;
+  const k = 4; const px = m.size * k; const lh = m.size * TEXT.lineHeight * k; const fam = fontStack(fontOf(m));
   const fontFor = (r) => `${r.i ? 'italic ' : ''}${r.b ? 'bold ' : ''}${px}px ${fam}`;
   const lines = [[]];
   runsOf(m).forEach((r) => r.t.split('\n').forEach((piece, i) => { if (i) lines.push([]); if (piece) lines.at(-1).push({ ...r, t: piece }); }));

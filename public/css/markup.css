@@ -1,5 +1,15 @@
 /* PDF markup editor (js/pdf-markup.js). Text box font: LINE Seed Sans TH (public/fonts, SIL Open Font License). */
 @font-face { font-family: "LINE Seed Sans TH"; src: url("../fonts/LINESeedSansTH_Rg.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+/* TH Sarabun New / PSK (SIPA): the same files are embedded in exported PDFs (js/pdf-realtext.js). A computer that has
+   the font installed uses its own copy. */
+@font-face { font-family: "TH Sarabun New"; src: local("TH Sarabun New"), url("../fonts/THSarabunNew-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "TH Sarabun New"; src: local("TH Sarabun New Bold"), url("../fonts/THSarabunNew-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "TH Sarabun New"; src: local("TH Sarabun New Italic"), url("../fonts/THSarabunNew-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "TH Sarabun New"; src: local("TH Sarabun New BoldItalic"), url("../fonts/THSarabunNew-BoldItalic.ttf") format("truetype"); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: "TH SarabunPSK"; src: url("../fonts/THSarabunPSK-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "TH SarabunPSK"; src: url("../fonts/THSarabunPSK-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "TH SarabunPSK"; src: url("../fonts/THSarabunPSK-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "TH SarabunPSK"; src: url("../fonts/THSarabunPSK-BoldItalic.ttf") format("truetype"); font-weight: 700; font-style: italic; font-display: swap; }
 
 /* Tools in one bar on top of the pages; it wraps onto a second row when the editor is narrow. */
 /* The bar is tinted glass (css/themes.css) floating over the pages, which scroll under it; --bar-h (js/view-tools.js

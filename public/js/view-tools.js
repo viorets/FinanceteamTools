@@ -169,3 +169,31 @@ export function actionMenu(btn, items, onPick) {
   addEventListener('pointerdown', close, true); addEventListener('keydown', key, true);
   m.onclick = (e) => { const b = e.target.closest('[data-v]'); if (!b) return; close(); onPick(b.dataset.v); };
 }
+
+// Alert window (from TUSUFinanceFeedback public/js/ui.js dialog): a title, a message, buttons; the page behind is
+// dimmed. Resolves the value of the button pressed (Esc or a click outside gives `none`). html is already escaped.
+// buttons: [{ v, label, primary }]; the last one gets the focus.
+export function noticeBox(title, html, buttons = [{ v: true, label: 'OK', primary: true }], { none = null, tone = '' } = {}) {
+  return new Promise((resolve) => {
+    const back = document.createElement('div'); back.className = 'vt-modal-back';
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const id = `vt-m-${Date.now()}`;
+    back.innerHTML = `<div class="vt-modal ${tone}" role="alertdialog" aria-modal="true" aria-labelledby="${id}">
+      ${tone === 'warn' ? `<svg class="vt-modal-ic" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>` : ''}
+      <h2 id="${id}">${esc(title)}</h2>${html}
+      <div class="vt-modal-acts">${buttons.map((b, i) => `<button type="button" class="vt-modal-btn${b.primary ? ' primary' : ''}" data-i="${i}">${esc(b.label)}</button>`).join('')}</div></div>`;
+    const before = document.activeElement;
+    const done = (v) => { back.remove(); removeEventListener('keydown', key, true); before?.focus?.({ preventScroll: true }); resolve(v); };
+    const key = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); done(none); }
+      if (e.key === 'Tab') { // keep the focus on the window's buttons
+        const bs = [...back.querySelectorAll('button')]; const i = bs.indexOf(document.activeElement);
+        e.preventDefault(); bs[(i + (e.shiftKey ? -1 : 1) + bs.length) % bs.length].focus();
+      }
+    };
+    back.addEventListener('click', (e) => { if (e.target === back) done(none); const b = e.target.closest('[data-i]'); if (b) done(buttons[Number(b.dataset.i)].v); });
+    addEventListener('keydown', key, true);
+    document.body.append(back);
+    back.querySelector('.vt-modal-acts button:last-child').focus();
+  });
+}

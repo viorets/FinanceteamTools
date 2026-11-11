@@ -34,13 +34,15 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 
 ### PDF editing
 - Open a PDF (up to 12 MB) from the card or by dropping it on the page
-- Tools: text box (Thai supported; LINE Seed Sans TH, Noto Sans Thai, Sarabun, Georgia or Arial), highlight text, draw, line, arrow, rectangle
+- Tools: text box (Thai supported; LINE Seed Sans TH, Noto Sans Thai, Sarabun, TH Sarabun New, TH SarabunPSK, EucrosiaUPC, Times New Roman, Arial or Georgia), highlight text, draw, line, arrow, rectangle
 - Text boxes are rich text: select letters and press **B**, *I*, U, S or the highlighter (Ctrl+B / I / U, Ctrl+Shift+X); click anywhere in a box to edit there; typing `-->` gives → and `==>` gives ➜
 - Highlights have their own colour (with HEX entry) and opacity, and sit behind the text (multiply), on screen and in the PDF; letters inside text boxes can be highlighted too
 - Hold Shift for straight lines and squares; select a mark to move it, change its width or colour, or delete it; undo/redo with Ctrl+Z / Ctrl+Y or the icon buttons
 - Zoom with Ctrl/⌘ + mouse wheel, a trackpad or finger pinch, or − / +; full screen keeps the tools on top, including Save draft and Download
 - **Save draft** keeps your marks on this device (browser storage) so you can reopen the same file later
 - **Download PDF** saves a marked copy (`<name> (marked).pdf`); the original file is never changed
+- Text boxes are written into the PDF as **real text** (`public/js/pdf-realtext.js`): searchable, copyable and sharp. Thai is shaped with each font's own rules and every glyph placed at its shaped position, so vowels and tone marks sit as on screen; ำ copies out as ำ. Fonts are embedded as subsets from `public/fonts/` (Sarabun, Noto Sans Thai, TH Sarabun New, TH SarabunPSK, LINE Seed Sans TH; bold/italic made by outline and slant where a font has no file). Times New Roman and Arial use the PDF's built-in Times and Helvetica; EucrosiaUPC (a Windows font we may not host) is read from the computer in Chrome/Edge, else TH Sarabun New is used and the status line says so; letters a font lacks come from its fallback font (also on screen). Georgia boxes stay a picture
+- Opening a PDF warns (alert window, after TUSUFinanceFeedback's) when it uses fonts the site does not have, naming the nearest font here, and when the PDF is locked by its author: such a PDF can be marked on screen, saved as a draft and converted to Word/Markdown, but a marked copy cannot be downloaded
 - **Download as Word (.docx)** or **Markdown** (or **Open in Markdown editor**) turns the PDF's own text into a document (`public/js/pdf-text.js`): headings from text size and bold lines, paragraphs, numbered and bulleted lists, and tables. Bordered tables follow the PDF's ruling lines (cells keep their wrapped text); borderless label-and-text layouts and column layouts become tables too. Running headers, footers and page numbers are left out
 - The Word file uses the PDF's main font (e.g. TH Sarabun New) and body size, Heading 1–4, Word bullets and numbering, bold and italic, and bordered tables with the PDF's column widths. Thai words are joined by zero-width spaces so Word wraps Thai lines where the browser's Thai word breaker allows (without them Word wraps only at spaces). Checked by opening the files in Microsoft Word
 - Thai is repaired on the way: legacy shifted-mark characters (U+F700–F71A), `ํา` for ำ, marks out of order, and Word's PDF-export faults (`จ ำกัด`, `ก าหนด`, bold `กิจกำร`, common words that lose ำ such as `กาไร`)
@@ -118,6 +120,8 @@ public/js/xlsx-core.js              # spreadsheet helpers: formats, styles, refe
 public/js/rich-text.js              # typed arrows and editing helpers
 public/js/pdf-text.js               # PDF text to blocks (headings, lists, tables, Thai repairs), Markdown and .docx
 public/js/pdf-ocr.js                # OCR for scanned or damaged pages (PaddleOCR + onnxruntime-web)
+public/js/pdf-realtext.js           # text boxes as real, shaped Thai text in the PDF; font faces and fallbacks
+public/fonts/                       # embeddable fonts (OFL / GPL): Sarabun, Noto Sans Thai, TH Sarabun New, TH SarabunPSK, LINE Seed Sans TH
 public/models/ocr/                  # PaddleOCR detection and Thai recognition models (ONNX)
 public/vendor/ort/                  # onnxruntime-web 1.20.1 (served from this site)
 public/js/themes.js                 # appearance (light/dark/device) and chart colour themes

@@ -1137,10 +1137,11 @@
         import { openXlsxEditor } from './js/xlsx-edit.js';
         import { openDocxEditor } from './js/docx-edit.js';
         import { pairHex } from './js/hex-color.js';
-        import { actionMenu, helpPop } from './js/view-tools.js';
+        import { actionMenu, helpPop, noticeBox } from './js/view-tools.js';
         import { markSaved } from './js/ribbon.js';
         import { openMd } from './js/md-edit.js';
-        import { pdfToBlocks, blocksToMd, blocksToDocx } from './js/pdf-text.js';
+        import { pdfToBlocks, blocksToMd, blocksToDocx, pdfFonts } from './js/pdf-text.js';
+        import { FACES } from './js/pdf-realtext.js';
         import { ocrPage } from './js/pdf-ocr.js';
         import { openGantt } from './js/gantt.js';
         import { openWordTable } from './js/word-table.js';
@@ -1177,14 +1178,22 @@
             document.body.append(a); a.click(); a.remove();
             setTimeout(() => URL.revokeObjectURL(a.href), 2000);
         };
-        let editor = null; let fileName = ''; let draftKey = '';
+        let editor = null; let fileName = ''; let draftKey = ''; let pdfLocked = false;
+        // A PDF locked by its author (it opens without a password, but changes are not allowed) has an /Encrypt entry
+        // in its trailer. pdf-lib cannot write such a file, so a marked copy cannot be downloaded; marking on screen,
+        // drafts and Word/Markdown still work.
+        const isLocked = (bytes) => /\/Encrypt\b/.test(new TextDecoder('latin1').decode(new Uint8Array(bytes)));
+        const lockedNotice = (name) => noticeBox('This PDF is locked by its author',
+            `<p>${name.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))} opens without a password, but whoever made it has locked it against changes, so a marked copy cannot be downloaded.</p>`
+            + '<p>You can still mark it up on screen, save a draft, and download its text as Word or Markdown. To download a marked copy, ask the author for an unlocked version, or print it to a new PDF and open that.</p>',
+            [{ v: true, label: 'OK', primary: true }], { tone: 'warn' });
 
         $('pdfFileInput').onchange = async (e) => {
             const f = e.target.files[0]; e.target.value = '';
             if (!f) return;
             if (editor?.isDirty() && !confirm('You have unsaved marks. Open another file anyway?')) return;
             const bytes = await f.arrayBuffer();
-            fileName = f.name; draftKey = `markup-draft:${f.name}:${bytes.byteLength}`;
+            fileName = f.name; draftKey = `markup-draft:${f.name}:${bytes.byteLength}`; pdfLocked = isLocked(bytes);
             let draft = null;
             try { draft = JSON.parse(localStorage.getItem(draftKey) || 'null'); } catch { /* no draft */ }
             status(`Opening ${f.name} (${mb(bytes.byteLength)})…`);
@@ -1192,8 +1201,26 @@
                 editor = await openPdfEditor($('pdfEditor'), { bytes, name: f.name, draft });
                 status(`${f.name} · ${mb(bytes.byteLength)}${draft ? ' · draft restored' : ''}`);
                 barActions($('pdfEditor'), 'mk', { open: () => $('pdfFileInput').click(), draft: pdfDraft, download: pdfDownload, more: PDF_FORMATS, tips: TIPS.pdf });
+                if (pdfLocked) lockedNotice(f.name).then(() => fontCaution(editor.doc, f.name)).catch((err) => console.warn('font check', err));
+                else fontCaution(editor.doc, f.name).catch((err) => console.warn('font check', err));
             } catch (err) { editor = null; status(err.message); console.error(err); }
         };
+
+        // Caution when the PDF uses fonts this site does not have (js/pdf-realtext.js FACES): the page still shows them
+        // as drawn, but text added here, and text written into the PDF, uses the nearest font the site has.
+        const fontKey = (n) => n.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const SITE_FONTS = new Set(Object.keys(FACES).map(fontKey));
+        const nearestFont = (n) => (/upc|psk|new$|thai|angsana|cordia|browallia|leelawadee|tahoma|kanit|prompt|mitr|sarabun|th /i.test(n) ? 'TH Sarabun New'
+            : /times|georgia|cambria|garamond|serif|book|minion/i.test(n) ? 'Times New Roman' : 'Arial');
+        async function fontCaution(doc, name) {
+            const missing = (await pdfFonts(doc)).filter((n) => !SITE_FONTS.has(fontKey(n)));
+            if (!missing.length || editor?.doc !== doc) return;
+            const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            await noticeBox('This PDF uses fonts the site does not have',
+                `<p>${esc(name)} uses ${missing.length > 1 ? 'these fonts' : 'this font'}:</p><ul>${missing.map((n) => `<li><b>${esc(n)}</b>: the nearest here is ${nearestFont(n)}</li>`).join('')}</ul>`
+                + '<p>The pages still show the original fonts. Text you add in a text box uses a font from the Font list, so it may look different from the text around it. Word downloads keep the font names; Word uses them if they are on the computer.</p>',
+                [{ v: true, label: 'OK', primary: true }], { tone: 'warn' });
+        }
 
         function pdfDraft() {
             try { localStorage.setItem(draftKey, JSON.stringify(editor.marks())); editor.clean(); status(`Draft saved on this device (${editor.marks().length} marks)`); return true; }
@@ -1237,12 +1264,14 @@
                 finally { pdfBusy = false; }
                 return;
             }
+            if (pdfLocked) { pdfBusy = false; status('This PDF is locked by its author, so a marked copy cannot be downloaded.'); lockedNotice(fileName); return; }
             status('Writing the marked PDF…');
             try {
                 const out = await editor.exportPdf();
                 if (out.byteLength > MAX_BYTES) { status(`Marked PDF is ${mb(out.byteLength)}: over the 12 MB limit`); return; }
                 download(out, fileName.replace(/\.pdf$/i, '') + ' (marked).pdf', 'application/pdf');
-                status(`Marked PDF downloaded (${mb(out.byteLength)})`);
+                const notes = editor.notes(); // e.g. a font that is not on this computer
+                status(`Marked PDF downloaded (${mb(out.byteLength)})${notes.length ? `. ${notes.join('; ')}.` : ''}`);
             } catch (err) { status(err.message); console.error(err); }
             finally { pdfBusy = false; }
         }
