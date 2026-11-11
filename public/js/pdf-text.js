@@ -164,7 +164,7 @@ const at = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]
 
 // Horizontal and vertical ruling lines on the page (stroked lines, thin filled bars, rectangle edges), in PDF units.
 function rulesOf(ops, vp) {
-  const H = []; const V = []; let m = [1, 0, 0, 1, 0, 0]; const stack = [];
+  const H = []; const V = []; let m = [1, 0, 0, 1, 0, 0]; const stack = []; const boxes = [];
   const paints = new Set([OPS.stroke, OPS.closeStroke, OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke]);
   const seg = ([x1, y1], [x2, y2]) => {
     if (Math.abs(y1 - y2) < 0.8 && Math.abs(x1 - x2) > 4) H.push({ y: (y1 + y2) / 2, a: Math.min(x1, x2), b: Math.max(x1, x2) });
@@ -190,9 +190,9 @@ function rulesOf(ops, vp) {
           const c = [at(m, x, y), at(m, x + w, y), at(m, x + w, y + h), at(m, x, y + h)];
           const wide = Math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1]); const tall = Math.hypot(c[3][0] - c[0][0], c[3][1] - c[0][1]);
           if (wide > vp.width * 0.9 && tall > vp.height * 0.9) continue; // page background
-          if (tall < 3) seg([c[0][0], (c[0][1] + c[3][1]) / 2], [c[1][0], (c[1][1] + c[2][1]) / 2]); // a thin bar is a line
-          else if (wide < 3) seg([(c[0][0] + c[1][0]) / 2, c[0][1]], [(c[3][0] + c[2][0]) / 2, c[3][1]]);
-          else for (let e = 0; e < 4; e++) seg(c[e], c[(e + 1) % 4]);
+          if (tall < 4.5) seg([c[0][0], (c[0][1] + c[3][1]) / 2], [c[1][0], (c[1][1] + c[2][1]) / 2]); // a thin bar is a line
+          else if (wide < 4.5) seg([(c[0][0] + c[1][0]) / 2, c[0][1]], [(c[3][0] + c[2][0]) / 2, c[3][1]]);
+          else boxes.push(c); // a shaded box: its edges count unless it sits inside another (see below)
           cur = start = c[0];
         } else if (op === OPS.closePath) { if (cur && start) seg(cur, start); cur = start; }
         else if (op === OPS.curveTo) { cur = at(m, co[k + 4], co[k + 5]); k += 6; }
@@ -200,6 +200,15 @@ function rulesOf(ops, vp) {
       }
     }
   }
+  // Word shades each text line with its own strip on top of the cell's shading: a box inside another box is shading,
+  // not a cell, so only the outer boxes give cell edges.
+  const span = (c) => { const xs = c.map((q) => q[0]); const ys = c.map((q) => q[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+  const spans = boxes.map(span);
+  boxes.forEach((c, i) => {
+    const [a, b, d, e] = spans[i];
+    if (spans.some(([p, q, r, t], j) => j !== i && p <= a + 1 && q <= b + 1 && r >= d - 1 && t >= e - 1 && (r - p) * (t - q) > (d - a) * (e - b) + 1)) return;
+    for (let k = 0; k < 4; k++) seg(c[k], c[(k + 1) % 4]);
+  });
   const merge = (list, key) => {
     list.sort((p, q) => p[key] - q[key] || p.a - q.a); const out = [];
     for (const l of list) {
@@ -245,6 +254,21 @@ const runsOf = (ln) => mergeRuns(ln.cells.flatMap((c, i) => (i ? [{ t: ' ', b: f
 // | { type: 'table', rows: [[text]] }. Also { pages, scanned: [page numbers without text] }.
 // ocr(page) -> text items (optional): scanned pages and pages with damaged Thai are read again by OCR;
 // onOcr(k, of, pageNumber) reports progress.
+// A table that runs on from the previous page (the last thing on that page, the first on this one, same number of
+// columns) joins it: a first row with an empty first cell continues the last row; a repeated header row is dropped.
+function joinTables(prev, t) {
+  if (prev?.type !== 'table' || prev.page !== t.page - 1 || prev.rows[0].length !== t.rows[0].length) return false;
+  const text = (r) => r.map((c) => c.map((x) => x.t).join('').trim());
+  let rows = t.rows;
+  if (JSON.stringify(text(rows[0])) === JSON.stringify(text(prev.rows[0]))) rows = rows.slice(1);
+  if (rows[0] && !text(rows[0])[0]) {
+    const last = prev.rows.at(-1);
+    rows[0].forEach((c, j) => { if (c.length) last[j] = last[j].length ? joinRuns(last[j], c) : c; });
+    rows = rows.slice(1);
+  }
+  prev.rows.push(...rows); prev.page = t.page; return true;
+}
+
 export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = () => {} } = {}) {
   const pages = [];
   for (let n = 1; n <= doc.numPages; n++) { onPage(n, doc.numPages); pages.push(await pageLines(await doc.getPage(n))); }
@@ -284,16 +308,17 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
   const levelOf = (size) => { const i = big.indexOf(Math.round(size * 2) / 2); return i < 0 ? 0 : Math.min(i + 1, 3); };
 
   const blocks = [];
+  const pushTable = (t, atTop) => { if (!(atTop && joinTables(blocks.at(-1), t))) blocks.push(t); };
   let carry = null; // a paragraph that may continue on the next page
-  for (const p of pages) {
-    const ls = p.lines;
+  for (const [pi, p] of pages.entries()) {
+    const ls = p.lines; const first = blocks.length;
     const gaps = ls.slice(1).map((l, i) => ls[i].y - l.y).filter((g) => g > 0).sort((a, b) => a - b);
     const lead = gaps[Math.floor(gaps.length / 2)] || body * 1.4; // usual line spacing on this page
     const left = Math.min(...ls.filter((l) => l.cells.length === 1).map((l) => l.x), Infinity);
     const right = Math.max(...ls.map((l) => l.x2), 0);
     let cur = null; let table = null;
     const grids = [...p.tables];
-    const flushGrids = (y) => { while (grids.length && grids[0].y > y) { close(); closeTable(); carry = null; const g = grids.shift(); blocks.push({ type: 'table', rows: g.rows, widths: g.widths }); } };
+    const flushGrids = (y) => { while (grids.length && grids[0].y > y) { close(); closeTable(); carry = null; const g = grids.shift(); pushTable({ type: 'table', rows: g.rows, widths: g.widths, page: pi }, blocks.length === first); } };
     const close = () => { if (cur) blocks.push(cur); cur = null; };
     const closeTable = () => {
       if (!table) return;
@@ -352,6 +377,7 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
     carry = lastB?.type === 'p' && !/[.!?:。]\s*$/.test(lastB.runs.map((r) => r.t).join('')) ? lastB : null;
   }
   // A short, all-bold, one-line paragraph is a sub-heading.
+  blocks.forEach((b) => { delete b.page; });
   const sub = Math.min(big.length + 1, 4);
   blocks.forEach((b) => { if (b.type === 'p' && b.bold && b.lines === 1 && b.runs.map((r) => r.t).join('').trim().length < 80) { b.type = 'h'; b.level = sub; } });
   // Word's PDF export can also drop ำ outright ("กาไร" for กำไร); fixed on whole paragraphs, as a word may span pieces.
