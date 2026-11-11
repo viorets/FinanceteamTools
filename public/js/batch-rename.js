@@ -3,6 +3,7 @@
 // Rules, applied in order: a name template with tokens, find and replace, numbering, letter case, tidy spaces.
 // An Excel or CSV list of old name -> new name can name the files instead. Presets keep a set of rules.
 import { noticeBox } from './view-tools.js';
+import { BI } from './pdf-merge.js';
 
 const JSZIP = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 const STORE = 'tusu-rename-presets';
@@ -49,25 +50,26 @@ export function openBatchRename(root, { download }) {
   const canFolder = typeof window.showDirectoryPicker === 'function';
   root.innerHTML = `
     <div class="sidebar bt-side">
-      <div class="control-group"><label for="rnFiles">Add files</label><input type="file" id="rnFiles" multiple>
-        <div class="bt-actions rn-src"><label class="gc-btn rn-pick">Add a folder<input type="file" id="rnFolder" webkitdirectory multiple hidden></label>${canFolder ? '<button type="button" class="gc-btn" id="rnDir" title="Chrome and Edge: rename the files where they are">Open folder to rename in place</button>' : ''}</div>
-        <p class="help-text">Or drop files here. Nothing is uploaded: the files stay on this device.</p></div>
-      <div class="control-group"><label for="rnPreset">Preset</label><div class="rn-row"><select id="rnPreset"><option value="">Choose a preset…</option></select><button type="button" class="bt-ic" id="rnDelP" title="Delete this preset" aria-label="Delete this preset">✕</button></div>
-        <div class="rn-row"><input type="text" id="rnPName" placeholder="Name, e.g. Receipts by date" aria-label="Preset name" autocomplete="off" maxlength="60"><button type="button" class="gc-btn" id="rnSaveP">Save preset</button></div></div>
+      <input type="file" id="rnFiles" multiple hidden><input type="file" id="rnFolder" webkitdirectory multiple hidden>
+      <div class="control-group"><span class="bt-label">Files</span><div class="bt-actions"><button type="button" class="gc-btn bt-add" id="rnAdd">${BI.add}<span>Add files</span></button><button type="button" class="gc-btn" id="rnAddDir">Add a folder</button></div>
+        ${canFolder ? '<button type="button" class="gc-btn gc-quiet rn-inplace" id="rnDir">Open a folder to rename in place</button>' : ''}
+        <p class="help-text">Or drop files here. Nothing is uploaded: the files stay on this device.${canFolder ? ' Renaming in place works in Chrome and Edge; elsewhere you get the renamed copies as a ZIP.' : ''}</p></div>
       <div class="control-group"><label for="rnTpl">New name</label><input type="text" id="rnTpl" autocomplete="off" spellcheck="false">
         <p class="help-text rn-tokens">Tokens: <button type="button" data-tok="{name}">{name}</button> <button type="button" data-tok="{n}">{n}</button> <button type="button" data-tok="{date}">{date}</button> <button type="button" data-tok="{today}">{today}</button> <button type="button" data-tok="{folder}">{folder}</button> <button type="button" data-tok="{ext}">{ext}</button><br>e.g. <code>อมธ_{date}_{n}_{name}</code></p></div>
       <details class="rn-set"><summary>Find and replace</summary>
         <div class="gc-pair"><input type="text" id="rnFind" placeholder="Find" aria-label="Find" autocomplete="off" spellcheck="false"><input type="text" id="rnRep" placeholder="Replace with" aria-label="Replace with" autocomplete="off" spellcheck="false"></div>
         <label class="rn-chk"><input type="checkbox" id="rnRegex"> Pattern (regular expression)</label><label class="rn-chk"><input type="checkbox" id="rnCase"> Match case</label></details>
-      <details class="rn-set"><summary>Numbering {n}</summary>
+      <details class="rn-set"><summary>Numbering</summary>
         <div class="rn-three"><label>Start <input type="number" id="rnStart" min="0" max="999999"></label><label>Step <input type="number" id="rnStep" min="1" max="1000"></label><label>Digits <input type="number" id="rnPad" min="1" max="8"></label></div>
         <label class="rn-chk"><input type="checkbox" id="rnThai"> Thai digits (๑ ๒ ๓)</label>
         <label>Order <select id="rnSort"><option value="added">As added (or moved)</option><option value="name">By name</option><option value="date">By date (oldest first)</option><option value="size">By size (smallest first)</option></select></label></details>
-      <details class="rn-set"><summary>Dates {date} {today}</summary>
+      <details class="rn-set"><summary>Dates</summary>
         <div class="gc-pair"><select id="rnDate" aria-label="Date format"><option value="dmy">dd-mm-yyyy</option><option value="ymd">yyyy-mm-dd</option><option value="compact">yyyymmdd</option></select><label class="rn-chk"><input type="checkbox" id="rnBe"> Buddhist year (2569)</label></div></details>
       <details class="rn-set"><summary>Tidy</summary>
         <label>Letters <select id="rnCaseMode"><option value="keep">As they are</option><option value="upper">UPPER CASE</option><option value="lower">lower case</option><option value="title">Title Case</option></select></label>
         <label class="rn-chk"><input type="checkbox" id="rnTidy"> Single spaces, none around _ and -</label><label class="rn-chk"><input type="checkbox" id="rnExt"> Keep the file type (.pdf, .xlsx…)</label></details>
+      <div class="control-group"><label for="rnPreset">Presets</label><div class="rn-row"><select id="rnPreset"><option value="">Choose a preset…</option></select><button type="button" class="bt-ic" id="rnDelP" title="Delete this preset" aria-label="Delete this preset">${BI.remove}</button></div>
+        <div class="rn-row"><input type="text" id="rnPName" placeholder="Name, e.g. Receipts by date" aria-label="Preset name" autocomplete="off" maxlength="60"><button type="button" class="gc-btn" id="rnSaveP">Save preset</button></div></div>
       <details class="rn-set"><summary>Names from a list</summary><input type="file" id="rnMap" accept=".xlsx,.xls,.csv" aria-label="Excel or CSV list of old and new names">
         <p class="help-text">An Excel or CSV sheet: old name in the first column, new name in the second. Files on the list take its name; the others follow the rules.</p></details>
     </div>
@@ -76,7 +78,10 @@ export function openBatchRename(root, { download }) {
         <button type="button" class="gc-btn gc-primary" id="rnZip" disabled>Download renamed (ZIP)</button>${canFolder ? '<button type="button" class="gc-btn" id="rnApply" disabled>Rename in folder</button><button type="button" class="gc-btn gc-quiet" id="rnUndo" hidden>Undo renaming</button>' : ''}<button type="button" class="gc-btn gc-quiet" id="rnClear" disabled>Clear</button></div>
       <p class="gc-status" id="rnStatus" role="status"></p>
       <div class="rn-wrap"><table class="rn-table"><thead><tr><th scope="col">#</th><th scope="col">Now</th><th scope="col">New name</th><th scope="col" aria-label="Order"></th></tr></thead><tbody id="rnBody"></tbody></table>
-        <div class="gc-empty" id="rnEmpty"><b>Rename many files at once.</b><br>Add files, set the new name with the rules on the left, check the list, then download them renamed as a ZIP${canFolder ? ' or rename them in their folder' : ''}.</div></div>
+        </div>
+      <div class="cx-empty" id="rnEmpty"><svg class="ed-ic" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M4 12h6M4 17h9"/><path d="m15.5 18.5 5-5-2-2-5 5-.6 2.6z"/></svg>
+        <h3>Rename many files at once</h3><p>Add files, set the new name with the rules, check this list, then download them renamed as a ZIP${canFolder ? ' or rename them in their folder' : ''}.</p>
+        <div class="cx-acts"><button type="button" class="action-btn" id="rnAdd2">Add files</button></div><p class="bt-quiet">Or drop them here. The files stay on this device.</p></div>
     </div>`;
   const status = (t) => { $('#rnStatus').textContent = t; };
   const ids = { rnTpl: 'template', rnFind: 'find', rnRep: 'replace', rnRegex: 'regex', rnCase: 'matchCase', rnStart: 'start', rnStep: 'step', rnPad: 'pad', rnThai: 'thai', rnDate: 'dateFmt', rnBe: 'be', rnCaseMode: 'caseMode', rnTidy: 'tidy', rnExt: 'keepExt', rnSort: 'sort' };
@@ -95,7 +100,9 @@ export function openBatchRename(root, { download }) {
     const name = $('#rnPName').value.trim() || $('#rnPreset').value; if (!name) { status('Give the preset a name first.'); $('#rnPName').focus(); return; }
     const o = presets(); o[name] = { ...st.r }; if (!savePresets(o)) { status('This browser does not allow saving presets.'); return; } drawPresets(); $('#rnPreset').value = name; $('#rnPName').value = ''; status(`Preset saved: ${name} (in this browser)`);
   };
-  $('#rnDelP').onclick = () => { const n = $('#rnPreset').value; if (!n) return; const o = presets(); delete o[n]; savePresets(o); drawPresets(); status(`Preset deleted: ${n}`); };
+  $('#rnDelP').onclick = async () => { const n = $('#rnPreset').value; if (!n) return;
+    if (!(await noticeBox(`Delete the preset "${n}"?`, '<p>Its rules are no longer kept in this browser. The files and names in the list stay as they are.</p>', [{ v: false, label: 'Keep it' }, { v: true, label: 'Delete', primary: true }], { none: false }))) return;
+    const o = presets(); delete o[n]; savePresets(o); drawPresets(); status(`Preset deleted: ${n}`); };
 
   // ---------- files in ----------
   let added = 0;
@@ -103,6 +110,7 @@ export function openBatchRename(root, { download }) {
     for (const f of fs) st.files.push({ name: f.name, file: f, lastModified: f.lastModified, size: f.size, folder: folderOf(f), handle: f.handle || null, added: added++ });
     st.undo = null; draw(); status(`${st.files.length} file${st.files.length === 1 ? '' : 's'}`);
   };
+  $('#rnAdd').onclick = () => $('#rnFiles').click(); $('#rnAdd2').onclick = () => $('#rnFiles').click(); $('#rnAddDir').onclick = () => $('#rnFolder').click();
   $('#rnFiles').onchange = (e) => { st.dir = null; addFiles(e.target.files); e.target.value = ''; };
   $('#rnFolder').onchange = (e) => { st.dir = null; addFiles([...e.target.files].filter((f) => !/^\./.test(f.name))); e.target.value = ''; };
   root.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); root.classList.add('ed-drop'); } });
@@ -137,7 +145,7 @@ export function openBatchRename(root, { download }) {
     return fs.map((f, i) => {
       const listed = st.map?.get(f.name.normalize('NFC'));
       let to = safeName(listed ? (st.r.keepExt && !/\.[^.]+$/.test(listed) && splitName(f.name).ext ? `${listed}.${splitName(f.name).ext}` : listed) : newName(f, i, st.r));
-      const empty = !splitName(to).base;
+      const empty = !splitName(to).base || to.startsWith('.'); // no name, or a hidden file (".pdf")
       if (!empty) {
         const key = to.toLowerCase(); let k = used.get(key) || 0; used.set(key, k + 1);
         if (k) { const { base, ext } = splitName(to); do { k++; to = `${base} (${k})${ext ? `.${ext}` : ''}`; } while (used.has(to.toLowerCase())); used.set(to.toLowerCase(), 1); }
@@ -148,11 +156,11 @@ export function openBatchRename(root, { download }) {
   function draw() {
     const rows = plan(); const n = rows.length; const changed = rows.filter((r) => !r.same && !r.empty).length; const bad = rows.filter((r) => r.empty).length;
     $('#rnCount').textContent = n ? `(${changed} of ${n} renamed${bad ? `, ${bad} without a name` : ''})` : '';
-    $('#rnEmpty').hidden = !!n; $('#rnZip').disabled = !n || !!bad; if ($('#rnApply')) $('#rnApply').disabled = !n || !!bad || !st.dir || !changed; $('#rnClear').disabled = !n;
+    $('#rnEmpty').hidden = !!n; $('.rn-wrap').hidden = !n; $('#rnZip').disabled = !n || !!bad; if ($('#rnApply')) $('#rnApply').disabled = !n || !!bad || !st.dir || !changed; $('#rnClear').disabled = !n;
     const manual = st.r.sort === 'added';
     $('#rnBody').innerHTML = rows.map((r, i) => `<tr class="${r.empty ? 'rn-bad' : r.same ? 'rn-same' : ''}"><td>${i + 1}</td><td class="rn-old" title="${esc(r.f.name)}">${esc(r.f.name)}</td>
-      <td class="rn-new" title="${esc(r.to)}">${r.empty ? '<em>No name: change the rules</em>' : esc(r.to)}${r.listed ? ' <span class="rn-tag">list</span>' : ''}</td>
-      <td class="rn-mv">${manual ? `<button type="button" class="bt-ic" data-mv="-1" data-a="${r.f.added}" aria-label="Move ${esc(r.f.name)} up"${i ? '' : ' disabled'}>↑</button><button type="button" class="bt-ic" data-mv="1" data-a="${r.f.added}" aria-label="Move ${esc(r.f.name)} down"${i < n - 1 ? '' : ' disabled'}>↓</button><button type="button" class="bt-ic" data-rm data-a="${r.f.added}" aria-label="Take ${esc(r.f.name)} off the list">✕</button>` : ''}</td></tr>`).join('');
+      <td class="rn-new" title="${esc(r.to)}">${r.empty ? '<em>No name (or only a file type): change the rules</em>' : esc(r.to)}${r.listed ? ' <span class="rn-tag">list</span>' : ''}</td>
+      <td class="rn-mv">${manual ? `<button type="button" class="bt-ic" data-mv="-1" data-a="${r.f.added}" aria-label="Move ${esc(r.f.name)} up"${i ? '' : ' disabled'}>${BI.up}</button><button type="button" class="bt-ic" data-mv="1" data-a="${r.f.added}" aria-label="Move ${esc(r.f.name)} down"${i < n - 1 ? '' : ' disabled'}>${BI.down}</button><button type="button" class="bt-ic" data-rm data-a="${r.f.added}" aria-label="Take ${esc(r.f.name)} off the list">${BI.close}</button>` : ''}</td></tr>`).join('');
   }
   $('#rnBody').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-a]'); if (!b) return; const k = st.files.findIndex((f) => f.added === +b.dataset.a);

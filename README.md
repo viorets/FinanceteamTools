@@ -83,19 +83,20 @@ The editor came from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinanc
 - Only what changed is rewritten: a text-only edit keeps every run's formatting; old `.doc` files are not supported
 
 ### Merge PDFs
-- Add several PDFs (or drop them on the page); each file's pages are added at the end, as page cards with thumbnails
+- **Add PDFs** (or drop them on the page); each file's pages are added at the end, as page cards with thumbnails. On iPad and narrow windows the pages come first and the file list under them
 - Keep only some pages of a file (**Pages**: `1-3, 5`, `8-`); move a whole file up or down with its pages
-- Put pages in order by dragging the cards, or with ← → on each card (touch and keyboard); ⟳ turns a page a quarter, ✕ removes it
+- Choose pages, then act on them: tap or click a page to choose it (Shift: a run of pages); the bar above the pages moves them **Earlier** or **Later**, **Turn**s them a quarter, or **Remove**s them. Pages can also be dragged (the chosen ones move together). Keyboard: arrows move between pages, Space chooses, Delete removes, Ctrl/⌘ + arrows move, Ctrl/⌘ + A chooses all, Esc chooses none
+- **Undo** (or Ctrl/⌘ + Z) takes back the last change, including removing a file or **Clear** (which asks first above 10 pages); a page range that cannot be read is shown under its field. Each card has the shape of its page (a landscape slide is a landscape card)
 - **Save as PDF**: Chrome and Edge ask where to save; other browsers download the file under the name given. Pages are copied with pdf-lib, so text stays searchable and links and fonts stay as they are
 - **Print**: the merged PDF opens in a new tab (opened on the tap, so Safari allows it), to print from there
 - A PDF locked by its author is added with a note; its pages are copied when the PDF allows it. Up to 100 MB of PDFs in all; above 12 MB the status line warns that saving may be slow on iPad
 
 ### Rename files
-- Add files, a whole folder, or drop them on the page; nothing is uploaded
+- **Add files**, **Add a folder**, or drop them on the page; nothing is uploaded. On iPad and narrow windows the preview comes first and the rules under it
 - **New name** template with tokens: `{name}` (the old name), `{n}` (a number), `{date}` (the file's date), `{today}`, `{folder}`, `{ext}`; e.g. `อมธ_{date}_{n}_{name}`
 - Folding sections: **Find and replace** (plain text or a pattern, match case), **Numbering** (start, step, digits, Thai digits; order as added, by name, date or size, or move files up and down), **Dates** (dd-mm-yyyy, yyyy-mm-dd or yyyymmdd; Buddhist year), **Tidy** (UPPER, lower or Title Case; single spaces; keep the file type), **Names from a list** (an Excel or CSV sheet of old name → new name; files on it take its name)
-- **Presets** keep a set of rules in this browser
-- The preview lists every file with its new name; names that clash get " (2)", " (3)"; characters that Windows or macOS do not allow become `_`; a rule that leaves a file without a name blocks the download until it is fixed
+- **Presets** (under the rules) keep a set of rules in this browser; deleting one asks first
+- The preview lists every file with its new name; names that clash get " (2)", " (3)"; characters that Windows or macOS do not allow become `_`; a name that is only a file type (".pdf", which would be a hidden file) is flagged; a rule that leaves a file without a name blocks the download until it is fixed
 - **Download renamed (ZIP)**: renamed copies in one ZIP, in every browser; the original files are unchanged
 - **Open folder to rename in place** (Chrome and Edge only): renames the files in that folder (through temporary names, so swapping two names works); **Undo renaming** puts the old names back while the page is open. Safari cannot change files on disk, so there it is the ZIP
 
