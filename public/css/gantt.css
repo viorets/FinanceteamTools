@@ -62,3 +62,13 @@
 .gc-del { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--ink-2); cursor: pointer; }
 .gc-del:hover { background: var(--danger-tint); color: var(--danger); }
 .gc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Dates typed as dd/mm/yyyy with a calendar button (js/gantt.js dateCell); the browser's picker sits hidden under it. */
+.gc-date { position: relative; display: flex; align-items: center; gap: 2px; }
+.gc-date input[type="text"] { flex: 1; font-variant-numeric: tabular-nums; }
+.gc-date input[aria-invalid] { border-color: var(--danger); background: var(--danger-tint, #fdecea); }
+.gc-cal { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--ink-2); cursor: pointer; }
+.gc-cal:hover:not(:disabled) { background: var(--tint); color: var(--ink); }
+.gc-cal:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.gc-cal:disabled { opacity: .35; cursor: default; }
+.gc-table input.gc-dpick { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }

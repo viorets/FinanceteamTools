@@ -47,6 +47,7 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 ### Gantt Chart Creator
 - Type tasks into the table (task, group, start, end, progress, milestone) or import an Excel sheet with columns Task, Start, End (optional: Group, Progress, Milestone; Thai headings work)
 - Gantt (one row per task) or timeline (one lane per group); days, weeks, months or quarters; English or Thai (B.E.) date labels; today line, progress and dates; gradient bars (PNG and SVG)
+- Dates are typed day/month/year (dd/mm/yyyy, whatever the browser's language; a Buddhist-era year such as 2569 counts as 2026) or picked from the calendar button
 - Group colours with HEX entry
 - Download **PNG** (3×, white or transparent background) or **SVG** (font included); both match the preview
 - Tasks are kept in this browser between visits

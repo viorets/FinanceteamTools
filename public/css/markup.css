@@ -42,7 +42,7 @@
 /* Pages. A finger scrolls; two fingers zoom the pages (the editor's own zoom, not the browser's). Pages wider than the
    view stay reachable on the left (auto margins centre them only while they fit). */
 .mk-pages { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: calc(var(--bar-h, 56px) + 24px) 16px 16px; scroll-padding-top: calc(var(--bar-h, 56px) + 16px); display: flex; flex-direction: column; align-items: flex-start; gap: 16px; touch-action: pan-x pan-y; }
-.mk-wait { color: #6e6e73; align-self: center; }
+.mk-wait { color: var(--ink-2, #6e6e73); align-self: center; }
 .mk-page { position: relative; flex: none; margin: 0 auto; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .12); touch-action: pan-x pan-y; }
 /* Touch (iPad, v2.13): no scrolling while drawing or when a finger starts on a text box or mark. */
 .mk:is([data-tool=pen], [data-tool=line], [data-tool=arrow], [data-tool=rect]) .mk-page, .mk[data-tool=select] :is(.mk-box, .mk-mark) { touch-action: none; }

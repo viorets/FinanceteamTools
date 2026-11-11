@@ -374,30 +374,64 @@ export function openGantt(root, { download }) {
   let t0 = 0; const redrawSoon = () => { clearTimeout(t0); t0 = setTimeout(() => draw(), 120); };
 
   const COLS = ['name', 'group', 'start', 'end', 'progress', 'milestone'];
+  // Dates are typed day/month/year (as in Thailand), whatever the browser's language; the calendar button opens the
+  // browser's own date picker. Stored as yyyy-mm-dd, as before. A Buddhist-era year (2569) is read as 2026.
+  const dmy = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+  const isoFrom = (txt) => {
+    const v = txt.trim(); let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(v); let y, mo, d;
+    if (m) [, y, mo, d] = m.map(Number); else if ((m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v))) [, d, mo, y] = m.map(Number); else return null;
+    if (y > 2400) y -= 543;
+    const dt = new Date(Date.UTC(y, mo - 1, d)); if (dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+    return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+  const CAL = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+  const dateCell = (k, label) => `<td><span class="gc-date"><input type="text" data-k="${k}" data-date inputmode="numeric" placeholder="dd/mm/yyyy" aria-label="${label} (day/month/year)" autocomplete="off" maxlength="10"><button type="button" class="gc-cal" data-pick="${k}" aria-label="Pick the ${label.toLowerCase()} on a calendar" title="Calendar">${CAL}</button><input type="date" class="gc-dpick" data-for="${k}" tabindex="-1" aria-hidden="true"></span></td>`;
+  const setEndOff = (tr, off) => tr.querySelectorAll('[data-k="end"], [data-pick="end"]').forEach((el) => { el.disabled = off; });
   function rowsUi() {
     const tb = $('#gcRows'); tb.replaceChildren();
     st.tasks.forEach((t, i) => {
       const tr = document.createElement('tr'); tr.dataset.i = i;
       tr.innerHTML = `<td><input type="text" data-k="name" aria-label="Task name" placeholder="Task name…" autocomplete="off"></td>
         <td><input type="text" data-k="group" aria-label="Group" list="gcGroups" placeholder="Group…" autocomplete="off"></td>
-        <td><input type="date" data-k="start" aria-label="Start date"></td>
-        <td><input type="date" data-k="end" aria-label="End date"></td>
+        ${dateCell('start', 'Start date')}
+        ${dateCell('end', 'End date')}
         <td><input type="number" data-k="progress" aria-label="Progress in percent" min="0" max="100" step="5" inputmode="numeric"></td>
         <td class="gc-c"><input type="checkbox" data-k="milestone" aria-label="Milestone (one day)"></td>
         <td class="gc-c"><button type="button" class="gc-del" aria-label="Remove task ${i + 1}" title="Remove task">${ICON.del}</button></td>`;
-      COLS.forEach((k) => { const el = tr.querySelector(`[data-k="${k}"]`); if (k === 'milestone') el.checked = !!t.milestone; else el.value = t[k] ?? ''; });
-      tr.querySelector('[data-k="end"]').disabled = !!t.milestone;
+      COLS.forEach((k) => { const el = tr.querySelector(`[data-k="${k}"]`); if (k === 'milestone') el.checked = !!t.milestone; else if (el.dataset.date != null) el.value = dmy(t[k]); else el.value = t[k] ?? ''; });
+      setEndOff(tr, !!t.milestone);
       tb.append(tr);
     });
   }
   $('#gcRows').addEventListener('input', (e) => {
     const k = e.target.dataset.k; const tr = e.target.closest('tr'); if (!k || !tr) return;
     const t = st.tasks[+tr.dataset.i];
+    if (e.target.dataset.date != null) { // a typed date counts once it is a whole, real date
+      const v = e.target.value.trim(); const iso = v ? isoFrom(v) : '';
+      e.target.toggleAttribute('aria-invalid', iso === null && v.length >= 8); if (iso === null) return;
+      t[k] = iso; save(); redrawSoon(); return;
+    }
     t[k] = k === 'milestone' ? e.target.checked : k === 'progress' ? (e.target.value === '' ? '' : Math.min(100, Math.max(0, +e.target.value))) : e.target.value;
-    if (k === 'milestone') tr.querySelector('[data-k="end"]').disabled = t.milestone;
+    if (k === 'milestone') setEndOff(tr, t.milestone);
     save(); redrawSoon();
   });
+  // Leaving a date field tidies it to dd/mm/yyyy (or back to the last good date).
+  $('#gcRows').addEventListener('focusout', (e) => {
+    if (e.target.dataset?.date == null) return; const t = st.tasks[+e.target.closest('tr').dataset.i];
+    e.target.value = dmy(t[e.target.dataset.k]); e.target.removeAttribute('aria-invalid');
+  });
+  // The calendar button: the browser's date picker, from a hidden date box beside the field.
+  $('#gcRows').addEventListener('change', (e) => {
+    const k = e.target.dataset.for; if (!k) return; const tr = e.target.closest('tr'); const t = st.tasks[+tr.dataset.i];
+    t[k] = e.target.value; tr.querySelector(`[data-k="${k}"]`).value = dmy(t[k]); save(); redrawSoon();
+  });
   $('#gcRows').addEventListener('click', (e) => {
+    const cal = e.target.closest('.gc-cal');
+    if (cal) {
+      const tr = cal.closest('tr'); const k = cal.dataset.pick; const pick = tr.querySelector(`[data-for="${k}"]`);
+      pick.value = st.tasks[+tr.dataset.i][k] || ''; try { pick.showPicker(); } catch { pick.focus(); pick.click(); }
+      return;
+    }
     const b = e.target.closest('.gc-del'); if (!b) return;
     st.tasks.splice(+b.closest('tr').dataset.i, 1); save(); rowsUi(); draw();
   });
