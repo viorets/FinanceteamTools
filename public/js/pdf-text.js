@@ -47,9 +47,10 @@ const ITALIC = /italic|oblique/i;
 const LIST = /^\s*(?:([•●▪■◦○◆❖➢➤►✓✔\-–—*·])|(\d{1,3})[.)]|([๐-๙]{1,3}|[a-zA-Zก-ฮ])[.)]|\(([\d๐-๙]{1,3}|[a-zA-Zก-ฮ])\))\s+/;
 
 // One page -> lines (top to bottom). A line is cells (split at wide gaps); a cell is runs { t, b, i }.
-async function pageLines(page) {
+// items: text items from OCR (js/pdf-ocr.js) instead of the page's own text.
+async function pageLines(page, items = null) {
   const ops = await page.getOperatorList(); // also loads the fonts, so their names (Bold, Italic) can be read
-  const tc = await page.getTextContent();
+  const tc = items ? { items, styles: {} } : await page.getTextContent();
   // A font that writes ำ where า belongs (TH Sarabun bold in Word's PDF export: "กิจกำร"): it has many ำ and no า.
   const amaa = {};
   tc.items.forEach((it) => { const c = (amaa[it.fontName] ||= [0, 0]); c[0] += (it.str?.match(/ำ/g) || []).length; c[1] += (it.str?.match(/า/g) || []).length; });
@@ -242,7 +243,9 @@ const runsOf = (ln) => mergeRuns(ln.cells.flatMap((c, i) => (i ? [{ t: ' ', b: f
 
 // Whole document -> blocks: { type: 'h', level, runs } | { type: 'p', runs } | { type: 'li', marker, ordered, runs }
 // | { type: 'table', rows: [[text]] }. Also { pages, scanned: [page numbers without text] }.
-export async function pdfToBlocks(doc, { onPage = () => {} } = {}) {
+// ocr(page) -> text items (optional): scanned pages and pages with damaged Thai are read again by OCR;
+// onOcr(k, of, pageNumber) reports progress.
+export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = () => {} } = {}) {
   const pages = [];
   for (let n = 1; n <= doc.numPages; n++) { onPage(n, doc.numPages); pages.push(await pageLines(await doc.getPage(n))); }
   const scanned = pages.map((p, i) => (p.lines.reduce((s, l) => s + l.text.length, 0) < 10 && p.images ? i + 1 : 0)).filter(Boolean);
@@ -258,6 +261,11 @@ export async function pdfToBlocks(doc, { onPage = () => {} } = {}) {
     const thai = (t.match(/[฀-๿]+/g) || []).length; const odd = (t.match(ODD) || []).length + (t.match(GAP) || []).length;
     return thai >= 10 && odd >= 3 && odd / thai > 0.03 ? i + 1 : 0;
   }).filter(Boolean);
+  const ocred = ocr ? [...new Set([...scanned, ...damaged])].sort((a, b) => a - b) : [];
+  for (const [k, n] of ocred.entries()) {
+    onOcr(k + 1, ocred.length, n);
+    const page = await doc.getPage(n); pages[n - 1] = await pageLines(page, await ocr(page));
+  }
 
   // Running headers and footers: lines in the top or bottom 9% of the page that repeat (numbers ignored) on at least
   // half the pages, and lone page numbers.
@@ -350,7 +358,7 @@ export async function pdfToBlocks(doc, { onPage = () => {} } = {}) {
   blocks.forEach((b) => (b.rows ? b.rows.flat() : [b.runs]).forEach((rs) => rs.forEach((r) => { r.t = r.t.replace(LOST_AM, (w) => AM_WORDS[w]); })));
   const fam = {}; pages.forEach((p) => Object.entries(p.fonts).forEach(([k, v]) => { fam[k] = (fam[k] || 0) + v; }));
   const font = Object.entries(fam).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-  return { blocks, pages: pages.length, scanned, damaged, font, size: body, page: { w: pages[0]?.width || 595, h: pages[0]?.height || 842 } };
+  return { blocks, pages: pages.length, scanned, damaged, ocred, font, size: body, page: { w: pages[0]?.width || 595, h: pages[0]?.height || 842 } };
 }
 
 // Runs with "\n" -> one runs list per line.

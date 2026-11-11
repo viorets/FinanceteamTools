@@ -44,7 +44,8 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 - **Download as Word (.docx)** or **Markdown** (or **Open in Markdown editor**) turns the PDF's own text into a document (`public/js/pdf-text.js`): headings from text size and bold lines, paragraphs, numbered and bulleted lists, and tables. Bordered tables follow the PDF's ruling lines (cells keep their wrapped text); borderless label-and-text layouts and column layouts become tables too. Running headers, footers and page numbers are left out
 - The Word file uses the PDF's main font (e.g. TH Sarabun New) and body size, Heading 1–4, Word bullets and numbering, bold and italic, and bordered tables with the PDF's column widths. Thai words are joined by zero-width spaces so Word wraps Thai lines where the browser's Thai word breaker allows (without them Word wraps only at spaces). Checked by opening the files in Microsoft Word
 - Thai is repaired on the way: legacy shifted-mark characters (U+F700–F71A), `ํา` for ำ, marks out of order, and Word's PDF-export faults (`จ ำกัด`, `ก าหนด`, bold `กิจกำร`, common words that lose ำ such as `กาไร`)
-- Pages whose stored Thai is damaged by the program that made the PDF (letters and symbols inside words, as from Safari or Microsoft Forms) and scanned pages without text are named in the status line; reading those needs OCR (a later step)
+- **OCR**: scanned pages, and pages whose stored Thai is damaged by the program that made the PDF (letters and symbols inside words, as from Safari or Microsoft Forms), are read from the page image instead (`public/js/pdf-ocr.js`): PaddleOCR (PP-OCRv3 mobile detection + PP-OCRv5 Thai recognition) running in the browser with onnxruntime-web; the file never leaves the device. About 4–5 s a page; the status line names the OCR pages so names and figures can be checked. Measured about 90% of characters right on a 200-dpi scan (small tone marks are the usual misses)
+- OCR files are served from this site: models in `public/models/ocr/` (about 10 MB, Apache-2.0, ONNX from [monkt/paddleocr-onnx](https://huggingface.co/monkt/paddleocr-onnx)) and the engine in `public/vendor/ort/` (onnxruntime-web 1.20.1, MIT, about 11 MB). They load the first time OCR is used and are cached for 30 days (`firebase.json`)
 
 The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinanceFeedback) (`public/js/markup/pdf-markup.js`).
 
@@ -91,7 +92,7 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 |---|---|---|
 | Chart from Excel | Sharp SVG charts in the team colours; Thai labels embedded (LINE Seed Sans TH) | Needs a tidy table; other fonts are only named in the SVG |
 | Excel to Word table | Word table styles; copy into Word or download a real .docx; wide form sheets become readable question/answer blocks | Values only, formulas become results; very wide sheets cannot stay one table |
-| PDF editing | Thai rich text boxes, highlights, shapes, drafts, full screen; PDF text to Word or Markdown with tables and Thai repairs | Adds marks on top: cannot edit the PDF's own text or fill form fields; 12 MB limit; Markdown needs text in the PDF (no OCR yet); slides, posters and borderless figure tables convert roughly; Canva's lost tone marks are not detected |
+| PDF editing | Thai rich text boxes, highlights, shapes, drafts, full screen; PDF text to Word or Markdown with tables and Thai repairs | Adds marks on top: cannot edit the PDF's own text or fill form fields; 12 MB limit; OCR is slower and can miss small tone marks; slides, posters and borderless figure tables convert roughly; Canva's lost tone marks are not detected |
 | Gantt Chart Creator | Quick Gantt or timeline from typed tasks or Excel; PNG/SVG match the preview | No dependencies or critical path; tasks stay in this browser |
 | Excel editing (beta) | Excel-like ribbon, live formulas, no size limit, Format as table, many export formats | Charts, images and pivot tables are dropped; filtered-out rows hidden on screen only |
 | Markdown editing | Fast writing with a live preview; Excel ranges paste as tables; .md, .html, Word, PDF downloads | PDF goes through the print window; images must be web addresses (no upload); Word file is .doc (web format) |
@@ -115,7 +116,10 @@ public/js/ribbon.js                 # ribbon (tabs + groups) for the Excel, Word
 public/js/gradient.js               # gradient fill for the charts (Gantt, Chart from Excel)
 public/js/xlsx-core.js              # spreadsheet helpers: formats, styles, reference shifting, TEXT() fix
 public/js/rich-text.js              # typed arrows and editing helpers
-public/js/pdf-text.js               # PDF text to blocks (headings, lists, tables, Thai repairs) and Markdown
+public/js/pdf-text.js               # PDF text to blocks (headings, lists, tables, Thai repairs), Markdown and .docx
+public/js/pdf-ocr.js                # OCR for scanned or damaged pages (PaddleOCR + onnxruntime-web)
+public/models/ocr/                  # PaddleOCR detection and Thai recognition models (ONNX)
+public/vendor/ort/                  # onnxruntime-web 1.20.1 (served from this site)
 public/js/themes.js                 # appearance (light/dark/device) and chart colour themes
 public/css/themes.css               # interface colours for light and dark
 public/js/md-edit.js                # Markdown editor (marked + DOMPurify)

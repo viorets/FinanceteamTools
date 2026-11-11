@@ -6,6 +6,14 @@
       {
         "source": "**/*.@(html|js|css)",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "**/*.@(onnx|wasm|mjs|ttf|woff2)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=2592000" }]
+      },
+      {
+        "source": "/models/**",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=2592000" }]
       }
     ]
   }
