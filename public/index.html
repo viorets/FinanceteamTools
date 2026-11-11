@@ -113,6 +113,11 @@
         .tab-btn:hover:not(.active) { background-color: var(--tint); }
         .tab-btn.active { background-color: var(--primary); color: var(--on-primary); font-weight: 600; }
         .tab-btn:focus-visible { outline: 2px solid var(--palette-2); outline-offset: 2px; }
+        /* Tool groups (Make, Edit, Batch): small headings in the side menu and in the narrow-screen list. */
+        .tab-group { display: block; margin: 14px 12px 2px; font-size: 12px; font-weight: bold; color: var(--ink-2); }
+        .tab-group:first-child { margin-top: 0; }
+        .tool-switch { display: none; }
+        .sr-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
         .tab-btn .beta { margin-left: auto; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: normal; background: var(--tint); }
         .tab-btn.active .beta { background: rgba(255, 255, 255, .2); }
         .theme-pick { padding: 0 8px 16px; border-bottom: 1px solid var(--border); }
@@ -149,11 +154,20 @@
             .brand { padding: 0; }
             .brand h1 span { display: none; }
             .brand h1 { white-space: nowrap; }
-            .tabs-container { flex-direction: row; padding-right: 12px; } /* room to scroll the last tab clear of the edge */
-            .tab-btn { position: relative; width: auto; white-space: nowrap; }
-            /* Only the open tool keeps its name, so it always fits in view; the others show their icon (name in the tooltip). */
-            .tab-btn:not(.active) { padding: 10px; }
-            .tab-btn:not(.active) > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+            /* The open tool's name is a button; it opens the whole list, named and grouped, under the bar (no tool sits
+               out of sight at the end of a sideways strip). */
+            .side { overflow: visible; }
+            .tool-switch { display: flex; align-items: center; gap: 8px; margin-left: auto; min-height: 44px; padding: 0 14px; border: 0; border-radius: 10px;
+                background: var(--primary); color: var(--on-primary); font: inherit; font-size: 15px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+            .tool-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+            .tool-now { display: flex; align-items: center; gap: 8px; }
+            .tool-now .beta { display: none; }
+            .tool-switch[aria-expanded="true"] > svg { transform: rotate(180deg); }
+            .tabs-container { display: none; position: absolute; top: calc(100% + 6px); right: 12px; z-index: 30; width: min(300px, calc(100vw - 24px)); max-height: calc(100dvh - 90px);
+                overflow-y: auto; padding: 8px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 16px; background: var(--glass-solid, var(--surface));
+                box-shadow: 0 12px 32px rgba(0, 45, 55, .18), 0 1px 2px rgba(0, 45, 55, .08); }
+            .side.tools-open .tabs-container { display: flex; }
+            .tabs-container .tab-group:first-child { margin-top: 4px; }
             .app-main { padding: 16px; }
             .theme-pick { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; } /* right after the brand, before the tool tabs */
             .pick-label, .mode-pick legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
@@ -446,16 +460,20 @@
             </details>
         </div>
 
-        <div class="tabs-container" role="tablist" aria-orientation="vertical">
+        <button type="button" class="tool-switch" id="toolSwitch" aria-expanded="false" aria-controls="toolList"><span class="tool-now"></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><span class="sr-label">All tools</span></button>
+        <div class="tabs-container" id="toolList" role="tablist" aria-orientation="vertical" aria-label="Tools">
+            <span class="tab-group" aria-hidden="true">Make</span>
             <button type="button" class="tab-btn active" role="tab" aria-selected="true" aria-controls="svgTool" onclick="switchTab('svgTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V8M18 17v-8"/></svg><span>Chart from Excel</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="wordTool" onclick="switchTab('wordTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg><span>Word table from Excel</span></button>
-            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="pdfTool" onclick="switchTab('pdfTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 17 .8-2.6 4.6-4.6 1.8 1.8-4.6 4.6z"/></svg><span>PDF markup</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="ganttTool" onclick="switchTab('ganttTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4v16h18"/><path d="M7 8h6M10 12h8M8 16h5"/></svg><span>Gantt chart</span></button>
-            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="xlsxTool" onclick="switchTab('xlsxTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg><span>Excel editor</span><span class="beta">beta</span></button>
+            <span class="tab-group" aria-hidden="true">Edit</span>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="pdfTool" onclick="switchTab('pdfTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 17 .8-2.6 4.6-4.6 1.8 1.8-4.6 4.6z"/></svg><span>PDF markup</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="docxTool" onclick="switchTab('docxTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><span>Word editor</span><span class="beta">beta</span></button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="xlsxTool" onclick="switchTab('xlsxTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/><rect x="9" y="9" width="6" height="6" fill="currentColor" stroke="none"/></svg><span>Excel editor</span><span class="beta">beta</span></button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="mdTool" onclick="switchTab('mdTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15V9l2.5 3L11 9v6M16 9v6M13.5 12.5 16 15l2.5-2.5"/></svg><span>Markdown editor</span></button>
+            <span class="tab-group" aria-hidden="true">Batch</span>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="mergeTool" onclick="switchTab('mergeTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/><path d="M14 7h5a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-5"/><path d="M10 10h6M13 7v6"/></svg><span>Merge PDFs</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="renameTool" onclick="switchTab('renameTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M4 12h6M4 17h9"/><path d="m15.5 18.5 5-5-2-2-5 5-.6 2.6z"/></svg><span>Rename files</span></button>
-            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="mdTool" onclick="switchTab('mdTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15V9l2.5 3L11 9v6M16 9v6M13.5 12.5 16 15l2.5-2.5"/></svg><span>Markdown editor</span></button>
         </div>
     </nav>
     <main class="app-main" id="main" tabindex="-1">
@@ -698,15 +716,27 @@
             btnElement.classList.add('active');
             btnElement.setAttribute('aria-selected', 'true');
             showTab(btnElement);
+            // Narrow screens: the open tool's icon and name on the switch, and the list closes once a tool is chosen.
+            const now = document.querySelector('.tool-now'); if (now) { now.replaceChildren(...[...btnElement.children].map((c) => c.cloneNode(true))); }
+            document.querySelector('.side')?.classList.remove('tools-open'); document.getElementById('toolSwitch')?.setAttribute('aria-expanded', 'false');
             // The open tool is in the address (#pdf, #gantt …), so a link or a reload opens it again.
             const hash = '#' + tabId.replace(/Tool$/, '');
             if (location.hash !== hash) history.replaceState(null, '', hash);
         }
 
-        // Tool names as tooltips: on narrow screens only the open tool shows its name.
+        // The tool list on narrow screens: the switch opens it; a tap outside, Esc or choosing a tool closes it.
+        (() => {
+            const sw = document.getElementById('toolSwitch'); const side = sw.closest('.side');
+            const set = (open) => { side.classList.toggle('tools-open', open); sw.setAttribute('aria-expanded', String(open)); if (open) side.querySelector('.tab-btn.active')?.focus(); };
+            sw.onclick = () => set(!side.classList.contains('tools-open'));
+            document.addEventListener('pointerdown', (e) => { if (side.classList.contains('tools-open') && !side.contains(e.target)) set(false); });
+            side.addEventListener('keydown', (e) => { if (e.key === 'Escape' && side.classList.contains('tools-open')) { set(false); sw.focus(); } });
+        })();
+        // Tool names as tooltips.
         document.querySelectorAll('.tab-btn').forEach((b) => { b.title = b.querySelector('span').textContent; });
         // Open the tool named in the address (#svg, #word, #pdf, #gantt, #xlsx, #docx, #md, #merge, #rename).
         (() => { const b = document.querySelector(`[aria-controls="${location.hash.slice(1)}Tool"]`); if (b) switchTab(b.getAttribute('aria-controls'), b); })();
+        { const now = document.querySelector('.tool-now'); const b = document.querySelector('.tab-btn.active'); if (now && !now.childNodes.length && b) now.replaceChildren(...[...b.children].map((c) => c.cloneNode(true))); }
         // Web fonts widen the tab names after the first layout: keep the open tool in view once they have loaded.
         const keepTab = () => showTab(document.querySelector('.tab-btn.active'));
         document.fonts?.ready.then(keepTab); addEventListener('load', keepTab);

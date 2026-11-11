@@ -421,7 +421,12 @@ export async function openDocxEditor(root, bytes) {
   const rb = ribbon(spec, 'de', 1); $('.de-top').append(rb);
   const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('de', undefined, { help: true }); $('.de-top').append(tools);
   const view = cssZoom(box, scroller, () => sheet, 'de');
-  requestAnimationFrame(() => { const room = scroller.clientWidth - 48; if (room > 0 && page.offsetWidth > room) view.zoomTo(room / page.offsetWidth); });
+  // The page fits the window's width when it opens, and again when the window narrows (an iPad turned to portrait):
+  // only ever smaller, so a zoom the user chose to read closer stays until it no longer fits.
+  const fit = () => { const room = scroller.clientWidth - 48; if (room > 0 && page.offsetWidth * view.get() > room) view.zoomTo(room / page.offsetWidth); };
+  let fitW = 0; // refit only when the width shrinks (not when the ribbon wraps and the height changes)
+  requestAnimationFrame(() => { fitW = scroller.clientWidth; fit(); });
+  new ResizeObserver(() => { const w = scroller.clientWidth; if (w < fitW - 1) requestAnimationFrame(fit); fitW = w; }).observe(scroller);
   fullScreen(box, 'de', 'oe-full');
   floatBar(box, $('.oe-bar'));
   const syncFc = pairHex($('#de-fc')); const syncHl = pairHex($('#de-hl')); pairHex($('#de-shc'));
