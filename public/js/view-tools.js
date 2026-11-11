@@ -115,7 +115,7 @@ export function fullScreen(box, p, cls, t = (en) => en, onChange = () => {}) {
   names.forEach((n) => document.addEventListener(n, onFs));
   const onKey = (e) => {
     if (!box.isConnected) { document.removeEventListener('keydown', onKey); return; }
-    if (e.key !== 'Escape' || !isOn() || fsEl() || e.target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (e.key !== 'Escape' || e.defaultPrevented || !isOn() || fsEl() || /INPUT|SELECT/.test(e.target.tagName)) return; // typing in the text or page still leaves
     set(false);
   };
   document.addEventListener('keydown', onKey);
@@ -160,7 +160,12 @@ export function actionMenu(btn, items, onPick) {
   m.hidden = false; m.style.top = `${r.bottom + 6}px`; m.style.left = `${Math.max(8, Math.min(r.right - 240, innerWidth - 248))}px`;
   m.querySelector('button').focus();
   const close = (e) => { if (e && m.contains(e.target)) return; m.hidden = true; removeEventListener('pointerdown', close, true); removeEventListener('keydown', key, true); };
-  const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); btn.focus(); } };
+  const key = (e) => {
+    if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); btn.focus(); return; }
+    const all = [...m.querySelectorAll('button')]; const i = all.indexOf(document.activeElement);
+    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: all.length - 1 }[e.key]; if (to == null) return;
+    e.preventDefault(); all[(to + all.length) % all.length].focus();
+  };
   addEventListener('pointerdown', close, true); addEventListener('keydown', key, true);
   m.onclick = (e) => { const b = e.target.closest('[data-v]'); if (!b) return; close(); onPick(b.dataset.v); };
 }

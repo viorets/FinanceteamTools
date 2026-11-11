@@ -147,7 +147,7 @@ export function openMd(root, { download }) {
   }
   function paint(frag, src) {
     const top = prev.scrollTop; doc.replaceChildren(frag); prev.scrollTop = top;
-    doc.querySelectorAll('input[type="checkbox"]').forEach((c, k) => { c.disabled = false; c.dataset.k = k; c.setAttribute('aria-label', 'Done'); c.contentEditable = 'false'; });
+    doc.querySelectorAll('input[type="checkbox"]').forEach((c, k) => { c.disabled = false; c.dataset.k = k; c.setAttribute('aria-label', `Done: ${(c.closest('li')?.textContent || '').trim().slice(0, 80) || 'task'}`); c.contentEditable = 'false'; });
     snap = { src, orig: new Map([...doc.children].filter((el) => el.dataset.s != null).map((el) => [el, el.outerHTML])) };
     if (caretAt != null) { placeCaret(caretAt); caretAt = null; }
   }
@@ -187,7 +187,7 @@ export function openMd(root, { download }) {
   doc.addEventListener('focusout', (e) => { if (!doc.contains(e.relatedTarget) && pullT) { clearTimeout(pullT); pull(); } });
   // "-->" / "==>" typed on the page become arrows, as in the text.
   function arrowHere() {
-    const sel = getSelection(); const n = sel.anchorNode; if (n?.nodeType !== 3) return;
+    const sel = getSelection(); const n = sel.anchorNode; if (n?.nodeType !== 3 || n.parentElement.closest('code, pre')) return;
     const before = n.data.slice(0, sel.anchorOffset); const len = ARROWS[before.slice(-3)] ? 3 : ARROWS[before.slice(-2)] ? 2 : 0; if (!len) return;
     const r = document.createRange(); r.setStart(n, sel.anchorOffset - len); r.setEnd(n, sel.anchorOffset); sel.removeAllRanges(); sel.addRange(r);
     document.execCommand('insertText', false, ARROWS[before.slice(-len)]);
@@ -333,6 +333,12 @@ export function openMd(root, { download }) {
   $('#md-hr').onclick = () => block('\n---\n');
 
   // ---------- typing helpers ----------
+  // Is position `at` inside code: a fenced block (``` or ~~~ lines above it, odd count) or `inline code` on its line?
+  function inCode(at) {
+    const v = ta.value; const before = v.slice(0, at); const ls = before.lastIndexOf('\n') + 1;
+    if ((before.slice(0, ls).match(/^ {0,3}(```|~~~)/gm) || []).length % 2) return true;
+    return ((before.slice(ls).match(/`/g) || []).length % 2) === 1;
+  }
   let plainPaste = false;
   ta.addEventListener('keydown', (e) => {
     const mod = e.ctrlKey || e.metaKey;
@@ -352,14 +358,14 @@ export function openMd(root, { download }) {
     if (e.inputType === 'insertText' && e.data === '>') {
       const s = ta.selectionStart; const line = ta.value.slice(ta.value.lastIndexOf('\n', s - 1) + 1, s);
       const len = ARROWS[line.slice(-3)] ? 3 : ARROWS[line.slice(-2)] ? 2 : 0;
-      if (len && !line.includes('<!--')) { const rep = ARROWS[line.slice(-len)]; ta.setSelectionRange(s - len, s); insert(rep); return; } // not inside an HTML comment
+      if (len && !line.includes('<!--') && !inCode(s - len)) { const rep = ARROWS[line.slice(-len)]; ta.setSelectionRange(s - len, s); insert(rep); return; } // not inside an HTML comment
     }
     changed();
   });
   // A range copied from Excel (tab-separated rows) becomes a Markdown table.
   ta.addEventListener('paste', (e) => {
     const t = e.clipboardData.getData('text/plain'); const plain = plainPaste; plainPaste = false;
-    if (plain || !t.includes('\t')) return;
+    if (plain || !t.includes('\t') || inCode(ta.selectionStart)) return;
     const rows = t.replace(/\r/g, '').replace(/\n+$/, '').split('\n').map((r) => r.split('\t').map((c) => c.trim().replace(/\|/g, '\\|')));
     const n = Math.max(...rows.map((r) => r.length)); if (n < 2) return;
     e.preventDefault();
