@@ -7,7 +7,7 @@
 // characters (every run keeps its formatting); a formatting edit rebuilds the paragraph's runs, each from its source
 // run. Headers and footers are not shown.
 import { cssZoom, floatBar, fullScreen, viewBar } from './view-tools.js';
-import { ribbon, RI, setPressed } from './ribbon.js';
+import { fileTab, ribbon, RI, setPressed } from './ribbon.js';
 import { pairHex } from './hex-color.js';
 import { arrowize, exec } from './rich-text.js';
 
@@ -383,6 +383,7 @@ export async function openDocxEditor(root, bytes) {
   const FONTS_W = ['TH Sarabun New', 'Calibri', 'Aptos', 'Arial', 'Tahoma', 'Cordia New', 'Angsana New', 'Noto Sans Thai', 'LINE Seed Sans TH', 'Times New Roman', 'Georgia'];
   const SIZES_W = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48];
   const spec = [
+    fileTab('de', { open: 'Open a Word file (.docx)', download: 'Download .docx' }),
     { tab: 'Home', groups: [
       { label: 'Clipboard', items: [{ btn: 'de-cut', icon: RI.cut, title: 'Cut (Ctrl+X)' }, { btn: 'de-copy', icon: RI.copy, title: 'Copy (Ctrl+C)' }, { btn: 'de-paste', icon: RI.paste, title: 'Paste (Ctrl+V)' }] },
       { label: 'Font', items: [{ select: 'de-font', title: 'Font', options: FONTS_W, width: 140 }, { select: 'de-size', title: 'Font size', options: SIZES_W.map(String), width: 58 },
@@ -414,7 +415,7 @@ export async function openDocxEditor(root, bytes) {
   const $ = (s) => root.querySelector(s);
   const scroller = $('.de-doc'); const box = $('.oe');
   scroller.append(sheet);
-  const rb = ribbon(spec, 'de'); $('.de-top').append(rb);
+  const rb = ribbon(spec, 'de', 1); $('.de-top').append(rb);
   const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('de'); $('.de-top').append(tools);
   const view = cssZoom(box, scroller, () => sheet, 'de');
   requestAnimationFrame(() => { const room = scroller.clientWidth - 48; if (room > 0 && page.offsetWidth > room) view.zoomTo(room / page.offsetWidth); });

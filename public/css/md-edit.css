@@ -2,7 +2,7 @@
    side by side; stacked on narrow screens. The page's own look (.md-doc) is set by the module, the same on screen and in
    the downloads. */
 .md-main { align-items: stretch !important; min-width: 0; }
-.md { height: calc(100vh - 200px); min-height: 520px; width: 100%; min-width: 0; gap: 8px; }
+.md { height: calc(100vh - 150px); height: calc(100dvh - 150px); min-height: 520px; width: 100%; min-width: 0; gap: 8px; }
 .md .md-bar { position: relative; top: 0; left: 0; right: 0; flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
 .md-panes { --md-z: 1; flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; touch-action: pan-x pan-y; }
 .md-panes[data-view="edit"] { grid-template-columns: 1fr; } .md-panes[data-view="edit"] .md-prev { display: none; }
@@ -13,8 +13,8 @@
 .md-prev { min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #fff; } /* white paper in both modes */
 .md-prev .md-doc { font-size: calc(16px * var(--md-z)); }
 .md-prev .md-doc li > input[type="checkbox"] { cursor: pointer; }
-.md-foot { display: flex; justify-content: space-between; gap: 12px; padding: 4px 6px 0; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.md-side input[type="text"] { font: inherit; font-size: 16px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; color: var(--fg-color); background: var(--surface); width: 100%; box-sizing: border-box; }
+.md-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 4px 6px 0; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.md-status { flex: 1 1 16rem; min-width: 0; }
 .md.oe-full .md-panes { min-height: 0; }
 .md.oe-full { height: 100vh; height: 100dvh; }
 /* Text / Preview switch: narrow screens show one pane at a time (js/md-edit.js), full height, instead of two halves. */

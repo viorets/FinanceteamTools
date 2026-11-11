@@ -5,7 +5,7 @@
 // On a protected sheet, locked cells stay read-only, and relock() (xlsx-relock.js) copies the original protection back.
 import { relock } from './xlsx-relock.js';
 import { cssZoom, floatBar, fullScreen, viewBar } from './view-tools.js';
-import { ribbon, RI, setPressed } from './ribbon.js';
+import { fileTab, ribbon, RI, setPressed } from './ribbon.js';
 import { pairHex } from './hex-color.js';
 import { THEMES, currentTheme } from './themes.js';
 import {
@@ -99,6 +99,7 @@ export async function openXlsxEditor(root, bytes) {
 
   // ---------- markup ----------
   const spec = [
+    fileTab('xe', { open: 'Open an Excel file (.xlsx)', download: 'Download as…' }),
     { tab: 'Home', groups: [
       { label: 'Clipboard', items: [{ btn: 'xe-cut', icon: RI.cut, title: 'Cut (Ctrl+X)' }, { btn: 'xe-copy', icon: RI.copy, title: 'Copy (Ctrl+C)' }, { btn: 'xe-paste', icon: RI.paste, title: 'Paste (Ctrl+V)' }] },
       { label: 'Font', items: [{ select: 'xe-font', title: 'Font', options: FONTS, width: 132 }, { select: 'xe-size', title: 'Font size', options: SIZES.map(String), width: 58 },
@@ -137,7 +138,7 @@ export async function openXlsxEditor(root, bytes) {
     <div class="xe-pop" id="xe-pop" hidden></div><div class="xe-hint" id="xe-hint" hidden></div></div>`;
   const $ = (s) => root.querySelector(s);
   const box = $('.oe'); const grid = $('#xe-grid'); const canvas = $('.xe-canvas'); const fxin = $('#xe-fxin'); const nameBox = $('#xe-name');
-  const rb = ribbon(spec, 'xe'); $('.xe-top').append(rb);
+  const rb = ribbon(spec, 'xe', 1); $('.xe-top').append(rb);
   const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('xe'); $('.xe-top').append(tools);
   const zoom = cssZoom(box, grid, () => canvas, 'xe');
   fullScreen(box, 'xe', 'oe-full');

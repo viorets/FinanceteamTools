@@ -23,11 +23,13 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 - Side navigation (top): Light, Dark or Follow device for the site. Dark is black and greys with white controls (monochrome, as on Apple's product pages)
 - Chart colours: TUSU Finance (the team CI, Mosaic Blue #00758F; default), TUSU Finance CI (the internal deck's teals #006371, #077989, #2babc2, #5f9aa3, ice #e8f9ff), 7 team palettes (Sakura Dusk, Midnight Violet, Old Rose, Mulled Wine, Winter Dawn, Autumn Harvest, Kombu Moss) and 10 theme-factory themes, shown as colour strips; they set the default colours of the charts, Gantt chart and Word tables
 - iPad and narrow windows: the top bar keeps the open tool's name in view (other tools show their icon); fields use 16px text so Safari does not zoom in
+- Editors (PDF, Excel, Word, Markdown) have no side panel: the document takes the full width. Before a file is open, a card in the middle has **Open a file** (or drop a file on it), the size limit and tips; the status line sits under the document
+- File tab (Excel, Word, Markdown; first tab, the editor opens on Home): **Open…**, **New** (Markdown), file name (Markdown), **Save draft** with the time it was saved, **Download** (a format menu for Excel and Markdown). The PDF editor has Open, Save draft and Download beside zoom
 - Editor ribbons (Excel, Word, Markdown) wrap onto more rows instead of scrolling sideways; click the open ribbon tab again to fold the groups away. Markdown shows a Text / Preview switch on narrow screens
 - Tinted glass frame: the side navigation, tool options and editor toolbars are frosted CI glass over a soft CI backdrop; documents, charts and tables stay solid white. Without blur support, or when the device asks for less transparency, the glass turns solid
 
 ### PDF editing
-- Upload a PDF (up to 12 MB)
+- Open a PDF (up to 12 MB) from the card or by dropping it on the page
 - Tools: text box (Thai supported; LINE Seed Sans TH, Noto Sans Thai, Sarabun, Georgia or Arial), highlight text, draw, line, arrow, rectangle
 - Text boxes are rich text: select letters and press **B**, *I*, U, S or the highlighter (Ctrl+B / I / U, Ctrl+Shift+X); click anywhere in a box to edit there; typing `-->` gives → and `==>` gives ➜
 - Highlights have their own colour (with HEX entry) and opacity, and sit behind the text (multiply), on screen and in the PDF; letters inside text boxes can be highlighted too

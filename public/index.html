@@ -376,6 +376,25 @@
         /* HEX field under each chart colour box (js/hex-color.js). */
         .control-group .hex-in { margin-top: 6px; width: 100%; }
 
+        /* Editors (PDF, Excel, Word, Markdown): no options panel. The file actions live in the editor's File tab and
+           quick icons, so the document gets the whole width; the status line sits under it. */
+        .tool-view.ed-view { grid-template-columns: minmax(0, 1fr); }
+        .ed-main { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px; min-width: 0; }
+        .ed-box { height: calc(100vh - 170px); height: calc(100dvh - 170px); min-height: 500px; width: 100%; min-width: 0; display: flex; flex-direction: column; }
+        .ed-box > * { flex: 1; min-height: 0; }
+        .ed-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+        .ed-status { margin: 0; min-height: 1.4em; padding: 0 4px; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+        /* Before a file is open: one card in the middle of the work area, which also takes a dropped file. */
+        .ed-empty { flex: 0 1 auto; align-self: center; margin: auto; max-width: 30rem; padding: 32px 24px; text-align: center; border: 1.5px dashed var(--border-strong); border-radius: 16px; }
+        .ed-empty .ed-ic { color: var(--primary); }
+        .ed-empty h2 { margin: 8px 0 6px; font-size: 20px; color: var(--ink); }
+        .ed-empty p { margin: 0 0 4px; font-size: 15px; line-height: 1.5; color: var(--ink-2); }
+        .ed-empty .ed-open { width: auto; margin: 16px auto 8px; padding: 12px 28px; }
+        .ed-empty .ed-limit { font-size: 13px; }
+        .ed-empty .ed-help { margin: 16px 0 0; font-size: 13px; line-height: 1.5; text-align: left; }
+        .ed-drop .main-content { box-shadow: 0 0 0 3px var(--accent); }
+        .ed-drop .ed-empty { border-color: var(--accent); background: var(--tint); }
+
         /* Narrower than a laptop (iPad, PC split screen): the tool's options sit above it. */
         @media (max-width: 1279px) {
             .tool-view { grid-template-columns: 1fr; }
@@ -538,83 +557,60 @@
     <!-- ========================================== -->
     <!-- TOOL 3: PDF EDITING (from TUSUFinanceFeedback) -->
     <!-- ========================================== -->
-    <div id="pdfTool" class="tool-view">
-        <div class="sidebar">
-            <div class="control-group">
-                <label for="pdfFileInput">Upload PDF File</label>
-                <input type="file" id="pdfFileInput" accept="application/pdf,.pdf" />
+    <div id="pdfTool" class="tool-view ed-view">
+        <input type="file" id="pdfFileInput" class="ed-file" accept="application/pdf,.pdf" tabindex="-1" aria-hidden="true">
+        <div class="main-content ed-main">
+            <div id="pdfEditor" class="ed-box">
+                <div class="ed-empty">
+                    <svg class="ed-ic" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 17 .8-2.6 4.6-4.6 1.8 1.8-4.6 4.6z"/></svg>
+                    <h2>Mark up a PDF</h2>
+                    <p>Add text, highlights, lines, arrows and drawings, then download a marked copy. The original file is not changed.</p>
+                    <button type="button" class="action-btn ed-open" data-open="pdf">Open a file</button>
+                    <p class="ed-limit">PDF up to 12 MB · or drop it here · drafts stay on this device</p>
+                    <p class="help-text ed-help">Text box: select letters and press <b>B</b>, <i>I</i>, <u>U</u>, <s>S</s> or the highlighter (Ctrl+B / I / U, Ctrl+Shift+X). Typing <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜. Hold Shift for straight lines and squares. Zoom with Ctrl + mouse wheel, a pinch, or − / +.</p>
+                </div>
             </div>
-
-            <div class="export-actions">
-                <button class="action-btn" id="pdfDraftBtn" style="flex: 1;" disabled>Save draft</button>
-                <button class="action-btn" id="pdfDownloadBtn" style="flex: 1;" disabled>Download PDF</button>
-            </div>
-            <p class="help-text" id="pdfStatus" role="status" style="margin-top: 10px;"></p>
-            <p class="help-text">Tools: text box, highlight text, draw, line, arrow, rectangle. Hold Shift for straight lines and squares. Select a mark to move it, change its width or colour, or delete it. Files up to 12 MB. Drafts are saved on this device only.</p>
-            <p class="help-text">Text box: select letters and press <b>B</b>, <i>I</i>, <u>U</u>, <s>S</s> or the highlighter (Ctrl+B / I / U, Ctrl+Shift+X). Typing <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜. Highlight colour and opacity sit under the Highlight tool. Zoom with Ctrl + mouse wheel, a pinch, or − / +. Full screen puts the tools on top.</p>
-        </div>
-
-        <div class="main-content" style="align-items: stretch;">
-            <div id="pdfEditor" style="height: calc(100vh - 200px); min-height: 500px; width: 100%;">
-                <p style="color:#666; text-align:center; padding-top: 50px;">Upload a PDF to start marking it up.</p>
-            </div>
+            <p class="ed-status" id="pdfStatus" role="status"></p>
         </div>
     </div>
 
     <!-- ========================================== -->
     <!-- TOOL 4: EXCEL EDITING (prototype)           -->
     <!-- ========================================== -->
-    <div id="xlsxTool" class="tool-view">
-        <div class="sidebar">
-            <div class="control-group">
-                <label for="xlsxFileInput">Upload Excel File (.xlsx)</label>
-                <input type="file" id="xlsxFileInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+    <div id="xlsxTool" class="tool-view ed-view">
+        <input type="file" id="xlsxFileInput" class="ed-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" tabindex="-1" aria-hidden="true">
+        <div class="main-content ed-main">
+            <div id="xlsxEditor" class="ed-box">
+                <div class="ed-empty">
+                    <svg class="ed-ic" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+                    <h2>Edit an Excel file</h2>
+                    <p>Cells, formulas (calculated live), formatting, rows and columns, sort and filter. Download the workbook or one sheet as CSV, TSV, text, JSON or HTML.</p>
+                    <button type="button" class="action-btn ed-open" data-open="xlsx">Open a file</button>
+                    <p class="ed-limit">Excel workbook (.xlsx) · or drop it here · charts, images and pivot tables are not kept</p>
+                    <p class="help-text ed-help">Click a cell and type (F2 or double-click edits it). Drag or Shift+click to select a range; copy and paste work with Excel. Drag the small square to fill a series. The Name Box jumps to an address; sheets are tabs at the bottom.</p>
+                </div>
             </div>
-            <div class="export-actions">
-                <button class="action-btn" id="xlsxDraftBtn" style="flex: 1;" disabled>Save draft</button>
-                <button class="action-btn" id="xlsxDownloadBtn" style="flex: 1;" disabled>Download</button>
-            </div>
-            <div class="control-group" style="margin-top: 8px;">
-                <label for="xlsxFormat">Download as</label>
-                <select id="xlsxFormat">
-                    <option value="xlsx">Excel workbook (.xlsx)</option>
-                    <option value="csv">CSV UTF-8, comma (.csv): this sheet</option>
-                    <option value="tsv">Tab-separated (.tsv): this sheet</option>
-                    <option value="utf16">Unicode text, UTF-16 (.txt): this sheet</option>
-                    <option value="json">JSON, header row as keys (.json): this sheet</option>
-                    <option value="html">Web page table (.html): this sheet</option>
-                </select>
-            </div>
-            <p class="help-text" id="xlsxStatus" role="status" style="margin-top: 10px;"></p>
-            <p class="help-text">Click a cell, then type (F2 or double-click edits it). Drag or Shift+click to select a range; copy and paste work with Excel. Drag the small square to fill a series. The ribbon formats cells (Format as table uses the chart colour themes), inserts rows and columns, sorts, filters and freezes panes; the Name Box jumps to an address; sheets are tabs at the bottom. Charts, images and pivot tables are not kept. Save draft keeps your edits on this device; Download as also gives this sheet as CSV UTF-8, TSV, Unicode text, JSON or HTML.</p>
-        </div>
-        <div class="main-content" style="align-items: stretch; min-width: 0;">
-            <div id="xlsxEditor" style="height: calc(100vh - 200px); min-height: 500px; width: 100%; min-width: 0;">
-                <p style="color:#666; text-align:center; padding-top: 50px;">Upload an Excel file to edit its cells.</p>
-            </div>
+            <p class="ed-status" id="xlsxStatus" role="status"></p>
         </div>
     </div>
 
     <!-- ========================================== -->
     <!-- TOOL 5: WORD EDITING (prototype)            -->
     <!-- ========================================== -->
-    <div id="docxTool" class="tool-view">
-        <div class="sidebar">
-            <div class="control-group">
-                <label for="docxFileInput">Upload Word File (.docx)</label>
-                <input type="file" id="docxFileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+    <div id="docxTool" class="tool-view ed-view">
+        <input type="file" id="docxFileInput" class="ed-file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" tabindex="-1" aria-hidden="true">
+        <div class="main-content ed-main">
+            <div id="docxEditor" class="ed-box">
+                <div class="ed-empty">
+                    <svg class="ed-ic" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+                    <h2>Edit a Word file</h2>
+                    <p>Edit the page as in Word: fonts, colours, lists, styles, text boxes and shapes. Download it as .docx, or export PDF, text, Markdown or HTML.</p>
+                    <button type="button" class="action-btn ed-open" data-open="docx">Open a file</button>
+                    <p class="ed-limit">Word document (.docx) · or drop it here · headers and footers are not shown</p>
+                    <p class="help-text ed-help">Enter starts a new paragraph. Right-click a style (or Modify…) to change it; ticked styles are remembered in this browser. Find &amp; export finds and replaces text. Insert draws text boxes, lines, arrows, rectangles and pen strokes.</p>
+                </div>
             </div>
-            <div class="export-actions">
-                <button class="action-btn" id="docxDraftBtn" style="flex: 1;" disabled>Save draft</button>
-                <button class="action-btn" id="docxDownloadBtn" style="flex: 1;" disabled>Download .docx</button>
-            </div>
-            <p class="help-text" id="docxStatus" role="status" style="margin-top: 10px;"></p>
-            <p class="help-text">The page is editable like Word: the ribbon sets font, size, bold, colour, highlight, alignment, lists, spacing and paragraph styles. Enter starts a new paragraph. Find &amp; export finds and replaces text and exports PDF, .txt, .md or .html. Insert draws text boxes, lines, arrows, rectangles and pen strokes on the page; they are saved as Word drawings. Modify… (or right-click a style) changes a style; ticked styles are remembered in this browser for your other documents. Save draft keeps your edits on this device. Headers and footers are not shown.</p>
-        </div>
-        <div class="main-content" style="align-items: stretch; min-width: 0;">
-            <div id="docxEditor" style="height: calc(100vh - 200px); min-height: 500px; width: 100%; min-width: 0;">
-                <p style="color:#666; text-align:center; padding-top: 50px;">Upload a Word file to edit its text.</p>
-            </div>
+            <p class="ed-status" id="docxStatus" role="status"></p>
         </div>
     </div>
 
@@ -626,7 +622,7 @@
     <!-- ========================================== -->
     <!-- TOOL 7: MARKDOWN EDITING (js/md-edit.js)   -->
     <!-- ========================================== -->
-    <div id="mdTool" class="tool-view"></div>
+    <div id="mdTool" class="tool-view ed-view"></div>
 
     </main>
     </div>
@@ -1079,6 +1075,7 @@
         import { openDocxEditor } from './js/docx-edit.js';
         import { pairHex } from './js/hex-color.js';
         import { actionMenu } from './js/view-tools.js';
+        import { markSaved } from './js/ribbon.js';
         import { openMd } from './js/md-edit.js';
         import { openGantt } from './js/gantt.js';
         import { openWordTable } from './js/word-table.js';
@@ -1126,40 +1123,52 @@
             let draft = null;
             try { draft = JSON.parse(localStorage.getItem(draftKey) || 'null'); } catch { /* no draft */ }
             status(`Opening ${f.name} (${mb(bytes.byteLength)})…`);
-            $('pdfDraftBtn').disabled = true; $('pdfDownloadBtn').disabled = true;
             try {
                 editor = await openPdfEditor($('pdfEditor'), { bytes, name: f.name, draft });
                 status(`${f.name} · ${mb(bytes.byteLength)}${draft ? ' · draft restored' : ''}`);
-                $('pdfDraftBtn').disabled = false; $('pdfDownloadBtn').disabled = false;
-                barActions($('pdfEditor'), 'mk', () => $('pdfDraftBtn').click(), () => $('pdfDownloadBtn').click());
+                barActions($('pdfEditor'), 'mk', { open: () => $('pdfFileInput').click(), draft: pdfDraft, download: pdfDownload });
             } catch (err) { editor = null; status(err.message); console.error(err); }
         };
 
-        $('pdfDraftBtn').onclick = () => {
-            try { localStorage.setItem(draftKey, JSON.stringify(editor.marks())); editor.clean(); status(`Draft saved on this device (${editor.marks().length} marks)`); }
-            catch (err) { status(`Could not save the draft: ${err.message}`); }
-        };
+        function pdfDraft() {
+            try { localStorage.setItem(draftKey, JSON.stringify(editor.marks())); editor.clean(); status(`Draft saved on this device (${editor.marks().length} marks)`); return true; }
+            catch (err) { status(`Could not save the draft: ${err.message}`); return false; }
+        }
 
-        $('pdfDownloadBtn').onclick = async () => {
-            $('pdfDownloadBtn').disabled = true; status('Writing the marked PDF…');
+        let pdfBusy = false;
+        async function pdfDownload() {
+            if (pdfBusy) return; pdfBusy = true; status('Writing the marked PDF…');
             try {
                 const out = await editor.exportPdf();
                 if (out.byteLength > MAX_BYTES) { status(`Marked PDF is ${mb(out.byteLength)}: over the 12 MB limit`); return; }
                 download(out, fileName.replace(/\.pdf$/i, '') + ' (marked).pdf', 'application/pdf');
                 status(`Marked PDF downloaded (${mb(out.byteLength)})`);
             } catch (err) { status(err.message); console.error(err); }
-            finally { $('pdfDownloadBtn').disabled = false; }
-        };
-
-        // Save draft and Download in each editor's own bar (they work in full screen); `more` lists other formats,
-        // shown as a menu under the bar's Download button.
-        function barActions(root, p, onDraft, onDownload, more = null) {
-            const d = root.querySelector(`#${p}-draft`), dl = root.querySelector(`#${p}-dl`);
-            if (d) d.onclick = onDraft;
-            if (!dl) return;
-            if (!more) { dl.onclick = onDownload; return; }
-            dl.onclick = () => actionMenu(dl, more, onDownload);
+            finally { pdfBusy = false; }
         }
+
+        // An editor's file actions, wherever they sit: the File tab (Open…, Save draft, Download) and the quick icons
+        // beside zoom (which also work in full screen). `more` lists download formats, shown as a menu. A saved
+        // draft shows its time beside Save draft.
+        function barActions(root, p, { open, draft, download: dl, more = null }) {
+            const on = (id, fn) => { const b = root.querySelector(`#${id}`); if (b) b.onclick = fn; };
+            const save = async () => { if (await draft()) markSaved(root, p); };
+            on(`${p}-open`, open); on(`${p}-f-open`, open); on(`${p}-draft`, save); on(`${p}-f-draft`, save);
+            [`${p}-dl`, `${p}-f-dl`].forEach((id) => { const b = root.querySelector(`#${id}`); if (b) b.onclick = more ? () => actionMenu(b, more, dl) : () => dl(); });
+        }
+
+        // Before a file is open: the card's Open button, and a file dropped anywhere on the tool opens it.
+        document.querySelectorAll('.ed-open').forEach((b) => { b.onclick = () => $(`${b.dataset.open}FileInput`).click(); });
+        ['pdf', 'xlsx', 'docx'].forEach((k) => {
+            const v = $(`${k}Tool`), inp = $(`${k}FileInput`);
+            const files = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+            v.addEventListener('dragover', (e) => { if (!files(e)) return; e.preventDefault(); v.classList.add('ed-drop'); });
+            v.addEventListener('dragleave', (e) => { if (!v.contains(e.relatedTarget)) v.classList.remove('ed-drop'); });
+            v.addEventListener('drop', (e) => {
+                v.classList.remove('ed-drop'); if (!files(e) || !e.dataTransfer.files.length) return;
+                e.preventDefault(); inp.files = e.dataTransfer.files; inp.dispatchEvent(new Event('change'));
+            });
+        });
 
         // Excel and Word drafts: the edited file itself, kept in this browser (IndexedDB: files can be several MB).
         const drafts = {
@@ -1177,34 +1186,20 @@
             ['json', 'JSON (.json)', 'This sheet, header row as keys'], ['html', 'Web page (.html)', 'This sheet as a table']];
         function bindOffice(kind, open, mime) {
             const say = (t) => { $(`${kind}Status`).textContent = t; };
-            const btn = $(`${kind}DownloadBtn`); const draftBtn = $(`${kind}DraftBtn`); const fmt = $(`${kind}Format`);
-            let name = ''; let key = '';
-            $(`${kind}FileInput`).onchange = async (e) => {
-                const f = e.target.files[0]; e.target.value = '';
-                if (!f) return;
-                if (office[kind]?.isDirty() && !confirm('You have unsaved changes. Open another file anyway?')) return;
-                name = f.name; key = `${kind}:${f.name}:${f.size}`; btn.disabled = true; draftBtn.disabled = true; say(`Opening ${f.name} (${mb(f.size)})…`);
-                let bytes = await f.arrayBuffer(); let fromDraft = false;
-                const d = await drafts.get(key);
-                if (d && confirm(`A draft of ${f.name} saved on ${new Date(d.at).toLocaleString()} is on this device. Open the draft?\n\nCancel opens the file as uploaded.`)) { bytes = d.bytes; fromDraft = true; }
-                try {
-                    office[kind] = await open($(`${kind}Editor`), bytes);
-                    say(`${f.name} · ${mb(f.size)}${fromDraft ? ' · draft restored' : ''}`); btn.disabled = false; draftBtn.disabled = false;
-                    barActions($(`${kind}Editor`), kind === 'xlsx' ? 'xe' : 'de', () => draftBtn.click(), (v) => { if (v && fmt) fmt.value = v; btn.click(); }, kind === 'xlsx' ? XLSX_FORMATS : null);
-                } catch (err) { office[kind] = null; say(err.message); console.error(err); }
+            const p = kind === 'xlsx' ? 'xe' : 'de'; const root = $(`${kind}Editor`);
+            let name = ''; let key = ''; let busy = false;
+            const draft = async () => {
+                if (busy) return false; busy = true; say('Saving the draft…');
+                try { const out = await office[kind].save(); await drafts.put(key, { bytes: out, at: Date.now() }); say(`Draft saved on this device (${mb(out.byteLength)}). Open the same file again to continue from it.`); return true; }
+                catch (err) { say(`Could not save the draft: ${err.message}`); console.error(err); return false; }
+                finally { busy = false; }
             };
-            draftBtn.onclick = async () => {
-                draftBtn.disabled = true; say('Saving the draft…');
-                try { const out = await office[kind].save(); await drafts.put(key, { bytes: out, at: Date.now() }); say(`Draft saved on this device (${mb(out.byteLength)}). Open the same file again to continue from it.`); }
-                catch (err) { say(`Could not save the draft: ${err.message}`); console.error(err); }
-                finally { draftBtn.disabled = false; }
-            };
-            btn.onclick = async () => {
-                btn.disabled = true; say('Writing the edited file…');
+            const dl = async (fmt = kind) => {
+                if (busy) return; busy = true; say('Writing the edited file…');
                 try {
                     const base = name.replace(/\.[^.]+$/, '');
-                    if (fmt && fmt.value !== 'xlsx') {
-                        const x = office[kind].exportAs(fmt.value);
+                    if (fmt !== kind) {
+                        const x = office[kind].exportAs(fmt);
                         download(x.data, `${base} - ${x.sheet}.${x.ext}`.replace(/[\\/:*?"<>|]/g, '_'), x.mime);
                         say(`${x.sheet} downloaded as .${x.ext}`);
                     } else {
@@ -1213,7 +1208,22 @@
                         say(`Edited file downloaded (${mb(out.byteLength)})`);
                     }
                 } catch (err) { say(err.message); console.error(err); }
-                finally { btn.disabled = false; }
+                finally { busy = false; }
+            };
+            $(`${kind}FileInput`).onchange = async (e) => {
+                const f = e.target.files[0]; e.target.value = '';
+                if (!f) return;
+                if (office[kind]?.isDirty() && !confirm('You have unsaved changes. Open another file anyway?')) return;
+                name = f.name; key = `${kind}:${f.name}:${f.size}`; say(`Opening ${f.name} (${mb(f.size)})…`);
+                let bytes = await f.arrayBuffer(); let fromDraft = null;
+                const d = await drafts.get(key);
+                if (d && confirm(`A draft of ${f.name} saved on ${new Date(d.at).toLocaleString()} is on this device. Open the draft?\n\nCancel opens the file as uploaded.`)) { bytes = d.bytes; fromDraft = d; }
+                try {
+                    office[kind] = await open(root, bytes);
+                    say(`${f.name} · ${mb(f.size)}${fromDraft ? ' · draft restored' : ''}`);
+                    barActions(root, p, { open: () => $(`${kind}FileInput`).click(), draft, download: dl, more: kind === 'xlsx' ? XLSX_FORMATS : null });
+                    if (fromDraft) markSaved(root, p, fromDraft.at);
+                } catch (err) { office[kind] = null; say(err.message); console.error(err); }
             };
         }
         openGantt($('ganttTool'), { download });

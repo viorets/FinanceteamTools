@@ -64,3 +64,9 @@ input[type="color"] { touch-action: none; }
 :is(.xe-top, .de-top, .md-top) .rb-pans { order: 2; flex: 1 0 100%; min-width: 0; }
 /* Clicking the open tab again folds the groups away (as in Office), leaving more of the sheet or page. */
 .rb.rb-min .rb-pans { display: none; }
+
+/* File tab (js/ribbon.js fileTab): set apart from the editing tabs, as in Office; "Saved 14:02" beside Save draft. */
+.rb-tab.rb-file { color: var(--primary); font-weight: 600; }
+.rb-tab.rb-file[aria-selected="true"] { color: var(--on-primary); }
+.rb-note { align-self: center; min-width: 0; padding: 0 4px; font-size: 12px; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rb-note:empty { display: none; }

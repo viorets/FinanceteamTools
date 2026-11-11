@@ -40,6 +40,10 @@ export const RI = {
   pen: svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
   line: svg('<path d="M5 19 19 5"/>'), arrow: svg('<path d="M5 19 19 5M10 5h9v9"/>'), rect: svg('<rect x="4" y="6" width="16" height="12" rx="1"/>'),
   select: svg('<path d="m4 4 7 17 2.5-7.5L21 11Z"/>'),
+  open: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1"/><path d="M3 7v10a2 2 0 0 0 2 2h13l3-9H8l-3 9"/>'),
+  newDoc: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/>'),
+  save: svg('<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>'),
+  dl: svg('<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>'),
   pdf: '<span style="font:700 10px system-ui">PDF</span>', txt: '<span style="font:700 10px system-ui">TXT</span>',
   md: '<span style="font:700 10px system-ui">MD</span>', html: '<span style="font:700 9px system-ui">HTML</span>',
 };
@@ -48,9 +52,10 @@ export const RI = {
 //   { btn: id, icon, title, toggle? }  { select: id, title, options: [[value, label]] | [label], width? }
 //   { color: id, title, icon }  (a colour box with a small icon above it; the editor pairs it with HEX + scrub)
 //   { input: id, title, width?, placeholder? }   { html: '…' } (anything else)
-export function ribbon(spec, prefix) {
+// `start`: the tab open at first (the File tab comes first, as in Office, but the editor opens on Home).
+export function ribbon(spec, prefix, start = 0) {
   const el = document.createElement('div'); el.className = 'rb';
-  const tabs = spec.map((t, i) => `<button type="button" role="tab" class="rb-tab" id="${prefix}-tab-${i}" aria-selected="${i === 0}" aria-controls="${prefix}-pan-${i}">${esc(t.tab)}</button>`).join('');
+  const tabs = spec.map((t, i) => `<button type="button" role="tab" class="rb-tab${t.file ? ' rb-file' : ''}" id="${prefix}-tab-${i}" aria-selected="${i === start}" aria-controls="${prefix}-pan-${i}">${esc(t.tab)}</button>`).join('');
   const item = (it) => {
     if (it.btn) return `<button type="button" class="rb-btn" id="${it.btn}" title="${esc(it.title)}" aria-label="${esc(it.title)}"${it.toggle ? ' aria-pressed="false"' : ''}>${it.icon}${it.text ? `<span class="rb-txt">${esc(it.text)}</span>` : ''}</button>`;
     if (it.select) return `<select class="rb-sel" id="${it.select}" title="${esc(it.title)}" aria-label="${esc(it.title)}"${it.width ? ` style="width:${it.width}px"` : ''}>${it.options.map((o) => (Array.isArray(o) ? `<option value="${esc(o[0])}">${esc(o[1])}</option>` : `<option>${esc(o)}</option>`)).join('')}</select>`;
@@ -58,7 +63,7 @@ export function ribbon(spec, prefix) {
     if (it.input) return `<input class="rb-in" id="${it.input}" title="${esc(it.title)}" aria-label="${esc(it.title)}" placeholder="${esc(it.placeholder || '')}" autocomplete="off" spellcheck="false"${it.width ? ` style="width:${it.width}px"` : ''}>`;
     return it.html || '';
   };
-  const panels = spec.map((t, i) => `<div class="rb-pan" role="tabpanel" id="${prefix}-pan-${i}" aria-labelledby="${prefix}-tab-${i}"${i ? ' hidden' : ''}>${t.groups.map((g) => `<div class="rb-grp" role="group" aria-label="${esc(g.label)}"><div class="rb-items">${g.items.map(item).join('')}</div><span class="rb-glabel">${esc(g.label)}</span></div>`).join('')}</div>`).join('');
+  const panels = spec.map((t, i) => `<div class="rb-pan" role="tabpanel" id="${prefix}-pan-${i}" aria-labelledby="${prefix}-tab-${i}"${i !== start ? ' hidden' : ''}>${t.groups.map((g) => `<div class="rb-grp" role="group" aria-label="${esc(g.label)}"><div class="rb-items">${g.items.map(item).join('')}</div><span class="rb-glabel">${esc(g.label)}</span></div>`).join('')}</div>`).join('');
   el.innerHTML = `<div class="rb-tabs" role="tablist">${tabs}</div><div class="rb-pans">${panels}</div>`;
   el.querySelector('.rb-tabs').addEventListener('click', (e) => {
     const b = e.target.closest('.rb-tab'); if (!b) return;
@@ -81,4 +86,18 @@ export function ribbon(spec, prefix) {
   el.addEventListener('mousedown', (e) => { if (e.target.closest('.rb-btn')) e.preventDefault(); });
   return el;
 }
+// The File tab (Excel, Word, Markdown): Open (and New), Save draft with the time it was saved, Download. Ids:
+// `${p}-f-open`, `${p}-f-new`, `${p}-f-draft`, `${p}-f-saved`, `${p}-f-dl`; the page or the editor wires them
+// (index.html barActions, js/md-edit.js). `name`: a file name field (its id) in the Save group.
+export function fileTab(p, { open = 'Open a file', newDoc = false, name = null, download = 'Download' } = {}) {
+  return { tab: 'File', file: true, groups: [
+    { label: 'File', items: [{ btn: `${p}-f-open`, icon: RI.open, text: 'Open…', title: open }, ...(newDoc ? [{ btn: `${p}-f-new`, icon: RI.newDoc, text: 'New', title: 'Start a new document' }] : [])] },
+    { label: 'Save', items: [...(name ? [{ input: name, title: 'File name', placeholder: 'File name', width: 180 }] : []),
+      { btn: `${p}-f-draft`, icon: RI.save, text: 'Save draft', title: 'Keep a draft on this device' },
+      { html: `<span class="rb-note" id="${p}-f-saved" aria-live="polite"></span>` },
+      { btn: `${p}-f-dl`, icon: RI.dl, text: download, title: download }] },
+  ] };
+}
+/** "Saved 14:02" beside Save draft in the File tab. */
+export const markSaved = (root, p, at = Date.now()) => { const n = root.querySelector(`#${p}-f-saved`); if (n) n.textContent = `Saved ${new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; };
 export const setPressed = (root, id, on) => { const b = root.querySelector(`#${id}`); if (b) b.setAttribute('aria-pressed', String(!!on)); };

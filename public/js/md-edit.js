@@ -4,7 +4,7 @@
 // from Excel is pasted as a Markdown table. Downloads: .md, a standalone .html, a Word .doc, or PDF (print).
 // Markdown is turned into HTML by marked (GitHub-flavoured: tables, task lists, strikethrough) and cleaned by
 // DOMPurify before it is shown. Drafts are kept in this browser (localStorage), by file name.
-import { ribbon, RI, setPressed } from './ribbon.js';
+import { fileTab, markSaved, ribbon, RI, setPressed } from './ribbon.js';
 import { actionMenu, clampZoom, fullScreen, pinchZoom, viewBar } from './view-tools.js';
 import { ARROWS } from './rich-text.js';
 
@@ -60,6 +60,7 @@ export function openMd(root, { download }) {
   let font = FONTS[0]; try { font = localStorage.getItem('md-font') || font; } catch { /* default */ }
 
   const spec = [
+    fileTab('md', { open: 'Open a Markdown file (.md)', newDoc: true, name: 'mdName', download: 'Download as…' }),
     { tab: 'Home', groups: [
       { label: 'Text', items: [{ select: 'md-h', title: 'Paragraph or heading', options: [['', 'Style…'], ['0', 'Paragraph'], ['1', 'Heading 1'], ['2', 'Heading 2'], ['3', 'Heading 3'], ['4', 'Heading 4']], width: 104 },
         { btn: 'md-b', icon: RI.bold, title: 'Bold (Ctrl+B)' }, { btn: 'md-i', icon: RI.italic, title: 'Italic (Ctrl+I)' }, { btn: 'md-s', icon: RI.strike, title: 'Strikethrough' }, { btn: 'md-c', icon: I.code, title: 'Inline code' }] },
@@ -80,15 +81,7 @@ export function openMd(root, { download }) {
   ];
 
   root.innerHTML = `
-    <div class="sidebar md-side">
-      <div class="control-group"><label for="mdFile">Open a Markdown file (.md)</label><input type="file" id="mdFile" accept=".md,.markdown,.txt,text/markdown,text/plain"></div>
-      <div class="control-group"><label for="mdName">File name</label><input type="text" id="mdName" autocomplete="off" spellcheck="false"></div>
-      <div class="export-actions"><button type="button" class="action-btn" id="mdNew" style="flex:1">New</button><button type="button" class="action-btn" id="mdDraft" style="flex:1">Save draft</button></div>
-      <div class="control-group" style="margin-top:8px"><label for="mdFormat">Download as</label><select id="mdFormat">${FORMATS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>
-      <div class="export-actions"><button type="button" class="action-btn" id="mdDownload" style="flex:1">Download</button></div>
-      <p class="help-text" id="mdStatus" role="status" style="margin-top:10px"></p>
-      <p class="help-text">Type Markdown on the left; the right side shows the page. Enter continues a list, Tab indents it. Paste a range from Excel to get a table (Ctrl+Shift+V pastes plain text). Tick boxes in the preview to tick tasks. Drafts are kept in this browser.</p>
-    </div>
+    <input type="file" id="mdFile" class="ed-file" accept=".md,.markdown,.txt,text/markdown,text/plain" tabindex="-1" aria-hidden="true">
     <div class="main-content md-main">
       <div class="oe md" id="mdBox">
         <div class="oe-bar md-bar"><div class="md-top"></div></div>
@@ -97,12 +90,12 @@ export function openMd(root, { download }) {
           <textarea class="md-src" id="mdSrc" spellcheck="true" aria-label="Markdown text" autocapitalize="sentences"></textarea>
           <div class="md-prev" aria-label="Preview"><article class="md-doc" lang="th"></article></div>
         </div>
-        <div class="md-foot"><span id="mdCount" role="status"></span><span id="mdPos"></span></div>
+        <div class="md-foot"><span id="mdStatus" class="md-status" role="status"></span><span id="mdCount"></span><span id="mdPos"></span></div>
       </div>
     </div>`;
   const $ = (s) => root.querySelector(s);
   const ta = $('#mdSrc'); const doc = $('.md-doc'); const prev = $('.md-prev'); const panes = $('.md-panes'); const box = $('#mdBox');
-  const rb = ribbon(spec, 'md'); $('.md-top').append(rb);
+  const rb = ribbon(spec, 'md', 1); $('.md-top').append(rb);
   const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('md'); $('.md-top').append(tools);
   fullScreen(box, 'md', 'oe-full');
   const style = document.createElement('style'); document.head.append(style);
@@ -277,15 +270,16 @@ export function openMd(root, { download }) {
     if (d && d.text !== text && confirm(`A draft of ${f.name} saved on ${new Date(d.at).toLocaleString()} is on this device. Open the draft?\n\nCancel opens the file as uploaded.`)) load(f.name, d.text, `${f.name} · draft restored`);
     else load(f.name, text, `${f.name} opened`);
   };
-  $('#mdNew').onclick = () => { if (dirty && !confirm('You have unsaved changes. Start a new document anyway?')) return; load('Untitled.md', '', 'New document'); ta.focus(); };
+  $('#md-f-open').onclick = () => $('#mdFile').click();
+  $('#md-f-new').onclick = () => { if (dirty && !confirm('You have unsaved changes. Start a new document anyway?')) return; load('Untitled.md', '', 'New document'); ta.focus(); };
   function saveDraft() {
     const n = fileName(); if (n !== name && name in drafts && drafts[name].text === saved) delete drafts[name]; // renamed: the draft moves with it
     drafts[n] = { text: ta.value, at: Date.now() }; name = n; nameIn.value = n;
     if (!keep()) { say('Could not save the draft: this browser\'s storage is full or switched off.'); return; }
     try { localStorage.setItem(LAST, n); } catch { /* not kept */ }
-    saved = ta.value; dirty = false; counts(); say(`Draft saved on this device (${new Date().toLocaleTimeString()})`);
+    saved = ta.value; dirty = false; counts(); markSaved(root, 'md'); say('Draft saved on this device');
   }
-  $('#mdDraft').onclick = saveDraft; $('#md-draft').onclick = saveDraft;
+  $('#md-f-draft').onclick = saveDraft; $('#md-draft').onclick = saveDraft;
   async function exportAs(fmt) {
     const base = fileName().replace(/\.(md|markdown|txt)$/i, ''); const text = ta.value;
     if (fmt === 'md') { download(new TextEncoder().encode(text), `${base}.md`, 'text/markdown;charset=utf-8'); say(`${base}.md downloaded`); return; }
@@ -304,10 +298,10 @@ export function openMd(root, { download }) {
     (d.fonts?.ready || Promise.resolve()).then(() => setTimeout(go, 150));
     say('Choose "Save as PDF" in the print window');
   }
-  $('#mdDownload').onclick = () => exportAs($('#mdFormat').value).catch((e) => say(e.message));
-  $('#md-dl').onclick = () => actionMenu($('#md-dl'), FORMATS, (v) => { $('#mdFormat').value = v; exportAs(v).catch((e) => say(e.message)); });
+  ['#md-dl', '#md-f-dl'].forEach((id) => { const b = $(id); b.onclick = () => actionMenu(b, FORMATS, (v) => exportAs(v).catch((e) => say(e.message))); });
 
   setFont(FONTS.includes(font) ? font : FONTS[0]); setView('split'); setPressed(rb, 'md-sync', true);
-  load(name, saved, drafts[name] ? `${name} · draft restored (saved ${new Date(drafts[name].at).toLocaleString()})` : 'Start typing, or open a .md file');
+  load(name, saved, drafts[name] ? `${name} · draft restored` : 'Start typing, or open a .md file (File tab)');
+  if (drafts[name]) markSaved(root, 'md', drafts[name].at);
   return { isDirty: () => dirty };
 }
