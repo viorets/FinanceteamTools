@@ -41,6 +41,9 @@ function familyOf(name) {
   if (!key || /^(sansserif|serif|monospace|g_?d\d)/.test(key)) return '';
   return KNOWN_FONTS[key] || base.replace(/([a-z])([A-Z])/g, '$1 $2');
 }
+// A figure in a statement: 1,245,300.50, (15,000.00), 12%, ฿500, or "-" for nil.
+const FIG = /^(?:[-+(]?\s?[฿$€£¥]?\s?[\d๐-๙][\d๐-๙,]*(?:\.[\d๐-๙]+)?\s?%?\)?|[-–—])$/;
+const LEADER = /\s*(?:\.{4,}|…{2,}|(?:\. ){3,}\.?)\s*/; // dot leaders between a label and its figure
 const MARKER_ONLY = /^(?:[•●▪■◦○◆❖➢➤►✓✔\-–—*·]|\(?(?:\d{1,3}|[๐-๙]{1,3}|[a-zA-Zก-ฮ])[.)])$/;
 const BOLD = /bold|black|heavy|semibold|demi|,b$/i;
 const ITALIC = /italic|oblique/i;
@@ -73,6 +76,15 @@ async function pageLines(page, items = null, { findGrids = true } = {}) {
     if (swapAm(it.fontName)) it = { ...it, str: it.str.replace(/ำ/g, 'า') };
     const prev = chunks[chunks.length - 1];
     if (prev && MARKS.test(it.str) && Math.abs(prev.y - f) < size * 0.6) { prev.runs.push({ t: it.str, b: st.b, i: st.i }); prev.x2 = Math.max(prev.x2, e + it.width); continue; }
+    // "Cash ........ 1,200.00" in one item: label and figure become two chunks (positions shared out by letters).
+    // Only amounts (with , . or brackets): a contents line's page number stays on its line.
+    const ld = LEADER.exec(it.str); const tail = ld && it.str.slice(ld.index + ld[0].length);
+    if (ld && ld.index && FIG.test(tail.trim()) && /[\d๐-๙][,.][\d๐-๙]|\(/.test(tail)) {
+      const per = it.width / it.str.length; const head = it.str.slice(0, ld.index);
+      chunks.push({ x: e, x2: e + head.length * per, y: f, size, fam: st.family, runs: [{ t: head, b: st.b, i: st.i }] });
+      chunks.push({ x: e + it.width - tail.length * per, x2: e + it.width, y: f, size, fam: st.family, runs: [{ t: tail, b: st.b, i: st.i }] });
+      continue;
+    }
     chunks.push({ x: e, x2: e + it.width, y: f, size, fam: st.family, runs: [{ t: it.str, b: st.b, i: st.i }] });
   }
   // Bordered tables: the page's ruling lines give the cell grid; text inside a grid goes to its cells.
@@ -118,15 +130,24 @@ function linesOf(chunks, vp) {
   const mark = (x) => { const k = Math.round(x / 2); starts.set(k, (starts.get(k) || 0) + 1); };
   lines.forEach((ln) => ln.items.forEach((ch, k) => { if (!k || ch.x - ln.items[k - 1].x2 > ln.size * 0.9) mark(ch.x); }));
   const edge = (x) => [-1, 0, 1].reduce((n, d) => n + (starts.get(Math.round(x / 2) + d) || 0), 0) >= 3;
+  // Figures are right-aligned, so their columns show where they end: x positions where a figure ends on 3 or more lines.
+  const textOf = (ch) => ch.runs.map((r) => r.t).join('').trim();
+  const ends = new Map();
+  lines.forEach((ln) => ln.items.forEach((ch) => { if (FIG.test(textOf(ch))) { const k = Math.round(ch.x2 / 2); ends.set(k, (ends.get(k) || 0) + 1); } }));
+  const figEdge = (ch) => FIG.test(textOf(ch)) && [-1, 0, 1].reduce((n, d) => n + (ends.get(Math.round(ch.x2 / 2) + d) || 0), 0) >= 3;
   for (const ln of lines) {
     ln.cells = []; let cell = null; let last = null;
     for (const ch of ln.items) {
       const gap = last ? ch.x - last.x2 : 0;
-      if (!cell || gap > ln.size * 3 || (gap > ln.size * 0.9 && edge(ch.x))) { cell = { x: ch.x, x2: ch.x2, runs: [], fam: ch.fam }; ln.cells.push(cell); }
+      if (!cell || gap > ln.size * 3 || (gap > ln.size * 0.9 && (edge(ch.x) || figEdge(ch))) || (gap > ln.size * 0.5 && figEdge(ch) && figEdge(last))) { cell = { x: ch.x, x2: ch.x2, runs: [], fam: ch.fam }; ln.cells.push(cell); }
       else if (gap > ln.size * 0.18 && !/\s$/.test(last.runs.at(-1).t) && !/^\s/.test(ch.runs[0].t)) cell.runs.push({ t: ' ', b: false, i: false });
       cell.runs.push(...ch.runs); cell.x2 = Math.max(cell.x2, ch.x2); last = ch;
     }
-    ln.cells.forEach((c) => { c.runs = mergeRuns(c.runs.map((r) => ({ ...r, t: cleanThai(r.t) }))); c.text = c.runs.map((r) => r.t).join('').trim(); });
+    ln.cells.forEach((c) => {
+      c.runs = mergeRuns(c.runs.map((r) => ({ ...r, t: cleanThai(r.t) })));
+      if (ln.cells.length > 1) { const r = c.runs.at(-1); r.t = r.t.replace(new RegExp(`${LEADER.source}$`), ''); } // leaders before the next column
+      c.text = c.runs.map((r) => r.t).join('').trim();
+    });
     ln.cells = ln.cells.filter((c) => c.text);
     // "1." or "•" alone in the first cell is a list marker with a hanging indent, not a column
     if (ln.cells.length >= 2 && MARKER_ONLY.test(ln.cells[0].text)) {
@@ -349,6 +370,12 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
       }
       // Rows with columns (wide gaps) gather into a table.
       if (l.cells.length >= 2) { close(); if (table && gap > lead * 2.2) closeTable(); l.last = l; (table ||= []).push(l); carry = null; return; }
+      // A section label inside a statement ("Current assets", "สินทรัพย์หมุนเวียน"): a short one-piece line with rows
+      // of the table close above and below stays in the table as a row of its own.
+      const next = ls[i + 1];
+      if (table && gap <= lead * 2.2 && next?.cells.length >= 2 && l.y - next.y <= lead * 2.2 && l.x2 < right - l.size * 4 && !LIST.test(l.text)) {
+        l.last = l; table.push(l); carry = null; return;
+      }
       closeTable();
       const level = levelOf(l.size);
       const m = LIST.exec(l.text);
@@ -425,7 +452,7 @@ function tableBlock(rows) {
   }));
   const right = Math.max(...anchor.map((a) => a.x2));
   return {
-    type: 'table',
+    type: 'table', borders: false, // laid out by spacing only, as in the PDF
     widths: anchor.map((a, j) => (anchor[j + 1]?.x ?? right) - a.x), // each column runs to where the next one starts
     rows: rows.map((r) => {
       const out = anchor.map(() => []);
@@ -476,7 +503,8 @@ export function blocksToMd(blocks) {
     else if (b.type === 'table') {
       const w = Math.max(...b.rows.map((r) => r.length));
       const row = (r) => `| ${Array.from({ length: w }, (_, j) => inline(r[j] || [])).join(' | ')} |`;
-      out.push(row(b.rows[0]), `|${' --- |'.repeat(w)}`, ...b.rows.slice(1).map(row));
+      const rule = Array.from({ length: w }, (_, j) => (figCol(b.rows, j) ? ' ---: |' : ' --- |')).join(''); // columns of figures align right
+      out.push(row(b.rows[0]), `|${rule}`, ...b.rows.slice(1).map(row));
     } else out.push(lineStart(inline(b.runs)));
   });
   return `${out.join('\n').trim()}\n`;
@@ -511,6 +539,10 @@ function trimRuns(runs) {
   return out.filter((r) => r.t);
 }
 
+const runsText = (runs) => runs.map((r) => r.t).join('').trim();
+// a column of figures: every filled cell below the header row is a figure
+const figCol = (rows, j) => { const cs = rows.slice(1).map((r) => runsText(r[j] || [])).filter(Boolean); return cs.length > 0 && cs.every((t) => FIG.test(t)); };
+const NO_BORDERS = `<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map((s) => `<w:${s} w:val="nil"/>`).join('')}</w:tblBorders>`;
 export async function blocksToDocx(blocks, { JSZip, font = '', size = 14, page = { w: 595, h: 842 }, title = '' } = {}) {
   const f = font || 'TH Sarabun New'; const sz = Math.round(Math.min(Math.max(size, 8), 28) * 2);
   const twip = (pt) => Math.round(pt * 20);
@@ -532,9 +564,10 @@ export async function blocksToDocx(blocks, { JSZip, font = '', size = 14, page =
       const cws = ws.map((v) => Math.floor((v / sum) * width));
       const rows = b.rows.map((r, i) => `<w:tr>${i === 0 ? '<w:trPr><w:tblHeader/></w:trPr>' : ''}${Array.from({ length: cols }, (_, j) => {
         const lines = splitLines(r[j] || []);
-        return `<w:tc><w:tcPr><w:tcW w:w="${cws[j]}" w:type="dxa"/></w:tcPr>${(lines.length ? lines : [[]]).map((ln) => wP(ln, '<w:spacing w:before="0" w:after="0"/>')).join('')}</w:tc>`;
+        const jc = FIG.test(runsText(r[j] || [])) ? '<w:jc w:val="right"/>' : ''; // figures align right, as in a statement
+        return `<w:tc><w:tcPr><w:tcW w:w="${cws[j]}" w:type="dxa"/></w:tcPr>${(lines.length ? lines : [[]]).map((ln) => wP(ln, `<w:spacing w:before="0" w:after="0"/>${jc}`)).join('')}</w:tc>`;
       }).join('')}</w:tr>`).join('');
-      body.push(`<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="${width}" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${cws.map((v) => `<w:gridCol w:w="${v}"/>`).join('')}</w:tblGrid>${rows}</w:tbl>`, '<w:p/>');
+      body.push(`<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="${width}" w:type="dxa"/>${b.borders === false ? NO_BORDERS : ''}<w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${cws.map((v) => `<w:gridCol w:w="${v}"/>`).join('')}</w:tblGrid>${rows}</w:tbl>`, '<w:p/>');
     }
   });
   const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
