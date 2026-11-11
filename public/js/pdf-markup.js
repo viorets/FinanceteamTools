@@ -12,6 +12,7 @@ import { normHex, pairHex } from './hex-color.js';
 import { fontStack, siteFont, textWriter } from './pdf-realtext.js';
 import { pageParagraphs } from './pdf-text.js';
 import { removeText } from './pdf-redact.js';
+import { ocrPage } from './pdf-ocr.js';
 import { ICON, clampZoom, floatBar, fullScreen, pinchZoom, viewBar, zoomAround } from './view-tools.js';
 
 const PDFJS_BASE = Promise.withResolvers ? 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/' : 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/legacy/build/';
@@ -150,7 +151,7 @@ const exec = (cmd, v = null) => { try { return document.execCommand(cmd, false, 
 // Opens the editor in `root`. bytes: the PDF (ArrayBuffer); name: file name; draft: saved marks or null.
 // t(en, th) translates labels. Resolves an editor handle { marks(), isDirty(), exportPdf() }.
 // defaults (admin console, v2.13): { size, textColor, shapeColor, font } of new text boxes and shapes; TEXT where not given.
-export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) => en, onDraft = () => {}, defaults = {} }) {
+export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) => en, onDraft = () => {}, onStatus = () => {}, defaults = {} }) {
   const textSize = defaults.size || TEXT.size;
   const font0 = FONTS.includes(defaults.font) ? defaults.font : TEXT.font;
   if (bytes.byteLength > MAX_BYTES) throw new Error(t('This file is over 12 MB, so it cannot be marked. Open it in Drive instead.', 'ไฟล์ใหญ่เกิน 12 MB จึงทำเครื่องหมายไม่ได้ กรุณาเปิดใน Drive'));
@@ -170,6 +171,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       </div>
       <span class="mk-grow"></span>
       ${viewBar('mk', t, { open: true, help: true })}
+      <p class="mk-caution" role="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>${t('Edit text: the text below an edit does not move. A longer edit can overlap it (amber outline); a shorter one leaves a gap.', 'แก้ข้อความ: ข้อความด้านล่างจะไม่เลื่อนตาม ถ้าแก้ให้ยาวขึ้นอาจทับข้อความด้านล่าง (กรอบสีส้ม) ถ้าสั้นลงจะเหลือช่องว่าง')}</span></p>
     </div><div class="mk-pages" id="mk-pages"><p class="mk-wait">${t('Loading…', 'กำลังโหลด…')}</p></div></div>`;
   const [pdfjs, PDFLib] = await loadLibs();
   await loadFonts([font0, ...(draft || []).filter((m) => m.type === 'text').map(fontOf)]);
@@ -635,13 +637,13 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   // The paragraph under point pt (page units) becomes a text box in its place: its text, the nearest site font, its
   // size, line spacing and colour; the original is covered on screen and removed from the downloaded PDF.
   async function editAt(p, pt) {
-    const paras = await (p.paras ||= pageParagraphs(p.page));
+    const paras = await (p.paras ||= pageText(p));
     const pad = 2; const u = paras.findLast(({ box: [x, y, w, h] }) => pt[0] >= x - pad && pt[0] <= x + w + pad && pt[1] >= y - pad && pt[1] <= y + h + pad);
     if (!u) return;
     const n = pages.indexOf(p); const key = `${n}:${u.box.map((v) => v.toFixed(1)).join(',')}`;
     const had = st.marks.find((m) => m.cover?.key === key);
     if (had) { st.sel = had.id; paint(); editBox(p, had.id); return; }
-    const font = siteFont(u.fam); await loadFonts([font]);
+    const font = u.fam ? siteFont(u.fam) : 'Sarabun'; await loadFonts([font]); // OCR text has no font name
     const { ink, bg } = sampleColours(p, u.box);
     const c = document.createElement('canvas').getContext('2d'); c.font = `${u.size}px ${fontStack(font)}`;
     const mt = c.measureText('Hg'); const asc = mt.fontBoundingBoxAscent ?? u.size * 0.8; const desc = mt.fontBoundingBoxDescent ?? u.size * 0.25;
@@ -653,9 +655,21 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       // wrap width: a paragraph keeps its own width; one line may run to the page's text margin; centred text
       // stays centred in the page's text column
       wrap: u.align ? u.col[1] - u.col[0] : u.lines > 1 ? u.box[2] + u.size * 0.3 : Math.max(u.box[2], u.col[1] - u.box[0]) + u.size * 0.3,
-      cover: { key, box: u.box, bg, rects: u.rects.map(([x0, y0, x1, y1]) => [x0 - u.size * 0.8, y0, x1, y1]) },
+      cover: { key, box: u.box, bg, scan: !!p.scanned, rects: u.rects.map(([x0, y0, x1, y1]) => [x0 - u.size * 0.8, y0, x1, y1]) },
     };
     st.marks.push(m); st.sel = m.id; changed(); editBox(p, m.id, true);
+  }
+  // The page's paragraphs; a page without text (a scan) is read by OCR first, once.
+  async function pageText(p) {
+    const own = await pageParagraphs(p.page);
+    if (own.reduce((s, u) => s + u.text.trim().length, 0) >= 10) return own;
+    try {
+      onStatus(t('Reading this scanned page with OCR…', 'กำลังอ่านหน้าสแกนด้วย OCR…'));
+      const items = await ocrPage(p.page, onStatus); p.scanned = true;
+      const read = await pageParagraphs(p.page, items);
+      onStatus(t(`Scanned page read by OCR: ${read.length} paragraphs to edit. Check names and figures.`, `อ่านหน้าสแกนแล้ว ${read.length} ย่อหน้า กรุณาตรวจชื่อและตัวเลข`));
+      return read;
+    } catch (err) { p.paras = null; onStatus(err.message); return own; }
   }
   // The text and background colours under a box, from the drawn page: the darkest and the most common light pixels.
   function sampleColours(p, [x, y, w, h]) {
@@ -714,7 +728,8 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       const hits = removeText(out, PDFLib, n, areas); let k = 0;
       for (const m of mine) {
         const got = m.cover.rects.map(() => hits[k++]);
-        if (got.some((h) => !h)) { covered++; const [x, y, w, h] = m.cover.box; const a = P0(n, [x, y + h]); outPages[n].drawRectangle({ x: a.x, y: a.y, width: w, height: h, color: hex(m.cover.bg) }); }
+        // a scan has no text to remove: its picture is covered (no note); otherwise covering is the fallback
+        if (got.some((h) => !h)) { if (!m.cover.scan) covered++; const [x, y, w, h] = m.cover.box; const a = P0(n, [x, y + h]); outPages[n].drawRectangle({ x: a.x, y: a.y, width: w, height: h, color: hex(m.cover.bg) }); }
       }
     }
     // Highlights first, so every other mark (and the page's ink, through multiply) sits on top of them.

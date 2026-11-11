@@ -105,3 +105,9 @@
 .mk-cover { position: absolute; pointer-events: none; }
 .mk[data-tool="edit"] .mk-page { cursor: text; }
 .mk-box.mk-over { outline: 2px dashed #d97706; outline-offset: 2px; }
+/* Edit text caution: a line in the tool bar while the tool is on (no pop-up). */
+.mk-caution { display: none; flex-basis: 100%; align-items: center; gap: 8px; margin: 4px 0 0; padding: 6px 10px; border-radius: 10px; background: rgba(217, 119, 6, .12); color: #92400e; font-size: 13px; line-height: 1.4; }
+.mk-caution svg { flex: none; }
+.mk[data-tool="edit"] .mk-caution { display: flex; }
+:root[data-mode="dark"] .mk-caution { color: #fcd34d; background: rgba(251, 191, 36, .14); }
+@media (prefers-color-scheme: dark) { :root:not([data-mode="light"]) .mk-caution { color: #fcd34d; background: rgba(251, 191, 36, .14); } }

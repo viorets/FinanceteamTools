@@ -28,7 +28,7 @@ export function parseOps(b) {
     if (c === 62 && b[i + 1] === 62) { i += 2; continue; }
     if (c === 60) { while (i < n && b[i] !== 62) i++; i++; operand(start, null); continue; } // <hex>
     if (c === 91 || c === 93) { i++; operand(start, null); continue; } // [ ] (TJ arrays: their strings are operands too)
-    if (c === 47) { i++; while (i < n && !WS.has(b[i]) && !DELIM.has(b[i])) i++; operand(start, null); continue; } // /Name
+    if (c === 47) { i++; while (i < n && !WS.has(b[i]) && !DELIM.has(b[i])) i++; operand(start, String.fromCharCode(...b.subarray(start + 1, i))); continue; } // /Name (kept: Do needs it)
     if (c === 123 || c === 125) { i++; continue; }
     // a number or an operator keyword
     while (i < n && !WS.has(b[i]) && !DELIM.has(b[i])) i++;
@@ -46,14 +46,17 @@ export function parseOps(b) {
   return out;
 }
 
-// Which text-showing operators start inside `areas` ([x0, y0, x1, y1] in PDF user space)?
+// Which text-showing operators start inside `areas` ([x0, y0, x1, y1] in PDF user space)? ctm: the starting
+// transform (a form's Matrix x the CTM where it is drawn). onForm(name, ctm): a form XObject drawn with Do; it returns
+// that form's per-area hits.
 // -> { cut: [{ start, end, keep }] (keep: text to put back, e.g. "T*" for '), hits: per-area count }
-export function findText(ops, areas) {
-  let ctm = [1, 0, 0, 1, 0, 0]; const stack = []; let tm = [1, 0, 0, 1, 0, 0]; let tlm = tm; let leading = 0; let rise = 0;
+export function findText(ops, areas, { ctm: ctm0 = [1, 0, 0, 1, 0, 0], onForm = null } = {}) {
+  let ctm = ctm0; const stack = []; let tm = [1, 0, 0, 1, 0, 0]; let tlm = tm; let leading = 0; let rise = 0;
   const cut = []; const hits = areas.map(() => 0);
   const lineTo = (tx, ty) => { tlm = mul([1, 0, 0, 1, tx, ty], tlm); tm = tlm; };
+  const nums = (a) => a.filter((v) => typeof v === 'number');
   for (const o of ops) {
-    const a = o.args;
+    const a = nums(o.args);
     switch (o.op) {
       case 'q': stack.push(ctm); break;
       case 'Q': ctm = stack.pop() || ctm; break;
@@ -65,6 +68,11 @@ export function findText(ops, areas) {
       case 'T*': lineTo(0, -leading); break;
       case 'TL': leading = a[0] || 0; break;
       case 'Ts': rise = a[0] || 0; break;
+      case 'Do': {
+        const name = o.args.find((v) => typeof v === 'string');
+        if (name && onForm) onForm(name, ctm)?.forEach((h, k) => { hits[k] += h; });
+        break;
+      }
       case "'": case '"': case 'Tj': case 'TJ': {
         if (o.op === "'" || o.op === '"') lineTo(0, -leading);
         const m = mul(tm, ctm); const x = rise * m[2] + m[4]; const y = rise * m[3] + m[5];
@@ -78,23 +86,55 @@ export function findText(ops, areas) {
   return { cut, hits };
 }
 
-// Removes the text in `areas` from page `index` of pdf-lib document `pdf`. Returns the per-area count of removed
-// text pieces (0 = nothing found there: the caller should cover that area).
-export function removeText(pdf, PDFLib, index, areas) {
-  const { PDFArray, PDFName, PDFRawStream, decodePDFRawStream } = PDFLib;
-  const node = pdf.getPage(index).node; const ctx = pdf.context;
-  const c = node.get(PDFName.of('Contents')); if (!c) return areas.map(() => 0);
-  const list = ctx.lookup(c) instanceof PDFArray ? ctx.lookup(c).asArray() : [c];
-  const parts = list.map((r) => { const s = ctx.lookup(r); return s instanceof PDFRawStream ? decodePDFRawStream(s).decode() : s.getContents(); });
-  // the streams are one content stream split at token boundaries: join them with a line break
-  const total = parts.reduce((t, p) => t + p.length + 1, 0); const bytes = new Uint8Array(total); let at = 0;
-  parts.forEach((p) => { bytes.set(p, at); at += p.length; bytes[at++] = 10; });
-  const { cut, hits } = findText(parseOps(bytes), areas);
-  if (!cut.length) return hits;
+const cutBytes = (bytes, cut) => {
   const enc = new TextEncoder(); const pieces = []; let from = 0;
   for (const { start, end, keep } of cut) { pieces.push(bytes.subarray(from, start), enc.encode(keep)); from = end; }
   pieces.push(bytes.subarray(from));
-  const out = new Uint8Array(pieces.reduce((t, p) => t + p.length, 0)); at = 0; pieces.forEach((p) => { out.set(p, at); at += p.length; });
-  node.set(PDFName.of('Contents'), ctx.register(ctx.flateStream(out)));
-  return hits;
+  const out = new Uint8Array(pieces.reduce((t, q) => t + q.length, 0)); let at = 0;
+  pieces.forEach((q) => { out.set(q, at); at += q.length; });
+  return out;
+};
+
+// Removes the text in `areas` from page `index` of pdf-lib document `pdf`, including text inside the page's form
+// XObjects. Returns the per-area count of removed text pieces (0 = nothing found there: the caller covers that area).
+export function removeText(pdf, PDFLib, index, areas) {
+  const { PDFArray, PDFDict, PDFName, PDFRawStream, decodePDFRawStream } = PDFLib;
+  const ctx = pdf.context; const node = pdf.getPage(index).node;
+  const read = (s) => (s instanceof PDFRawStream ? decodePDFRawStream(s).decode() : s.getContents());
+  // Runs one content stream with its resources; returns { bytes (changed or null), res (changed resources or null), hits }.
+  function run(bytes, res, ctm, depth) {
+    let newRes = null;
+    const onForm = (name, at) => {
+      if (depth > 4) return null;
+      const xo = res && ctx.lookup(res.get(PDFName.of('XObject'))); if (!(xo instanceof PDFDict)) return null;
+      const ref = xo.get(PDFName.of(name)); const form = ctx.lookup(ref);
+      if (!form?.dict || form.dict.get(PDFName.of('Subtype'))?.toString() !== '/Form') return null;
+      const mtx = ctx.lookup(form.dict.get(PDFName.of('Matrix')));
+      const m = mtx instanceof PDFArray ? mtx.asArray().map((v) => ctx.lookup(v).asNumber()) : [1, 0, 0, 1, 0, 0];
+      const fres = ctx.lookup(form.dict.get(PDFName.of('Resources'))) || res;
+      const r = run(read(form), fres instanceof PDFDict ? fres : res, mul(m, at), depth + 1);
+      if (r.bytes || r.res) { // a copy of the form for this page, with the text taken out
+        const dict = form.dict.clone(ctx); dict.delete(PDFName.of('Filter')); dict.delete(PDFName.of('DecodeParms')); dict.delete(PDFName.of('Length'));
+        if (r.res) dict.set(PDFName.of('Resources'), r.res);
+        const copy = ctx.flateStream(r.bytes || read(form), {}); dict.entries().forEach(([k, v]) => { if (!copy.dict.has(k)) copy.dict.set(k, v); });
+        newRes ||= res.clone(ctx);
+        const xs = ctx.lookup(newRes.get(PDFName.of('XObject'))).clone(ctx); xs.set(PDFName.of(name), ctx.register(copy)); newRes.set(PDFName.of('XObject'), xs);
+        res = newRes;
+      }
+      return r.hits;
+    };
+    const { cut, hits } = findText(parseOps(bytes), areas, { ctm, onForm });
+    return { bytes: cut.length ? cutBytes(bytes, cut) : null, res: newRes, hits };
+  }
+  const c = node.get(PDFName.of('Contents')); if (!c) return areas.map(() => 0);
+  const list = ctx.lookup(c) instanceof PDFArray ? ctx.lookup(c).asArray() : [c];
+  const parts = list.map((r) => read(ctx.lookup(r)));
+  // the streams are one content stream split at token boundaries: join them with a line break
+  const total = parts.reduce((t, q) => t + q.length + 1, 0); const bytes = new Uint8Array(total); let at = 0;
+  parts.forEach((q) => { bytes.set(q, at); at += q.length; bytes[at++] = 10; });
+  const res = node.Resources ? node.Resources() : ctx.lookup(node.get(PDFName.of('Resources')));
+  const r = run(bytes, res, [1, 0, 0, 1, 0, 0], 0);
+  if (r.bytes) node.set(PDFName.of('Contents'), ctx.register(ctx.flateStream(r.bytes)));
+  if (r.res) node.set(PDFName.of('Resources'), r.res); // this page's own copy (resources can be shared or inherited)
+  return r.hits;
 }

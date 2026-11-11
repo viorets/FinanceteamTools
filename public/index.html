@@ -1198,7 +1198,7 @@
             try { draft = JSON.parse(localStorage.getItem(draftKey) || 'null'); } catch { /* no draft */ }
             status(`Opening ${f.name} (${mb(bytes.byteLength)})…`);
             try {
-                editor = await openPdfEditor($('pdfEditor'), { bytes, name: f.name, draft });
+                editor = await openPdfEditor($('pdfEditor'), { bytes, name: f.name, draft, onStatus: status });
                 status(`${f.name} · ${mb(bytes.byteLength)}${draft ? ' · draft restored' : ''}`);
                 barActions($('pdfEditor'), 'mk', { open: () => $('pdfFileInput').click(), draft: pdfDraft, download: pdfDownload, more: PDF_FORMATS, tips: TIPS.pdf });
                 if (pdfLocked) lockedNotice(f.name).then(() => fontCaution(editor.doc, f.name)).catch((err) => console.warn('font check', err));

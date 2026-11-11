@@ -561,8 +561,9 @@ export async function pdfFonts(doc, max = 5) {
 // or one table cell line. Each unit: { text, runs, fam, size, lh (line height / size), box: [x, y, w, h] page units
 // (top-left origin) covering the letters with their marks, first: first baseline (page units from the top),
 // rects: [[x0, y0, x1, y1]] per line in PDF space (what to remove from the page), lines }.
-export async function pageParagraphs(page) {
-  const { lines, height } = await pageLines(page, null, { findGrids: false });
+// items: OCR text items for a scanned page (js/pdf-ocr.js), instead of the page's own text.
+export async function pageParagraphs(page, items = null) {
+  const { lines, height } = await pageLines(page, items, { findGrids: false });
   const units = []; const right = Math.max(0, ...lines.map((l) => l.x2)); // the text's right edge on this page
   const left = Math.min(...lines.map((l) => l.x), right);
   for (const ln of lines) {
