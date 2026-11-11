@@ -25,7 +25,7 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 - Side navigation (top): Light, Dark or Follow device for the site. Dark is black and greys with white controls (monochrome, as on Apple's product pages)
 - Chart colours: TUSU Finance (the team CI, Mosaic Blue #00758F; default), TUSU Finance CI (the internal deck's teals #006371, #077989, #2babc2, #5f9aa3, ice #e8f9ff), 7 team palettes (Sakura Dusk, Midnight Violet, Old Rose, Mulled Wine, Winter Dawn, Autumn Harvest, Kombu Moss) and 10 theme-factory themes, shown as colour strips; they set the default colours of the charts, Gantt chart and Word tables
 - iPad and narrow windows: the top bar keeps the open tool's name in view (other tools show their icon); fields use 16px text so Safari does not zoom in
-- Side menu names: Chart from Excel, Word table from Excel, PDF markup, Gantt chart, Excel editor, Word editor, Merge PDFs, Markdown editor
+- Side menu names: Chart from Excel, Word table from Excel, PDF markup, Gantt chart, Excel editor, Word editor, Merge PDFs, Rename files, Markdown editor
 - Each editor has a **?** button beside full screen: tips and keyboard shortcuts. Opening an Excel or Word file says in the status line what the edited copy will not keep (for example "not kept in the edited copy: 2 charts, 1 image") or what is not shown (headers and footers), read from the file itself
 - Editors (PDF, Excel, Word, Markdown) have no side panel: the document takes the full width. Before a file is open, a card in the middle has **Open a file** (or drop a file on it), the size limit and tips; the status line sits under the document
 - File tab (Excel, Word, Markdown; first tab, the editor opens on Home): **Open…**, **New** (Markdown), file name (Markdown), **Save draft** with the time it was saved, **Download** (a format menu for Excel and Markdown). The PDF editor has Open, Save draft and Download beside zoom
@@ -90,6 +90,15 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 - **Print**: the merged PDF opens in a new tab (opened on the tap, so Safari allows it), to print from there
 - A PDF locked by its author is added with a note; its pages are copied when the PDF allows it. Up to 100 MB of PDFs in all; above 12 MB the status line warns that saving may be slow on iPad
 
+### Rename files
+- Add files, a whole folder, or drop them on the page; nothing is uploaded
+- **New name** template with tokens: `{name}` (the old name), `{n}` (a number), `{date}` (the file's date), `{today}`, `{folder}`, `{ext}`; e.g. `อมธ_{date}_{n}_{name}`
+- Folding sections: **Find and replace** (plain text or a pattern, match case), **Numbering** (start, step, digits, Thai digits; order as added, by name, date or size, or move files up and down), **Dates** (dd-mm-yyyy, yyyy-mm-dd or yyyymmdd; Buddhist year), **Tidy** (UPPER, lower or Title Case; single spaces; keep the file type), **Names from a list** (an Excel or CSV sheet of old name → new name; files on it take its name)
+- **Presets** keep a set of rules in this browser
+- The preview lists every file with its new name; names that clash get " (2)", " (3)"; characters that Windows or macOS do not allow become `_`; a rule that leaves a file without a name blocks the download until it is fixed
+- **Download renamed (ZIP)**: renamed copies in one ZIP, in every browser; the original files are unchanged
+- **Open folder to rename in place** (Chrome and Edge only): renames the files in that folder (through temporary names, so swapping two names works); **Undo renaming** puts the old names back while the page is open. Safari cannot change files on disk, so there it is the ZIP
+
 ### Markdown editing
 - Write Markdown on the left, see the formatted page on the right (or text only / preview only); scroll stays in step
 - Ribbon: paragraph and heading styles, bold, italic, strikethrough, inline code, bullets, numbering, checklists, quotes, indent, links, images, tables, code blocks, divider; find and replace
@@ -123,7 +132,7 @@ public/js/pdf-markup.js             # PDF editor module
 public/css/markup.css               # PDF editor styles
 public/js/gantt.js                  # Gantt Chart Creator (layout → SVG and PNG)
 public/css/gantt.css                # Gantt Chart Creator styles
-public/css/batch.css                # Merge PDFs styles
+public/css/batch.css                # Merge PDFs and Rename files styles
 public/js/view-tools.js             # zoom, full screen and icon buttons shared by the PDF, Excel and Word editors
 public/css/view-tools.css           # their styles, and the HEX field
 public/js/hex-color.js              # HEX entry beside every colour picker
@@ -146,6 +155,7 @@ public/css/md-edit.css              # Markdown editor styles
 public/js/xlsx-edit.js              # Excel editor (ExcelJS)
 public/js/xlsx-relock.js            # puts sheet protection back after saving (from TUSUFinanceFeedback)
 public/js/pdf-merge.js              # Merge PDFs (pdf.js thumbnails, pdf-lib copyPages)
+public/js/batch-rename.js           # Rename files (rules, presets, ZIP, rename in place)
 public/js/docx-edit.js              # Word editor (JSZip; edits word/document.xml, headers and footers; pages)
 public/css/office-edit.css          # Excel and Word editor styles
 public/fonts/LINESeedSansTH_Rg.ttf  # text box font (SIL Open Font License)
