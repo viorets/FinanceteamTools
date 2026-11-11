@@ -82,7 +82,9 @@ export function openPdfMerge(root, { download }) {
   };
   function undo() {
     const s = st.undo.pop(); if (!s) return;
+    const inGrid = grid.contains(document.activeElement); // keep the keyboard on the pages after Ctrl+Z
     st.files = s.files; st.tiles = s.tiles; st.sel.clear(); draw(); status(`Undone: ${s.label}`);
+    if (inGrid && st.tiles.length) focusTile(st.focus);
   }
   $('#mgUndo').onclick = undo;
 
