@@ -72,12 +72,15 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 - Formulas calculate live (HyperFormula; TEXT() uses Excel's number formats); charts, images and pivot tables are **not** kept
 
 ### Word editing (beta)
-- WordCraft-style: one editable page with a ribbon: font, size, B/I/U/S, colour, highlight (HEX), alignment, bullets and numbering, indent, line spacing, and a styles gallery (Normal, Title, Headings, Quote)
+- WordCraft-style: the document is shown in pages with a ribbon: font, size, B/I/U/S, colour, highlight (HEX), alignment, bullets and numbering, indent, line spacing, and a styles gallery (Normal, Title, Headings, Quote)
 - **Modify…** (or right-click a style) changes a style's font, size, colour, bold, italic, alignment and spacing in the document's styles; ticked styles are remembered in this browser and used when that style is applied in other documents
 - Tab stops are laid out as in Word (left, centre, right, dot leaders), so a table of contents shows its dotted lines and page numbers; TOC entries keep the TOC style rather than the link style
 - Enter starts a new paragraph; find and replace; word count; export PDF, .txt, .md, .html; **Save draft** keeps the edited document in this browser
 - Insert text boxes, lines, arrows, rectangles and pen strokes on the page, saved as Word drawings; typing --> gives → and ==> gives ➜
-- Only what changed is rewritten: a text-only edit keeps every run's formatting; headers and footers are not shown; old `.doc` files are not supported
+- **Pages**: the text is laid out page by page as in Word: a paragraph or table row that would cross the bottom margin moves to the next page; page breaks, "page break before" and section breaks start a new page. The pages are drawn behind the text, so typing and undo work as before. Line breaks inside a paragraph are not split across pages (the whole paragraph moves), so a page can end a little earlier than in Word
+- **Headers and footers**: each page shows its section's header and footer, including a different first page and odd/even pages; PAGE, NUMPAGES, IF and = fields are worked out per page. Double-click one (or Insert > Header & footer) to type in it; the text keeps its formatting, and fields and pictures stay as they are. Typing in an empty header or footer adds one to that section
+- **Page numbers** (Insert > Page numbers): footer or header, left/centre/right, format 1 2 3 · i ii iii · I II III · a b c · A B C · ๑ ๒ ๓, text before (e.g. หน้า), the total ("of N" / "จาก N"), the first number, and the page to **start** and **stop** on. They are written as Word fields (PAGE inside IF and = fields), so Word numbers the pages itself; applying again replaces them (and a footer line that held only a page number), and "No page numbers" removes them. Numbers then count the pages of the whole document (sections' own restarts are cleared)
+- Only what changed is rewritten: a text-only edit keeps every run's formatting; old `.doc` files are not supported
 
 ### Markdown editing
 - Write Markdown on the left, see the formatted page on the right (or text only / preview only); scroll stays in step
@@ -133,7 +136,7 @@ public/js/md-edit.js                # Markdown editor (marked + DOMPurify)
 public/css/md-edit.css              # Markdown editor styles
 public/js/xlsx-edit.js              # Excel editor (ExcelJS)
 public/js/xlsx-relock.js            # puts sheet protection back after saving (from TUSUFinanceFeedback)
-public/js/docx-edit.js              # Word editor (JSZip; edits word/document.xml only)
+public/js/docx-edit.js              # Word editor (JSZip; edits word/document.xml, headers and footers; pages)
 public/css/office-edit.css          # Excel and Word editor styles
 public/fonts/LINESeedSansTH_Rg.ttf  # text box font (SIL Open Font License)
 public/favicon.png                  # tab icon (paper plane, FINANCE-TEAM_2.png)

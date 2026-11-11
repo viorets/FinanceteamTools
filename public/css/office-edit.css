@@ -122,6 +122,28 @@
 .de-stymod { height: 36px; padding: 0 10px; white-space: nowrap; }
 .de-keep { display: inline-block; width: 0; }
 .de-ink { position: absolute; inset: 0; pointer-events: none; }
+/* Pages (js/docx-edit.js paginate): white pages drawn behind the one text column, headers and footers above it. */
+.de-paged .de-page { position: relative; z-index: 1; background: transparent; box-shadow: none; }
+.de-paged .de-page:focus-visible { box-shadow: none; }
+.de-frames { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; }
+.de-pf { background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .15); }
+.de-hfl { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.de-ink { z-index: 3; }
+.de-hfbox { pointer-events: auto; min-height: 1.2em; color: #000; line-height: 1.2; outline: none; opacity: .55; border-radius: 2px; cursor: default; }
+.de-hfedit .de-hfbox { opacity: 1; cursor: text; box-shadow: 0 0 0 1px #2babc2; }
+.de-hfedit .de-hfbox:focus { box-shadow: 0 0 0 2px var(--accent); }
+.de-hfedit .de-hfbox:empty::before { content: attr(aria-label); color: #7a8a92; font: 12px system-ui, sans-serif; }
+.de-hfedit .de-page { opacity: .45; }
+/* Table rows move to the next page with a transform, so each cell draws its own borders (collapsed borders are
+   painted by the table and would stay behind): right and bottom, plus top on the first row and left on the first cell. */
+.de-paged .de-page .de-tbl { border-collapse: separate; border-spacing: 0; }
+.de-paged .de-page .de-tbl.de-borders td { border-width: 0 1px 1px 0; }
+.de-paged .de-page .de-tbl.de-borders tr:first-child > td { border-top-width: 1px; }
+.de-paged .de-page .de-tbl.de-borders td:first-child { border-left-width: 1px; }
+.de-paged .de-page .de-tbl.de-borders tr.de-pgtop > td { border-top-width: 1px; }
+.de-fld { white-space: pre; }
+.de-pnnote { margin: 0; font-size: 12px; color: var(--ink-2); }
+.de-sform input[type=text] { min-height: 34px; padding: 4px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 16px; }
 .de-sheet:not([data-tool="text"]) .de-ink { pointer-events: auto; cursor: crosshair; }
 .de-sheet[data-tool="textbox"] .de-ink { cursor: text; }
 .de-svg { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
