@@ -56,26 +56,27 @@ export function openBatchRename(root, { download }) {
         <p class="help-text">Or drop files here. Nothing is uploaded: the files stay on this device.${canFolder ? ' Renaming in place works in Chrome and Edge; elsewhere you get the renamed copies as a ZIP.' : ''}</p></div>
       <div class="control-group"><label for="rnTpl">New name</label><input type="text" id="rnTpl" autocomplete="off" spellcheck="false">
         <p class="help-text rn-tokens">Tokens: <button type="button" data-tok="{name}">{name}</button> <button type="button" data-tok="{n}">{n}</button> <button type="button" data-tok="{date}">{date}</button> <button type="button" data-tok="{today}">{today}</button> <button type="button" data-tok="{folder}">{folder}</button> <button type="button" data-tok="{ext}">{ext}</button><br>e.g. <code>อมธ_{date}_{n}_{name}</code></p></div>
-      <details class="rn-set"><summary>Find and replace</summary>
+      <details class="rn-set"><summary>Find and replace<span class="rn-on" data-on="find"></span></summary>
         <div class="gc-pair"><input type="text" id="rnFind" placeholder="Find" aria-label="Find" autocomplete="off" spellcheck="false"><input type="text" id="rnRep" placeholder="Replace with" aria-label="Replace with" autocomplete="off" spellcheck="false"></div>
         <label class="rn-chk"><input type="checkbox" id="rnRegex"> Pattern (regular expression)</label><label class="rn-chk"><input type="checkbox" id="rnCase"> Match case</label></details>
-      <details class="rn-set"><summary>Numbering</summary>
+      <details class="rn-set"><summary>Numbering<span class="rn-on" data-on="num"></span></summary>
         <div class="rn-three"><label>Start <input type="number" id="rnStart" min="0" max="999999"></label><label>Step <input type="number" id="rnStep" min="1" max="1000"></label><label>Digits <input type="number" id="rnPad" min="1" max="8"></label></div>
         <label class="rn-chk"><input type="checkbox" id="rnThai"> Thai digits (๑ ๒ ๓)</label>
         <label>Order <select id="rnSort"><option value="added">As added (or moved)</option><option value="name">By name</option><option value="date">By date (oldest first)</option><option value="size">By size (smallest first)</option></select></label></details>
-      <details class="rn-set"><summary>Dates</summary>
+      <details class="rn-set"><summary>Dates<span class="rn-on" data-on="date"></span></summary>
         <div class="gc-pair"><select id="rnDate" aria-label="Date format"><option value="dmy">dd-mm-yyyy</option><option value="ymd">yyyy-mm-dd</option><option value="compact">yyyymmdd</option></select><label class="rn-chk"><input type="checkbox" id="rnBe"> Buddhist year (2569)</label></div></details>
-      <details class="rn-set"><summary>Tidy</summary>
+      <details class="rn-set"><summary>Tidy<span class="rn-on" data-on="tidy"></span></summary>
         <label>Letters <select id="rnCaseMode"><option value="keep">As they are</option><option value="upper">UPPER CASE</option><option value="lower">lower case</option><option value="title">Title Case</option></select></label>
         <label class="rn-chk"><input type="checkbox" id="rnTidy"> Single spaces, none around _ and -</label><label class="rn-chk"><input type="checkbox" id="rnExt"> Keep the file type (.pdf, .xlsx…)</label></details>
+      <details class="rn-set"><summary>Names from a list<span class="rn-on" data-on="list"></span></summary><input type="file" id="rnMap" accept=".xlsx,.xls,.csv" aria-label="Excel or CSV list of old and new names">
+        <p class="help-text">An Excel or CSV sheet: old name in the first column, new name in the second. Files on the list take its name; the others follow the rules.</p></details>
       <div class="control-group"><label for="rnPreset">Presets</label><div class="rn-row"><select id="rnPreset"><option value="">Choose a preset…</option></select><button type="button" class="bt-ic" id="rnDelP" title="Delete this preset" aria-label="Delete this preset">${BI.remove}</button></div>
         <div class="rn-row"><input type="text" id="rnPName" placeholder="Name, e.g. Receipts by date" aria-label="Preset name" autocomplete="off" maxlength="60"><button type="button" class="gc-btn" id="rnSaveP">Save preset</button></div></div>
-      <details class="rn-set"><summary>Names from a list</summary><input type="file" id="rnMap" accept=".xlsx,.xls,.csv" aria-label="Excel or CSV list of old and new names">
-        <p class="help-text">An Excel or CSV sheet: old name in the first column, new name in the second. Files on the list take its name; the others follow the rules.</p></details>
     </div>
     <div class="main-content bt-main">
-      <div class="gc-bar"><h2 class="gc-h">Preview <span class="bt-count" id="rnCount"></span></h2>
+      <div class="bt-top"><div class="gc-bar"><h2 class="gc-h">Preview <span class="bt-count" id="rnCount"></span></h2>
         <button type="button" class="gc-btn gc-primary" id="rnZip" disabled>Download renamed (ZIP)</button>${canFolder ? '<button type="button" class="gc-btn" id="rnApply" disabled>Rename in folder</button><button type="button" class="gc-btn gc-quiet" id="rnUndo" hidden>Undo renaming</button>' : ''}<button type="button" class="gc-btn gc-quiet" id="rnClear" disabled>Clear</button></div>
+      </div>
       <p class="gc-status" id="rnStatus" role="status"></p>
       <div class="rn-wrap"><table class="rn-table"><thead><tr><th scope="col">#</th><th scope="col">Now</th><th scope="col">New name</th><th scope="col" aria-label="Order"></th></tr></thead><tbody id="rnBody"></tbody></table>
         </div>
@@ -95,7 +96,7 @@ export function openBatchRename(root, { download }) {
 
   // ---------- presets ----------
   function drawPresets() { const p = presets(); $('#rnPreset').innerHTML = `<option value="">Choose a preset…</option>${Object.keys(p).sort().map((n) => `<option>${esc(n)}</option>`).join('')}`; }
-  $('#rnPreset').onchange = (e) => { const p = presets()[e.target.value]; if (!p) return; st.r = { ...DEFAULTS, ...p }; fill(); draw(); status(`Preset: ${e.target.value}`); };
+  $('#rnPreset').onchange = (e) => { const p = presets()[e.target.value]; $('#rnDelP').disabled = !e.target.value; if (!p) return; st.r = { ...DEFAULTS, ...p }; fill(); draw(); status(`Preset: ${e.target.value}`); };
   $('#rnSaveP').onclick = () => {
     const name = $('#rnPName').value.trim() || $('#rnPreset').value; if (!name) { status('Give the preset a name first.'); $('#rnPName').focus(); return; }
     const o = presets(); o[name] = { ...st.r }; if (!savePresets(o)) { status('This browser does not allow saving presets.'); return; } drawPresets(); $('#rnPreset').value = name; $('#rnPName').value = ''; status(`Preset saved: ${name} (in this browser)`);
@@ -156,7 +157,13 @@ export function openBatchRename(root, { download }) {
   function draw() {
     const rows = plan(); const n = rows.length; const changed = rows.filter((r) => !r.same && !r.empty).length; const bad = rows.filter((r) => r.empty).length;
     $('#rnCount').textContent = n ? `(${changed} of ${n} renamed${bad ? `, ${bad} without a name` : ''})` : '';
-    $('#rnEmpty').hidden = !!n; $('.rn-wrap').hidden = !n; $('#rnZip').disabled = !n || !!bad; if ($('#rnApply')) $('#rnApply').disabled = !n || !!bad || !st.dir || !changed; $('#rnClear').disabled = !n;
+    $('#rnEmpty').hidden = !!n; $('.rn-wrap').hidden = !n;
+    // what each closed section is doing, beside its name
+    const r = st.r; const on = { find: r.find ? `${r.find} → ${r.replace || '(nothing)'}` : '', num: /\{n\}/i.test(r.template) ? `from ${r.start}${r.step > 1 ? `, step ${r.step}` : ''}${r.thai ? ', Thai digits' : ''}` : '',
+      date: /\{(date|today)\}/i.test(r.template) ? ({ dmy: 'dd-mm-yyyy', ymd: 'yyyy-mm-dd', compact: 'yyyymmdd' }[r.dateFmt] + (r.be ? ', B.E.' : '')) : '',
+      tidy: r.caseMode !== 'keep' ? { upper: 'UPPER CASE', lower: 'lower case', title: 'Title Case' }[r.caseMode] : '', list: st.map ? `${st.map.size} names` : '' };
+    root.querySelectorAll('.rn-on').forEach((el) => { el.textContent = on[el.dataset.on] ? `· ${on[el.dataset.on]}` : ''; });
+    $('#rnDelP').disabled = !$('#rnPreset').value; $('#rnZip').disabled = !n || !!bad || !changed; // nothing to download while no name changes if ($('#rnApply')) $('#rnApply').disabled = !n || !!bad || !st.dir || !changed; $('#rnClear').disabled = !n;
     const manual = st.r.sort === 'added';
     $('#rnBody').innerHTML = rows.map((r, i) => `<tr class="${r.empty ? 'rn-bad' : r.same ? 'rn-same' : ''}"><td>${i + 1}</td><td class="rn-old" title="${esc(r.f.name)}">${esc(r.f.name)}</td>
       <td class="rn-new" title="${esc(r.to)}">${r.empty ? '<em>No name (or only a file type): change the rules</em>' : esc(r.to)}${r.listed ? ' <span class="rn-tag">list</span>' : ''}</td>

@@ -732,6 +732,12 @@
             document.addEventListener('pointerdown', (e) => { if (side.classList.contains('tools-open') && !side.contains(e.target)) set(false); });
             side.addEventListener('keydown', (e) => { if (e.key === 'Escape' && side.classList.contains('tools-open')) { set(false); sw.focus(); } });
         })();
+        // The tool list is a vertical tab list: up and down arrows (and Home, End) move between the tools.
+        document.getElementById('toolList').addEventListener('keydown', (e) => {
+            const all = [...document.querySelectorAll('#toolList .tab-btn')]; const i = all.indexOf(document.activeElement); if (i < 0) return;
+            const j = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: all.length - 1 }[e.key]; if (j == null) return;
+            e.preventDefault(); all[(j + all.length) % all.length].focus();
+        });
         // Tool names as tooltips.
         document.querySelectorAll('.tab-btn').forEach((b) => { b.title = b.querySelector('span').textContent; });
         // Open the tool named in the address (#svg, #word, #pdf, #gantt, #xlsx, #docx, #md, #merge, #rename).

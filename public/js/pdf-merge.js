@@ -1,9 +1,10 @@
 // Merge PDFs (Acrobat's Combine files): add several PDFs, keep a page range of each, put the pages in order, turn or
 // remove pages, then Save as one PDF or print it. Pages are copied with pdf-lib, so text, links and fonts stay as
 // they are; nothing leaves the device.
-// Pages are chosen, then acted on: tap or click a page to choose it (Shift: a run of pages), and the bar above the
-// pages turns, moves or removes the chosen ones. Keyboard: arrows move between pages, Space chooses, Delete removes,
-// Ctrl/⌘ + arrows move the chosen pages, Ctrl/⌘ + A chooses all, Ctrl/⌘ + Z undoes. Pages can also be dragged.
+// Pages are chosen, then acted on: click a page to choose it (Ctrl/⌘-click adds one, Shift-click a run; a finger
+// tap adds), and the bar above the pages turns, moves (one place, or to a page number) or removes the chosen ones.
+// Keyboard: arrows move between pages, Space chooses, R turns, Delete removes, Ctrl/⌘ + arrows move the chosen
+// pages, Ctrl/⌘ + A chooses all, Ctrl/⌘ + Z undoes. Pages can also be dragged. The bars stay in view while scrolling.
 import { loadLibs } from './pdf-markup.js';
 import { noticeBox } from './view-tools.js';
 
@@ -51,7 +52,9 @@ export function openPdfMerge(root, { download }) {
       <p class="gc-status bt-status" id="mgStatus" role="status"></p>
     </div>
     <div class="main-content bt-main">
+      <div class="bt-top">
       <div class="gc-bar"><h2 class="gc-h">Pages <span class="bt-count" id="mgCount"></span></h2>
+        <button type="button" class="gc-btn gc-quiet bt-jump" id="mgJump" hidden></button>
         <button type="button" class="bt-ic" id="mgUndo" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)" disabled>${BI.undo}</button>
         <button type="button" class="gc-btn gc-quiet" id="mgClear" disabled>Clear</button>
         <button type="button" class="gc-btn" id="mgPrint" disabled>Print</button>
@@ -60,10 +63,11 @@ export function openPdfMerge(root, { download }) {
         <span class="mg-selcount" id="mgSelcount"></span>
         <button type="button" class="bt-tool" data-act="left" title="Move earlier (Ctrl+←)">${BI.left}<span>Earlier</span></button>
         <button type="button" class="bt-tool" data-act="right" title="Move later (Ctrl+→)">${BI.right}<span>Later</span></button>
-        <button type="button" class="bt-tool" data-act="turn" title="Turn a quarter">${BI.turn}<span>Turn</span></button>
+        <span class="mg-to"><label for="mgTo">Move to page</label><input type="number" id="mgTo" min="1" inputmode="numeric"><button type="button" class="bt-tool" data-act="to">Move</button></span>
+        <button type="button" class="bt-tool" data-act="turn" title="Turn a quarter (R)">${BI.turn}<span>Turn</span></button>
         <button type="button" class="bt-tool bt-danger" data-act="del" title="Remove (Delete)">${BI.remove}<span>Remove</span></button>
         <button type="button" class="bt-tool" data-act="none" title="Choose none (Esc)">${BI.close}<span>Done</span></button>
-      </div>
+      </div></div>
       <div class="mg-grid" id="mgGrid" role="listbox" aria-multiselectable="true" aria-label="Pages of the merged PDF, in order" tabindex="-1"></div>
       <div class="cx-empty" id="mgEmpty">${BI.merge}<h3>Merge PDFs into one file</h3>
         <p>Add two or more PDFs, keep the pages you need, put them in order, then save one PDF or print it.</p>
@@ -87,6 +91,8 @@ export function openPdfMerge(root, { download }) {
     if (inGrid && st.tiles.length) focusTile(st.focus);
   }
   $('#mgUndo').onclick = undo;
+  // iPad and narrow windows: the file list is under the pages; this goes to it (its first page range field)
+  root.addEventListener('click', (e) => { if (e.target.closest('#mgJump')) { const side = $('.bt-side'); side.scrollIntoView({ behavior: 'smooth', block: 'start' }); side.querySelector('.mg-range input')?.focus({ preventScroll: true }); } });
 
   // ---------- adding files ----------
   async function addFiles(fs) {
@@ -105,6 +111,7 @@ export function openPdfMerge(root, { download }) {
         const file = { id: st.nextId++, name: f.name, bytes, doc, n: doc.numPages, range: '', locked: isLocked(bytes) };
         st.files.push(file);
         for (let i = 0; i < file.n; i++) st.tiles.push({ key: st.nextKey++, fid: file.id, i, rot: 0 });
+        sizeOf(file);
       } catch (err) { status(`${f.name} could not be opened${/password/i.test(err.message) ? ' (it needs a password)' : ''}.`); continue; }
     }
     draw();
@@ -119,6 +126,14 @@ export function openPdfMerge(root, { download }) {
   root.addEventListener('dragleave', (e) => { if (!root.contains(e.relatedTarget)) root.classList.remove('ed-drop'); });
   root.addEventListener('drop', (e) => { root.classList.remove('ed-drop'); if (!e.dataTransfer?.files.length) return; e.preventDefault(); addFiles(e.dataTransfer.files); });
 
+  // Each page's shape before its thumbnail is drawn (no jump from portrait to landscape while scrolling).
+  async function sizeOf(file) {
+    for (let i = 0; i < file.n; i++) {
+      try { const vp = (await file.doc.getPage(i + 1)).getViewport({ scale: 1 }); const ar = vp.width / vp.height;
+        st.tiles.forEach((t) => { if (t.fid === file.id && t.i === i && !t.ar) { t.ar = ar; const el = grid.querySelector(`.mg-tile[data-key="${t.key}"]`); if (el) shape(el, t); } });
+      } catch { /* drawn later */ }
+    }
+  }
   // ---------- the file list: page range, order, remove ----------
   function drawList() {
     list.innerHTML = st.files.map((f, k) => `<li class="mg-file" data-id="${f.id}">
@@ -169,6 +184,7 @@ export function openPdfMerge(root, { download }) {
     st.sel.forEach((k) => { if (!st.tiles.some((t) => t.key === k)) st.sel.delete(k); });
     st.focus = Math.min(st.focus, Math.max(0, many - 1));
     $('#mgCount').textContent = many ? `(${many})` : '';
+    const jump = $('#mgJump'); jump.hidden = !st.files.length; jump.textContent = `${st.files.length} file${st.files.length === 1 ? '' : 's'} · page ranges`;
     ['#mgSave', '#mgPrint', '#mgClear'].forEach((s) => { $(s).disabled = !many; });
     $('#mgUndo').disabled = !st.undo.length;
     $('#mgEmpty').hidden = !!many; grid.hidden = !many;
@@ -192,7 +208,12 @@ export function openPdfMerge(root, { download }) {
     } else if (only) { st.sel.clear(); st.sel.add(key); st.anchor = key; } else { if (st.sel.has(key)) st.sel.delete(key); else st.sel.add(key); st.anchor = key; }
     st.focus = k; draw(); tileAt(k)?.focus({ preventScroll: true });
   }
-  grid.addEventListener('click', (e) => { const el = e.target.closest('.mg-tile'); if (!el) return; choose([...grid.children].indexOf(el), { range: e.shiftKey }); });
+  let lastPointer = 'mouse'; grid.addEventListener('pointerdown', (e) => { lastPointer = e.pointerType; });
+  grid.addEventListener('click', (e) => {
+    const el = e.target.closest('.mg-tile'); if (!el) return; const k = [...grid.children].indexOf(el);
+    // a mouse click chooses that page only (Ctrl/⌘ adds, Shift a run), as in a file list; a finger or pen tap adds
+    choose(k, { range: e.shiftKey, only: !e.shiftKey && !(e.ctrlKey || e.metaKey) && lastPointer === 'mouse' });
+  });
   // the chosen pages: move one place earlier or later, turn, remove
   function act(a) {
     const chosen = selected(); if (!chosen.length) return;
@@ -203,6 +224,11 @@ export function openPdfMerge(root, { download }) {
       st.tiles = st.tiles.filter((t) => !st.sel.has(t.key)); st.sel.clear(); draw(); focusTile(st.focus);
       status(`${chosen.length} page${chosen.length === 1 ? '' : 's'} removed · Undo puts ${chosen.length === 1 ? 'it' : 'them'} back`); return;
     }
+    if (a === 'to') {
+      const to = Math.round(+$('#mgTo').value); if (!(to >= 1)) { $('#mgTo').focus(); return; }
+      snap('moving pages'); const rest = st.tiles.filter((t) => !st.sel.has(t.key)); const at = Math.min(to - 1, rest.length);
+      rest.splice(at, 0, ...chosen); st.tiles = rest; draw(); focusTile(at); status(`Moved to page ${at + 1}`); return;
+    }
     const d = a === 'left' ? -1 : 1; const idx = st.tiles.map((t, i) => (st.sel.has(t.key) ? i : -1)).filter((i) => i >= 0);
     if ((d < 0 && idx[0] === 0) || (d > 0 && idx.at(-1) === st.tiles.length - 1)) return;
     snap('moving pages');
@@ -211,12 +237,14 @@ export function openPdfMerge(root, { download }) {
     status(`Moved to page ${first + 1}`);
   }
   $('#mgSelbar').addEventListener('click', (e) => { const b = e.target.closest('button[data-act]'); if (b) act(b.dataset.act); });
+  $('#mgTo').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); act('to'); } });
   grid.addEventListener('keydown', (e) => {
     const mod = e.ctrlKey || e.metaKey; const k = st.focus; const cols = Math.max(1, Math.round(grid.clientWidth / (tileAt(0)?.offsetWidth || 150)));
     const go = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols, Home: -Infinity, End: Infinity }[e.key];
     if (mod && (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === 'ArrowDown')) { e.preventDefault(); if (!st.sel.size) choose(k, { only: true }); act(e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? 'left' : 'right'); return; }
     if (go != null) { e.preventDefault(); const to = Math.max(0, Math.min(st.tiles.length - 1, k + (Number.isFinite(go) ? go : go < 0 ? -k : st.tiles.length))); if (e.shiftKey) choose(to, { range: true }); else focusTile(to); return; }
     if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); choose(k); return; }
+    if ((e.key === 'r' || e.key === 'R') && !mod) { e.preventDefault(); if (!st.sel.size) choose(k, { only: true }); act('turn'); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); if (!st.sel.size) choose(k, { only: true }); act('del'); return; }
     if (e.key === 'Escape' && st.sel.size) { e.preventDefault(); act('none'); return; }
     if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); st.tiles.forEach((t) => st.sel.add(t.key)); draw(); focusTile(k); }

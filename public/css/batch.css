@@ -2,6 +2,15 @@
    other tools; the work (pages, the preview list) comes first on iPad and narrow windows, as Chart from Excel. */
 .bt-main { flex-direction: column; align-items: stretch !important; justify-content: flex-start !important; gap: 12px; min-width: 0; }
 @media (max-width: 1279px) { .bt-main { order: -1; } }
+/* The bar (and Merge's chosen-pages bar) stays in view while the pages scroll: under the top bar on iPad. */
+.bt-main { overflow: visible !important; }
+.bt-top { position: sticky; top: 0; z-index: 5; display: grid; gap: 8px; margin: -8px -8px 0; padding: 8px; border-radius: 12px; background: var(--surface); }
+@media (max-width: 900px) { .bt-top { top: 64px; } }
+.bt-jump { display: none; }
+@media (max-width: 1279px) { .bt-jump:not([hidden]) { display: inline-flex; } }
+.mg-to { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-2); }
+.mg-to label { margin: 0; font-weight: normal; }
+.mg-to input { width: 4.5em; min-height: 40px; box-sizing: border-box; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); color: var(--fg-color); font-size: 16px; }
 .bt-label { display: block; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary); margin-bottom: 6px; }
 .bt-side input[type="text"] { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px; color: var(--fg-color); background: var(--surface); }
 .bt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -52,7 +61,12 @@ input[aria-invalid="true"] { border-color: var(--danger) !important; }
 .rn-set { border-top: 1px solid var(--border); margin: 0; padding: 0; }
 .rn-set:last-of-type { border-bottom: 1px solid var(--border); margin-bottom: 14px; }
 .rn-set[open] { padding-bottom: 12px; display: grid; gap: 8px; }
-.rn-set > summary { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary); min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.rn-set > summary { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary); min-height: 44px; display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+.rn-set > summary::-webkit-details-marker { display: none; }
+/* open/closed marker, and what a closed section is doing (e.g. "b → X") */
+.rn-set > summary::after { content: ""; width: 8px; height: 8px; margin-left: auto; border: solid var(--ink-2); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform .15s ease-out; }
+.rn-set[open] > summary::after { transform: rotate(45deg); }
+.rn-on { font-family: var(--font-family, inherit); font-size: 13px; font-weight: normal; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .rn-set > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 .rn-set label { display: grid; gap: 2px; font-weight: normal; margin: 0; }
 .rn-set .rn-chk { display: flex; align-items: center; gap: 10px; min-height: 40px; cursor: pointer; }
