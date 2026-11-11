@@ -165,6 +165,12 @@ export function openMd(root, { download }) {
   const turn = () => tdLib ||= Promise.all([script(TURNDOWN, 'TurndownService'), script(TD_GFM, 'turndownPluginGfm')]).then(([T, G]) => {
     const td = new T({ headingStyle: 'atx', hr: '---', bulletListMarker: '-', codeBlockStyle: 'fenced', emDelimiter: '*', strongDelimiter: '**' });
     td.use(G.gfm);
+    // bold right next to italic with no space ("**a***b*") does not parse as Markdown; keep such runs as HTML tags
+    const EMPH = /^(STRONG|B|EM|I)$/;
+    const touching = (n) => EMPH.test(n.previousSibling?.nodeName || '') || EMPH.test(n.nextSibling?.nodeName || '');
+    td.addRule('touchingEmphasis', { filter: (n) => EMPH.test(n.nodeName) && touching(n), replacement(content, node) {
+      const tag = /^(STRONG|B)$/.test(node.nodeName) ? 'strong' : 'em'; return content.trim() ? `<${tag}>${content}</${tag}>` : content;
+    } });
     td.addRule('listItem', { filter: 'li', replacement(content, node, o) { // "- item" / "1. item", not Turndown's "-   item"
       const ol = node.parentNode.nodeName === 'OL'; const i = [...node.parentNode.children].indexOf(node);
       const mark = ol ? `${(+node.parentNode.getAttribute('start') || 1) + i}. ` : `${o.bulletListMarker} `;

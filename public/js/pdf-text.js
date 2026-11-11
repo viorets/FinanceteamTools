@@ -440,11 +440,17 @@ function inline(runs) {
     const parts = [[]]; runs.forEach((r) => r.t.split('\n').forEach((t, k) => { if (k) parts.push([]); if (t) parts.at(-1).push({ ...r, t }); }));
     return parts.map(inline).filter(Boolean).join('<br>');
   }
-  return mergeRuns(runs).map((r) => {
-    const m = /^(\s*)(.*?)(\s*)$/s.exec(r.t); const [, a, body, z] = m;
-    if (!body) return r.t;
+  const rs = mergeRuns(runs).map((r) => { const [, a, body, z] = /^(\s*)(.*?)(\s*)$/s.exec(r.t); return { ...r, a, body, z, styled: !!body && (r.b || r.i) }; });
+  return rs.map((r, k) => {
+    if (!r.body) return r.t;
+    // styled runs that touch with no space between ("**a***b*") break Markdown; use HTML tags there
+    const touches = r.styled && ((!r.a && rs[k - 1]?.styled && !rs[k - 1].z) || (!r.z && rs[k + 1]?.styled && !rs[k + 1].a));
+    if (touches) {
+      const open = (r.b ? '<strong>' : '') + (r.i ? '<em>' : ''); const close = (r.i ? '</em>' : '') + (r.b ? '</strong>' : '');
+      return r.a + open + esc(r.body) + close + r.z;
+    }
     const mark = r.b && r.i ? '***' : r.b ? '**' : r.i ? '*' : '';
-    return a + mark + esc(body) + mark + z;
+    return r.a + mark + esc(r.body) + mark + r.z;
   }).join('').replace(/\s+/g, ' ').replace(/(?:\s*(?:…|\.{2,})\s*){2,}/g, ' … ').trim();
 }
 const lineStart = (t) => t.replace(/^(#{1,6}\s|>|[-+]\s|\d+[.)]\s)/, '\\$1');
