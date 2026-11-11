@@ -92,3 +92,6 @@ input[type="color"] { touch-action: none; }
 .vt-modal-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-color-scheme: dark) { :root:not([data-mode="light"]) .vt-modal-ic { color: #fbbf24; } }
 :root[data-mode="dark"] .vt-modal-ic { color: #fbbf24; }
+
+/* Delete stands apart from Undo and Redo, so a quick tap on Undo does not land on it. */
+.vt-acts [id$="-del"] { margin-left: 10px; margin-right: 10px; }

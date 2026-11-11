@@ -1287,7 +1287,10 @@ export async function openDocxEditor(root, bytes) {
     sheet.classList.toggle('de-hfedit', onOff); setPressed(rb, 'de-hf', onOff);
     hfLayer.querySelectorAll('.de-hfbox').forEach((b) => { b.contentEditable = onOff ? 'true' : 'false'; });
     if (!onOff) paginate();
-    status(onOff ? 'Header & footer: type in them (the text keeps its formatting; Esc or double-click the page to finish)' : 'Back to the document');
+    // while it is on, the ribbon button says how to leave (a tap works where Esc and double-click do not: iPad)
+    const hb = $('#de-hf'); const lbl = onOff ? 'Close header & footer' : 'Header & footer';
+    hb.querySelector('.rb-txt').textContent = lbl; hb.title = onOff ? 'Close header & footer (Esc)' : 'Edit the header and footer (or double-click one)'; hb.setAttribute('aria-label', hb.title);
+    status(onOff ? 'Header & footer: type in them (the text keeps its formatting). Tap Close header & footer when done.' : 'Back to the document');
   }
   hfLayer.addEventListener('dblclick', (e) => { const b = e.target.closest('.de-hfbox'); if (!b || sheet.classList.contains('de-hfedit')) return; hfMode(true); b.focus(); });
   page.addEventListener('dblclick', () => { if (sheet.classList.contains('de-hfedit')) hfMode(false); });
@@ -1403,7 +1406,8 @@ export async function openDocxEditor(root, bytes) {
   }
   function pnDialog() {
     const pop = $('#de-pop'); const n = Math.max(1, pageList.length);
-    pop.innerHTML = `<form class="de-sform"><div class="de-shead"><b>Page numbers</b><button type="button" class="rb-btn" data-x aria-label="Close">✕</button></div>
+    pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-labelledby', 'de-pn-title');
+    pop.innerHTML = `<form class="de-sform"><div class="de-shead"><b id="de-pn-title">Page numbers</b><button type="button" class="rb-btn" data-x aria-label="Close">✕</button></div>
       <div class="de-srow"><label>Where <select name="where"><option value="footer">Footer</option><option value="header">Header</option></select></label>
         <label>Align <select name="align"><option value="center">Centre</option><option value="right">Right</option><option value="left">Left</option></select></label></div>
       <label>Format <select name="fmt">${PN_FMT.map(([f, l]) => `<option value="${f}">${l}</option>`).join('')}</select></label>
@@ -1411,13 +1415,28 @@ export async function openDocxEditor(root, bytes) {
       <label class="de-chk"><input name="total" type="checkbox"> Show the total (of N)</label>
       <div class="de-srow"><label>Start on page <input name="from" type="number" min="1" max="${n}" value="1"></label><label>First number <input name="first" type="number" min="0" max="9999" value="1"></label></div>
       <label>Stop after page <input name="to" type="number" min="1" max="${n}" placeholder="to the end"></label>
+      <p class="de-pnprev" aria-live="polite"></p>
       <p class="de-pnnote">Pages before the start page and after the stop page have no number. Word works the numbers out when it opens the file.</p>
       <div class="de-srow"><button type="submit" class="rb-btn de-sok">Apply</button></div></form>`;
-    const f = pop.querySelector('form'); pop.querySelector('[data-x]').onclick = () => { pop.hidden = true; };
+    const f = pop.querySelector('form');
+    // closing (✕, Esc or Apply) puts the focus back on the Page numbers button
+    const close = () => { pop.hidden = true; pop.onkeydown = null; $('#de-pn').focus(); };
+    pop.querySelector('[data-x]').onclick = close;
+    pop.onkeydown = (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
+    // what the start page will show, e.g. "On page 3: หน้า ๑ จาก ๔"
+    const preview = () => {
+      const E = f.elements; const fmt = E.fmt.value; const out = pop.querySelector('.de-pnprev');
+      if (fmt === 'none') { out.textContent = 'The page numbers this tool wrote will be taken out.'; return; }
+      const from = Math.max(1, Math.round(+E.from.value || 1)); const first = Math.max(0, Math.round(+E.first.value || 0)); const to = E.to.value ? Math.max(from, Math.round(+E.to.value)) : 0;
+      const before = E.before.value.replace(/"/g, ''); const pre = before && !/\s$/.test(before) ? `${before} ` : before;
+      const total = E.total.checked ? `${/[฀-๿]/.test(before) ? ' จาก ' : ' of '}${formatNumber(first + (to || n) - from, fmt)}` : '';
+      out.textContent = `On page ${from}: ${pre}${formatNumber(first, fmt)}${total}`;
+    };
+    f.addEventListener('input', preview); preview();
     f.onsubmit = async (e) => {
       e.preventDefault(); const E = f.elements; const from = Math.max(1, Math.round(+E.from.value || 1)); const to = E.to.value ? Math.max(from, Math.round(+E.to.value)) : 0;
       const before = E.before.value.replace(/"/g, ''); const thai = /[฀-๿]/.test(before);
-      pop.hidden = true;
+      close();
       try { await applyPageNumbers({ where: E.where.value, align: E.align.value, fmt: E.fmt.value, before: before && !/\s$/.test(before) ? `${before} ` : before, total: E.total.checked, of: thai ? ' จาก ' : ' of ', from, first: Math.max(0, Math.round(+E.first.value || 0)), to }); }
       catch (err) { status(`Could not add page numbers: ${err.message}`); }
     };
