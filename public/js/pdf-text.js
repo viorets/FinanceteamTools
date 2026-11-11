@@ -31,6 +31,16 @@ export function cleanThai(s) {
 
 const MARKS = /^[\p{M}ัิ-ฺ็-๎-]+$/u;
 const THAI = /[฀-๿]/;
+// "ABCDEF+THSarabunNew-Bold" -> "TH Sarabun New"; "Kanit-Regular" -> "Kanit"; "Arial,Bold" -> "Arial".
+const KNOWN_FONTS = { thsarabunnew: 'TH Sarabun New', thsarabunpsk: 'TH SarabunPSK', angsananew: 'Angsana New', angsanaupc: 'AngsanaUPC',
+  cordianew: 'Cordia New', browallianew: 'Browallia New', leelawadeeui: 'Leelawadee UI', leelawadee: 'Leelawadee', tahoma: 'Tahoma',
+  timesnewromanpsmt: 'Times New Roman', timesnewroman: 'Times New Roman', arialmt: 'Arial', calibri: 'Calibri', cambria: 'Cambria' };
+function familyOf(name) {
+  const base = String(name).replace(/^[A-Z]{6}\+/, '').split(/[-,]/)[0].replace(/(Bold|Italic|Oblique|Regular|Light|Medium|Semi|Black|PS|MT)+$/i, (m) => (/^(PS|MT)$/i.test(m) ? m : ''));
+  const key = base.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!key || /^(sansserif|serif|monospace|g_?d\d)/.test(key)) return '';
+  return KNOWN_FONTS[key] || base.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
 const MARKER_ONLY = /^(?:[•●▪■◦○◆❖➢➤►✓✔\-–—*·]|\(?(?:\d{1,3}|[๐-๙]{1,3}|[a-zA-Zก-ฮ])[.)])$/;
 const BOLD = /bold|black|heavy|semibold|demi|,b$/i;
 const ITALIC = /italic|oblique/i;
@@ -48,7 +58,7 @@ async function pageLines(page) {
   for (const name of Object.keys(tc.styles)) {
     let f = null; try { f = page.commonObjs.get(name); } catch { /* not loaded */ }
     const n = f?.name || tc.styles[name].fontFamily || '';
-    fontOf[name] = { b: !!f?.bold || BOLD.test(n), i: !!f?.italic || ITALIC.test(n) };
+    fontOf[name] = { b: !!f?.bold || BOLD.test(n), i: !!f?.italic || ITALIC.test(n), family: familyOf(n) };
   }
   const vp = page.getViewport({ scale: 1 });
   // Items -> chunks; a chunk that is only combining marks belongs to the chunk before it (stream order), so marks
@@ -82,11 +92,14 @@ async function pageLines(page) {
     let rows = t.cells.map((r) => r.map((chs) => cellRuns(linesOf(chs, vp))));
     rows = rows.filter((r) => r.some((c) => c.length));
     const keep = rows[0].map((_, j) => rows.some((r) => r[j].length));
-    grids.push({ y: t.ys[0], top: vp.height - t.ys[0], rows: rows.map((r) => r.filter((_, j) => keep[j])) });
+    const widths = t.xs.slice(1).map((x, j) => x - t.xs[j]).filter((_, j) => keep[j]);
+    grids.push({ y: t.ys[0], top: vp.height - t.ys[0], rows: rows.map((r) => r.filter((_, j) => keep[j])), widths });
   });
   grids.sort((p, q) => q.y - p.y);
   const images = ops.fnArray.filter((fn) => fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintImageXObjectRepeat).length;
-  return { lines: linesOf(rest, vp), tables: grids, height: vp.height, width: vp.width, images };
+  const fonts = {};
+  tc.items.forEach((it) => { const fam = fontOf[it.fontName]?.family; if (fam && it.str) fonts[fam] = (fonts[fam] || 0) + it.str.length; });
+  return { lines: linesOf(rest, vp), tables: grids, height: vp.height, width: vp.width, images, fonts };
 }
 
 // Chunks -> lines (top to bottom); a line's chunks split into cells at wide gaps.
@@ -272,7 +285,7 @@ export async function pdfToBlocks(doc, { onPage = () => {} } = {}) {
     const right = Math.max(...ls.map((l) => l.x2), 0);
     let cur = null; let table = null;
     const grids = [...p.tables];
-    const flushGrids = (y) => { while (grids.length && grids[0].y > y) { close(); closeTable(); carry = null; blocks.push({ type: 'table', rows: grids.shift().rows }); } };
+    const flushGrids = (y) => { while (grids.length && grids[0].y > y) { close(); closeTable(); carry = null; const g = grids.shift(); blocks.push({ type: 'table', rows: g.rows, widths: g.widths }); } };
     const close = () => { if (cur) blocks.push(cur); cur = null; };
     const closeTable = () => {
       if (!table) return;
@@ -335,7 +348,9 @@ export async function pdfToBlocks(doc, { onPage = () => {} } = {}) {
   blocks.forEach((b) => { if (b.type === 'p' && b.bold && b.lines === 1 && b.runs.map((r) => r.t).join('').trim().length < 80) { b.type = 'h'; b.level = sub; } });
   // Word's PDF export can also drop ำ outright ("กาไร" for กำไร); fixed on whole paragraphs, as a word may span pieces.
   blocks.forEach((b) => (b.rows ? b.rows.flat() : [b.runs]).forEach((rs) => rs.forEach((r) => { r.t = r.t.replace(LOST_AM, (w) => AM_WORDS[w]); })));
-  return { blocks, pages: pages.length, scanned, damaged };
+  const fam = {}; pages.forEach((p) => Object.entries(p.fonts).forEach(([k, v]) => { fam[k] = (fam[k] || 0) + v; }));
+  const font = Object.entries(fam).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  return { blocks, pages: pages.length, scanned, damaged, font, size: body, page: { w: pages[0]?.width || 595, h: pages[0]?.height || 842 } };
 }
 
 // Runs with "\n" -> one runs list per line.
@@ -363,8 +378,10 @@ function tableBlock(rows) {
   rows.forEach((r) => r.cells.forEach((c) => { // widen the columns to everything that lands in them
     const j = colOf(anchor, c); anchor[j].x = Math.min(anchor[j].x, c.x); anchor[j].x2 = Math.max(anchor[j].x2, c.x2);
   }));
+  const right = Math.max(...anchor.map((a) => a.x2));
   return {
     type: 'table',
+    widths: anchor.map((a, j) => (anchor[j + 1]?.x ?? right) - a.x), // each column runs to where the next one starts
     rows: rows.map((r) => {
       const out = anchor.map(() => []);
       r.cells.forEach((c) => out[colOf(anchor, c)].push(c.runs));
@@ -412,4 +429,80 @@ export function blocksToMd(blocks) {
     } else out.push(lineStart(inline(b.runs)));
   });
   return `${out.join('\n').trim()}\n`;
+}
+
+// ---------- Word (.docx) ----------
+// A real Word document from the blocks: the PDF's main font and body size, Heading 1–4, bulleted and numbered lists
+// (Word numbering, restarting at each list's first number), bold and italic, and tables with borders. JSZip is passed
+// in (the page already loads it for the Office editors).
+const x = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+// Word wraps Thai only where it may break a line; a zero-width space between Thai words (found by the browser's
+// Thai word breaker) gives it those places, so lines fill the page as in the PDF.
+const SEG = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
+const THAI_END = /[ก-๎]$/; const THAI_START = /^[ก-๎]/;
+const wrapThai = (t) => {
+  if (!SEG || !THAI.test(t)) return t;
+  let out = ''; let prev = '';
+  for (const { segment } of SEG.segment(t)) { out += (THAI_END.test(prev) && THAI_START.test(segment) ? '​' : '') + segment; prev = segment; }
+  return out;
+};
+function wRuns(runs) {
+  return mergeRuns(runs).map((r) => {
+    const pr = `${r.b ? '<w:b/><w:bCs/>' : ''}${r.i ? '<w:i/><w:iCs/>' : ''}`;
+    return r.t.split('\n').map((t, k) => `${k ? '<w:r><w:br/></w:r>' : ''}${t ? `<w:r>${pr ? `<w:rPr>${pr}</w:rPr>` : ''}<w:t xml:space="preserve">${x(wrapThai(t))}</w:t></w:r>` : ''}`).join('');
+  }).join('');
+}
+const wP = (runs, ppr = '') => `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ''}${wRuns(trimRuns(runs))}</w:p>`;
+function trimRuns(runs) {
+  const out = mergeRuns(runs).map((r) => ({ ...r }));
+  if (out[0]) out[0].t = out[0].t.replace(/^[ \t]+/, '');
+  if (out.at(-1)) out.at(-1).t = out.at(-1).t.replace(/[ \t]+$/, '');
+  return out.filter((r) => r.t);
+}
+
+export async function blocksToDocx(blocks, { JSZip, font = '', size = 14, page = { w: 595, h: 842 }, title = '' } = {}) {
+  const f = font || 'TH Sarabun New'; const sz = Math.round(Math.min(Math.max(size, 8), 28) * 2);
+  const twip = (pt) => Math.round(pt * 20);
+  const body = []; const nums = []; // one Word list per run of list items: [abstract id, start]
+  let list = null;
+  blocks.forEach((b) => {
+    if (b.type !== 'li') list = null;
+    if (b.type === 'h') body.push(wP(b.runs.map((r) => ({ ...r, b: false })), `<w:pStyle w:val="Heading${b.level}"/>`));
+    else if (b.type === 'p') body.push(wP(b.runs));
+    else if (b.type === 'li') {
+      const kind = b.ordered ? 1 : b.marker === '-' ? 0 : 2; // 0 bullet, 1 Word numbering, 2 keep the marker as text
+      if (!list || list.kind !== kind) { list = { kind, id: nums.length + 1 }; nums.push([kind, b.ordered ? parseInt(b.marker, 10) || 1 : 1]); }
+      const runs = kind === 2 ? [{ t: `${b.marker} `, b: false, i: false }, ...b.runs] : b.runs;
+      body.push(wP(runs, `<w:pStyle w:val="ListParagraph"/>${kind === 2 ? '<w:ind w:left="720" w:hanging="360"/>' : `<w:numPr><w:ilvl w:val="0"/><w:numId w:val="${list.id}"/></w:numPr>`}`));
+    } else if (b.type === 'table') {
+      const cols = Math.max(...b.rows.map((r) => r.length));
+      const width = twip(page.w - 144); // the page less 1" margins
+      const ws = Array.from({ length: cols }, (_, j) => Math.max(b.widths?.[j] || 0, 20)); const sum = ws.reduce((a, v) => a + v, 0);
+      const cws = ws.map((v) => Math.floor((v / sum) * width));
+      const rows = b.rows.map((r, i) => `<w:tr>${i === 0 ? '<w:trPr><w:tblHeader/></w:trPr>' : ''}${Array.from({ length: cols }, (_, j) => {
+        const lines = splitLines(r[j] || []);
+        return `<w:tc><w:tcPr><w:tcW w:w="${cws[j]}" w:type="dxa"/></w:tcPr>${(lines.length ? lines : [[]]).map((ln) => wP(ln, '<w:spacing w:before="0" w:after="0"/>')).join('')}</w:tc>`;
+      }).join('')}</w:tr>`).join('');
+      body.push(`<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="${width}" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${cws.map((v) => `<w:gridCol w:w="${v}"/>`).join('')}</w:tblGrid>${rows}</w:tbl>`, '<w:p/>');
+    }
+  });
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${W}><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="${twip(page.w)}" w:h="${twip(page.h)}"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const fonts = `<w:rFonts w:ascii="${x(f)}" w:hAnsi="${x(f)}" w:eastAsia="${x(f)}" w:cs="${x(f)}"/>`;
+  const head = (lvl, k) => `<w:style w:type="paragraph" w:styleId="Heading${lvl}"><w:name w:val="heading ${lvl}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="120"/><w:outlineLvl w:val="${lvl - 1}"/></w:pPr><w:rPr><w:b/><w:bCs/><w:sz w:val="${Math.round(sz * k)}"/><w:szCs w:val="${Math.round(sz * k)}"/></w:rPr></w:style>`;
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr>${fonts}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/><w:lang w:val="en-US" w:bidi="th-TH"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="259" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>`
+    + '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'
+    + head(1, 1.6) + head(2, 1.35) + head(3, 1.15) + head(4, 1)
+    + '<w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="60"/><w:ind w:left="720"/><w:contextualSpacing/></w:pPr></w:style>'
+    + '<w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/><w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tblBorders><w:tblCellMar><w:left w:w="108" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style>'
+    + '</w:styles>';
+  const abs = (id, kind) => `<w:abstractNum w:abstractNumId="${id}"><w:multiLevelType w:val="singleLevel"/><w:lvl w:ilvl="0">${kind === 1 ? '<w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/>' : '<w:numFmt w:val="bullet"/><w:lvlText w:val="•"/>'}<w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum>`;
+  const numbering = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering ${W}>${abs(0, 0)}${abs(1, 1)}${nums.map(([kind, start], i) => `<w:num w:numId="${i + 1}"><w:abstractNumId w:val="${kind === 1 ? 1 : 0}"/>${kind === 1 ? `<w:lvlOverride w:ilvl="0"><w:startOverride w:val="${start}"/></w:lvlOverride>` : ''}</w:num>`).join('')}</w:numbering>`;
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>');
+  zip.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>');
+  zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${x(title)}</dc:title></cp:coreProperties>`);
+  zip.file('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/></Relationships>');
+  zip.file('word/document.xml', doc); zip.file('word/styles.xml', styles); zip.file('word/numbering.xml', numbering);
+  return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
 }

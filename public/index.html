@@ -603,7 +603,7 @@
                 <div class="ed-empty">
                     <svg class="ed-ic" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 17 .8-2.6 4.6-4.6 1.8 1.8-4.6 4.6z"/></svg>
                     <h2>Mark up a PDF</h2>
-                    <p>Add text, highlights, lines, arrows and drawings, then download a marked copy, or turn the PDF's text into Markdown. The original file is not changed.</p>
+                    <p>Add text, highlights, lines, arrows and drawings, then download a marked copy, or turn the PDF's text into Word or Markdown. The original file is not changed.</p>
                     <button type="button" class="action-btn ed-open" data-open="pdf">Open a file</button>
                     <p class="ed-limit">PDF up to 12 MB · or drop it here · drafts stay on this device</p>
                     <p class="help-text ed-help">Text box: select letters and press <b>B</b>, <i>I</i>, <u>U</u>, <s>S</s> or the highlighter (Ctrl+B / I / U, Ctrl+Shift+X). Typing <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜. Hold Shift for straight lines and squares. Zoom with Ctrl + mouse wheel, a pinch, or − / +.</p>
@@ -1140,7 +1140,7 @@
         import { actionMenu, helpPop } from './js/view-tools.js';
         import { markSaved } from './js/ribbon.js';
         import { openMd } from './js/md-edit.js';
-        import { pdfToBlocks, blocksToMd } from './js/pdf-text.js';
+        import { pdfToBlocks, blocksToMd, blocksToDocx } from './js/pdf-text.js';
         import { openGantt } from './js/gantt.js';
         import { openWordTable } from './js/word-table.js';
         import { gradientize } from './js/gradient.js';
@@ -1199,12 +1199,12 @@
             catch (err) { status(`Could not save the draft: ${err.message}`); return false; }
         }
 
-        // Download as: the marked PDF, or the PDF's text as Markdown (js/pdf-text.js), downloaded or opened in the
-        // Markdown editor. Markdown comes from the text the PDF holds, not from the marks.
-        const PDF_FORMATS = [['pdf', 'Marked PDF (.pdf)', 'The PDF with your marks'], ['md', 'Markdown (.md)', 'The text: headings, lists and tables'],
-            ['mdedit', 'Open in Markdown editor', 'Check and edit the text, then download']];
+        // Download as: the marked PDF, or the PDF's text (js/pdf-text.js) as Markdown or Word, or opened in the
+        // Markdown editor. The text comes from what the PDF holds, not from the marks.
+        const PDF_FORMATS = [['pdf', 'Marked PDF (.pdf)', 'The PDF with your marks'], ['docx', 'Word (.docx)', 'The text with headings, lists and tables'],
+            ['md', 'Markdown (.md)', 'The text: headings, lists and tables'], ['mdedit', 'Open in Markdown editor', 'Check and edit the text, then download']];
         const range = (ns) => ns.reduce((out, n) => { const r = out.at(-1); if (r && n === r[1] + 1) r[1] = n; else out.push([n, n]); return out; }, []).map(([a, b]) => (a === b ? a : `${a}–${b}`)).join(', ');
-        async function pdfMarkdown(open) {
+        async function pdfText(fmt) {
             const base = fileName.replace(/\.pdf$/i, '');
             const r = await pdfToBlocks(editor.doc, { onPage: (n, all) => status(`Reading the text of page ${n} of ${all}…`) });
             const text = blocksToMd(r.blocks);
@@ -1215,7 +1215,12 @@
             const tables = r.blocks.filter((b) => b.type === 'table').length;
             const done = `${r.pages} page${r.pages > 1 ? 's' : ''}${tables ? `, ${tables} table${tables > 1 ? 's' : ''}` : ''}`;
             const tail = notes.length ? `. Note: ${notes.join('; ')}.` : '';
-            if (open) { if (md.open(`${base}.md`, text, `${base}.md from the PDF (${done})${tail}`)) { switchTab('mdTool', document.querySelector('[aria-controls="mdTool"]')); status(`Opened in the Markdown editor (${done})${tail}`); } return; }
+            if (fmt === 'docx') {
+                const out = await blocksToDocx(r.blocks, { JSZip: await zipLib(), font: r.font, size: r.size, page: r.page, title: base });
+                download(out, `${base}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                status(`${base}.docx downloaded (${done}${r.font ? `, font ${r.font}` : ''})${tail}`); return;
+            }
+            if (fmt === 'mdedit') { if (md.open(`${base}.md`, text, `${base}.md from the PDF (${done})${tail}`)) { switchTab('mdTool', document.querySelector('[aria-controls="mdTool"]')); status(`Opened in the Markdown editor (${done})${tail}`); } return; }
             download(new TextEncoder().encode(text), `${base}.md`, 'text/markdown;charset=utf-8');
             status(`${base}.md downloaded (${done})${tail}`);
         }
@@ -1224,7 +1229,7 @@
         async function pdfDownload(fmt = 'pdf') {
             if (pdfBusy) return; pdfBusy = true;
             if (fmt !== 'pdf') {
-                try { await pdfMarkdown(fmt === 'mdedit'); } catch (err) { status(`Could not read the text: ${err.message}`); console.error(err); }
+                try { await pdfText(fmt); } catch (err) { status(`Could not read the text: ${err.message}`); console.error(err); }
                 finally { pdfBusy = false; }
                 return;
             }
@@ -1241,7 +1246,7 @@
         // An editor's file actions, wherever they sit: the File tab (Open…, Save draft, Download) and the quick icons
         // beside zoom (which also work in full screen). `more` lists download formats, shown as a menu. A saved
         // draft shows its time beside Save draft.
-        const TIPS = {pdf: "<ul><li>Tools: text box, highlight text, draw, line, arrow, rectangle. Hold <kbd>Shift</kbd> for straight lines and squares.</li><li>Select a mark to move it, change its width or colour, or delete it.</li><li>In a text box: <kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> highlight; <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜.</li><li>Zoom with <kbd>Ctrl</kbd> + mouse wheel, a pinch, or − / +. Undo <kbd>Ctrl</kbd>+<kbd>Z</kbd>, redo <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li><li><b>Download as</b> gives the marked PDF, or the PDF's own text as Markdown (headings, lists, tables). <b>Open in Markdown editor</b> lets you check and edit it first. Scanned pages have no text to read yet.</li><li>Files up to 12 MB. Drafts stay on this device; the original file is never changed.</li></ul>", xlsx: "<ul><li>Click a cell and type; <kbd>F2</kbd> or a double-click edits it. <kbd>Enter</kbd> / <kbd>Tab</kbd> / arrows move, <kbd>Esc</kbd> cancels.</li><li>Drag or <kbd>Shift</kbd>+click to select a range; <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> work with Excel and Google Sheets.</li><li>Drag the small square at the corner to fill a series. The Name Box jumps to an address such as B12.</li><li>Formulas calculate live; Formulas tab lists the functions. Sheets are tabs at the bottom.</li><li>Download as gives the workbook, or this sheet as CSV UTF-8, TSV, Unicode text, JSON or HTML. Charts, images and pivot tables are not kept.</li></ul>", docx: "<ul><li>Edit the page as in Word. <kbd>Enter</kbd> starts a paragraph, <kbd>Shift</kbd>+<kbd>Enter</kbd> a line break; in a list <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> change the level.</li><li><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>; <kbd>Ctrl</kbd>+<kbd>F</kbd> find, <kbd>Ctrl</kbd>+<kbd>H</kbd> replace.</li><li>Right-click a style (or Modify…) to change it; ticked styles are remembered in this browser.</li><li>Insert draws text boxes, lines, arrows, rectangles and pen strokes, saved as Word drawings.</li><li>Headers and footers are kept in the file but not shown here.</li></ul>"};
+        const TIPS = {pdf: "<ul><li>Tools: text box, highlight text, draw, line, arrow, rectangle. Hold <kbd>Shift</kbd> for straight lines and squares.</li><li>Select a mark to move it, change its width or colour, or delete it.</li><li>In a text box: <kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> highlight; <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜.</li><li>Zoom with <kbd>Ctrl</kbd> + mouse wheel, a pinch, or − / +. Undo <kbd>Ctrl</kbd>+<kbd>Z</kbd>, redo <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li><li><b>Download as</b> gives the marked PDF, or the PDF's own text as Word (.docx) or Markdown, with headings, lists and tables. <b>Open in Markdown editor</b> lets you check and edit it first. Scanned pages have no text to read yet.</li><li>Files up to 12 MB. Drafts stay on this device; the original file is never changed.</li></ul>", xlsx: "<ul><li>Click a cell and type; <kbd>F2</kbd> or a double-click edits it. <kbd>Enter</kbd> / <kbd>Tab</kbd> / arrows move, <kbd>Esc</kbd> cancels.</li><li>Drag or <kbd>Shift</kbd>+click to select a range; <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> work with Excel and Google Sheets.</li><li>Drag the small square at the corner to fill a series. The Name Box jumps to an address such as B12.</li><li>Formulas calculate live; Formulas tab lists the functions. Sheets are tabs at the bottom.</li><li>Download as gives the workbook, or this sheet as CSV UTF-8, TSV, Unicode text, JSON or HTML. Charts, images and pivot tables are not kept.</li></ul>", docx: "<ul><li>Edit the page as in Word. <kbd>Enter</kbd> starts a paragraph, <kbd>Shift</kbd>+<kbd>Enter</kbd> a line break; in a list <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> change the level.</li><li><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>; <kbd>Ctrl</kbd>+<kbd>F</kbd> find, <kbd>Ctrl</kbd>+<kbd>H</kbd> replace.</li><li>Right-click a style (or Modify…) to change it; ticked styles are remembered in this browser.</li><li>Insert draws text boxes, lines, arrows, rectangles and pen strokes, saved as Word drawings.</li><li>Headers and footers are kept in the file but not shown here.</li></ul>"};
         function barActions(root, p, { open, draft, download: dl, more = null, tips = '' }) {
             const on = (id, fn) => { const b = root.querySelector(`#${id}`); if (b) b.onclick = fn; };
             const h = root.querySelector(`#${p}-help`); if (h && tips) helpPop(h, tips);
