@@ -28,6 +28,7 @@
     <link rel="stylesheet" href="css/office-edit.css">
     <link rel="stylesheet" href="css/view-tools.css">
     <link rel="stylesheet" href="css/gantt.css">
+    <link rel="stylesheet" href="css/batch.css">
     <link rel="stylesheet" href="css/md-edit.css">
     
     <style>
@@ -452,6 +453,7 @@
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="ganttTool" onclick="switchTab('ganttTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4v16h18"/><path d="M7 8h6M10 12h8M8 16h5"/></svg><span>Gantt chart</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="xlsxTool" onclick="switchTab('xlsxTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg><span>Excel editor</span><span class="beta">beta</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="docxTool" onclick="switchTab('docxTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><span>Word editor</span><span class="beta">beta</span></button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="mergeTool" onclick="switchTab('mergeTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/><path d="M14 7h5a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-5"/><path d="M10 10h6M13 7v6"/></svg><span>Merge PDFs</span></button>
             <button type="button" class="tab-btn" role="tab" aria-selected="false" aria-controls="mdTool" onclick="switchTab('mdTool', this)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15V9l2.5 3L11 9v6M16 9v6M13.5 12.5 16 15l2.5-2.5"/></svg><span>Markdown editor</span></button>
         </div>
     </nav>
@@ -663,6 +665,11 @@
     <!-- ========================================== -->
     <div id="mdTool" class="tool-view ed-view"></div>
 
+    <!-- ========================================== -->
+    <!-- TOOL 8: MERGE PDFS (js/pdf-merge.js)       -->
+    <!-- ========================================== -->
+    <div id="mergeTool" class="tool-view"></div>
+
     </main>
     </div>
 
@@ -692,7 +699,7 @@
 
         // Tool names as tooltips: on narrow screens only the open tool shows its name.
         document.querySelectorAll('.tab-btn').forEach((b) => { b.title = b.querySelector('span').textContent; });
-        // Open the tool named in the address (#svg, #word, #pdf, #gantt, #xlsx, #docx, #md).
+        // Open the tool named in the address (#svg, #word, #pdf, #gantt, #xlsx, #docx, #md, #merge).
         (() => { const b = document.querySelector(`[aria-controls="${location.hash.slice(1)}Tool"]`); if (b) switchTab(b.getAttribute('aria-controls'), b); })();
         // Web fonts widen the tab names after the first layout: keep the open tool in view once they have loaded.
         const keepTab = () => showTab(document.querySelector('.tab-btn.active'));
@@ -1140,6 +1147,7 @@
         import { actionMenu, helpPop, noticeBox } from './js/view-tools.js';
         import { markSaved } from './js/ribbon.js';
         import { openMd } from './js/md-edit.js';
+        import { openPdfMerge } from './js/pdf-merge.js';
         import { pdfToBlocks, blocksToMd, blocksToDocx, pdfFonts } from './js/pdf-text.js';
         import { FACES, siteFont } from './js/pdf-realtext.js';
         import { ocrPage } from './js/pdf-ocr.js';
@@ -1377,6 +1385,7 @@
         openGantt($('ganttTool'), { download });
         const md = openMd($('mdTool'), { download });
         openWordTable($('wordTool'), { download });
+        openPdfMerge($('mergeTool'), { download });
         bindOffice('xlsx', openXlsxEditor, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         bindOffice('docx', openDocxEditor, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 

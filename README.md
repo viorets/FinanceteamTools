@@ -25,7 +25,7 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 - Side navigation (top): Light, Dark or Follow device for the site. Dark is black and greys with white controls (monochrome, as on Apple's product pages)
 - Chart colours: TUSU Finance (the team CI, Mosaic Blue #00758F; default), TUSU Finance CI (the internal deck's teals #006371, #077989, #2babc2, #5f9aa3, ice #e8f9ff), 7 team palettes (Sakura Dusk, Midnight Violet, Old Rose, Mulled Wine, Winter Dawn, Autumn Harvest, Kombu Moss) and 10 theme-factory themes, shown as colour strips; they set the default colours of the charts, Gantt chart and Word tables
 - iPad and narrow windows: the top bar keeps the open tool's name in view (other tools show their icon); fields use 16px text so Safari does not zoom in
-- Side menu names: Chart from Excel, Word table from Excel, PDF markup, Gantt chart, Excel editor, Word editor, Markdown editor
+- Side menu names: Chart from Excel, Word table from Excel, PDF markup, Gantt chart, Excel editor, Word editor, Merge PDFs, Markdown editor
 - Each editor has a **?** button beside full screen: tips and keyboard shortcuts. Opening an Excel or Word file says in the status line what the edited copy will not keep (for example "not kept in the edited copy: 2 charts, 1 image") or what is not shown (headers and footers), read from the file itself
 - Editors (PDF, Excel, Word, Markdown) have no side panel: the document takes the full width. Before a file is open, a card in the middle has **Open a file** (or drop a file on it), the size limit and tips; the status line sits under the document
 - File tab (Excel, Word, Markdown; first tab, the editor opens on Home): **Open…**, **New** (Markdown), file name (Markdown), **Save draft** with the time it was saved, **Download** (a format menu for Excel and Markdown). The PDF editor has Open, Save draft and Download beside zoom
@@ -82,6 +82,14 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 - **Page numbers** (Insert > Page numbers): footer or header, left/centre/right, format 1 2 3 · i ii iii · I II III · a b c · A B C · ๑ ๒ ๓, text before (e.g. หน้า), the total ("of N" / "จาก N"), the first number, and the page to **start** and **stop** on. They are written as Word fields (PAGE inside IF and = fields), so Word numbers the pages itself; applying again replaces them (and a footer line that held only a page number), and "No page numbers" removes them. Numbers then count the pages of the whole document (sections' own restarts are cleared)
 - Only what changed is rewritten: a text-only edit keeps every run's formatting; old `.doc` files are not supported
 
+### Merge PDFs
+- Add several PDFs (or drop them on the page); each file's pages are added at the end, as page cards with thumbnails
+- Keep only some pages of a file (**Pages**: `1-3, 5`, `8-`); move a whole file up or down with its pages
+- Put pages in order by dragging the cards, or with ← → on each card (touch and keyboard); ⟳ turns a page a quarter, ✕ removes it
+- **Save as PDF**: Chrome and Edge ask where to save; other browsers download the file under the name given. Pages are copied with pdf-lib, so text stays searchable and links and fonts stay as they are
+- **Print**: the merged PDF opens in a new tab (opened on the tap, so Safari allows it), to print from there
+- A PDF locked by its author is added with a note; its pages are copied when the PDF allows it. Up to 100 MB of PDFs in all; above 12 MB the status line warns that saving may be slow on iPad
+
 ### Markdown editing
 - Write Markdown on the left, see the formatted page on the right (or text only / preview only); scroll stays in step
 - Ribbon: paragraph and heading styles, bold, italic, strikethrough, inline code, bullets, numbering, checklists, quotes, indent, links, images, tables, code blocks, divider; find and replace
@@ -115,6 +123,7 @@ public/js/pdf-markup.js             # PDF editor module
 public/css/markup.css               # PDF editor styles
 public/js/gantt.js                  # Gantt Chart Creator (layout → SVG and PNG)
 public/css/gantt.css                # Gantt Chart Creator styles
+public/css/batch.css                # Merge PDFs styles
 public/js/view-tools.js             # zoom, full screen and icon buttons shared by the PDF, Excel and Word editors
 public/css/view-tools.css           # their styles, and the HEX field
 public/js/hex-color.js              # HEX entry beside every colour picker
@@ -136,6 +145,7 @@ public/js/md-edit.js                # Markdown editor (marked + DOMPurify)
 public/css/md-edit.css              # Markdown editor styles
 public/js/xlsx-edit.js              # Excel editor (ExcelJS)
 public/js/xlsx-relock.js            # puts sheet protection back after saving (from TUSUFinanceFeedback)
+public/js/pdf-merge.js              # Merge PDFs (pdf.js thumbnails, pdf-lib copyPages)
 public/js/docx-edit.js              # Word editor (JSZip; edits word/document.xml, headers and footers; pages)
 public/css/office-edit.css          # Excel and Word editor styles
 public/fonts/LINESeedSansTH_Rg.ttf  # text box font (SIL Open Font License)

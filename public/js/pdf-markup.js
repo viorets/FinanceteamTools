@@ -45,7 +45,7 @@ const FMT = [
 const KEY = Object.fromEntries(FMT.map(([cmd, k]) => [cmd, k]));
 
 let libs = null;
-function loadLibs() {
+export function loadLibs() { // pdf.js and pdf-lib, loaded once (also used by js/pdf-merge.js)
   return libs || (libs = Promise.all([
     import(PDFJS).then((m) => { m.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; return m; }),
     new Promise((res, rej) => {
