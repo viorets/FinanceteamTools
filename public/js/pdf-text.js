@@ -613,8 +613,10 @@ export async function pageParagraphs(page, items = null) {
       box: [u.x - 1, top, u.x2 - u.x + 2, bottom - top],
       rects: u.segs.map((sg) => [sg.x - 1, sg.y - sg.size * 0.42, sg.x2 + 1, sg.y + sg.size * 1.05]),
       lines: u.segs.length, col: [left, right],
-      // centred: every line sits in the middle of the page's text column
-      align: u.segs.every((sg) => sg.x - left > sg.size * 2 && Math.abs((sg.x - left) - (right - sg.x2)) < sg.size * 1.5) ? 'center' : null,
+      // centred: every line sits in the middle of the page's text column; right: every line ends at its right edge
+      // and starts well in from the left (a signature block, a date line)
+      align: u.segs.every((sg) => sg.x - left > sg.size * 2 && Math.abs((sg.x - left) - (right - sg.x2)) < sg.size * 1.5) ? 'center'
+        : u.segs.every((sg) => right - sg.x2 < sg.size * 1.5 && sg.x - left > sg.size * 6) ? 'right' : null,
     };
   });
 }

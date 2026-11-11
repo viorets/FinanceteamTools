@@ -653,8 +653,8 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       id: uid(), page: n, type: 'text', x: u.align ? u.col[0] : u.box[0] + 1, y: u.first - ((lh * u.size - asc - desc) / 2 + asc), align: u.align,
       runs: u.runs.map((r) => ({ t: r.t, ...(r.b ? { b: 1 } : {}), ...(r.i ? { i: 1 } : {}) })), text: u.text, color: ink, size: u.size, font, lh,
       // wrap width: a paragraph keeps its own width; one line may run to the page's text margin; centred text
-      // stays centred in the page's text column
-      wrap: u.align ? u.col[1] - u.col[0] : u.lines > 1 ? u.box[2] + u.size * 0.3 : Math.max(u.box[2], u.col[1] - u.box[0]) + u.size * 0.3,
+      // stays centred in the page's text column; right-aligned text keeps its own right edge
+      wrap: u.align === 'right' ? u.box[0] + u.box[2] - 1 - u.col[0] : u.align ? u.col[1] - u.col[0] : u.lines > 1 ? u.box[2] + u.size * 0.3 : Math.max(u.box[2], u.col[1] - u.box[0]) + u.size * 0.3,
       cover: { key, box: u.box, bg, scan: !!p.scanned, rects: u.rects.map(([x0, y0, x1, y1]) => [x0 - u.size * 0.8, y0, x1, y1]) },
     };
     st.marks.push(m); st.sel = m.id; changed(); editBox(p, m.id, true);
@@ -755,7 +755,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       }
       if (m.type === 'text' && m.text.trim() && await writer.draw(pg, { ...m, runs: m.wrap ? wrapRuns(m) : runsOf(m) }, (x, y) => P([x, y]), { lineHeight: m.lh || TEXT.lineHeight, fontFamily: fontOf })) continue;
       if (m.type === 'text' && m.text.trim()) {
-        const png = await textPng(m);
+        const png = await textPng({ ...m, runs: m.wrap ? wrapRuns(m) : runsOf(m) });
         const img = await out.embedPng(png.bytes);
         const a = P([m.x, m.y - png.oy + png.h]);
         pg.drawImage(img, { x: a.x, y: a.y, width: png.w, height: png.h });
@@ -783,7 +783,11 @@ async function textPng(m) {
   const asc = mt.fontBoundingBoxAscent ?? px * 0.8; const desc = mt.fontBoundingBoxDescent ?? px * 0.25;
   const lay = lines.map((l) => { let x = 0; return l.map((r) => { ctx.font = fontFor(r); const w = ctx.measureText(r.t).width; const o = { r, x, w }; x += w; return o; }); });
   const pad = Math.max(0, (asc + desc - lh) / 2); // tall Thai fonts reach above and below the line box
-  const W = Math.max(1, ...lay.map((l) => (l.length ? l.at(-1).x + l.at(-1).w : 0))) + px * 0.15 + 2 * k;
+  let W = Math.max(1, ...lay.map((l) => (l.length ? l.at(-1).x + l.at(-1).w : 0))) + px * 0.15 + 2 * k;
+  if ((m.align === 'center' || m.align === 'right') && m.wrap) { // place each line in the box's width, as on screen
+    W = Math.max(W, m.wrap * k);
+    lay.forEach((l) => { const lw = l.length ? l.at(-1).x + l.at(-1).w : 0; const dx = (W - lw) / (m.align === 'center' ? 2 : 1); l.forEach((o) => { o.x += dx; }); });
+  }
   c.width = Math.ceil(W); c.height = Math.ceil(lh * lines.length + 2 * pad);
   const top = (i) => pad + i * lh + (lh - asc - desc) / 2; // top of the font box on line i
   lay.forEach((l, i) => l.forEach(({ r, x, w }) => { if (r.hl) { ctx.fillStyle = rgba(r.hl, r.ha ?? HL_OPACITY); ctx.fillRect(x, top(i), w, asc + desc); } }));

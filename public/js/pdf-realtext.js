@@ -97,8 +97,8 @@ export async function textWriter(pdf, PDFLib) {
     for (const [i, line] of lines.entries()) {
       const base = m.y + i * lh + (lh - asc - desc) / 2 + asc; // baseline, as CSS places it (and textPng)
       let x = m.x;
-      if (m.align === 'center' && m.wrap) { // centred in the box's width, as on screen
-        const lw = line.reduce((s, r) => { ctx.font = css(r); return s + ctx.measureText(r.t).width; }, 0); x += (m.wrap - lw) / 2;
+      if ((m.align === 'center' || m.align === 'right') && m.wrap) { // centred or right-aligned in the box's width, as on screen
+        const lw = line.reduce((s, r) => { ctx.font = css(r); return s + ctx.measureText(r.t).width; }, 0); x += (m.wrap - lw) / (m.align === 'center' ? 2 : 1);
       }
       for (const r of line) {
         ctx.font = css(r); const w = ctx.measureText(r.t).width;
