@@ -474,5 +474,9 @@ export function openMd(root, { download }) {
   setFont(FONTS.includes(font) ? font : FONTS[0]); setView('split'); setPressed(rb, 'md-sync', true);
   load(name, saved, drafts[name] ? `${name} · draft restored` : 'Start typing, or open a .md file (File tab)');
   if (drafts[name]) markSaved(root, 'md', drafts[name].at);
-  return { isDirty: () => dirty };
+  // open(name, text, note): put text from another tool in the editor (asks first if there are unsaved changes).
+  return {
+    isDirty: () => dirty,
+    open(n, text, note) { if (dirty && !confirm('You have unsaved changes in the Markdown editor. Replace them?')) return false; load(n, text, note); return true; },
+  };
 }

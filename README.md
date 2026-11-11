@@ -41,6 +41,9 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 - Zoom with Ctrl/⌘ + mouse wheel, a trackpad or finger pinch, or − / +; full screen keeps the tools on top, including Save draft and Download
 - **Save draft** keeps your marks on this device (browser storage) so you can reopen the same file later
 - **Download PDF** saves a marked copy (`<name> (marked).pdf`); the original file is never changed
+- **Download as Markdown** (or **Open in Markdown editor**) turns the PDF's own text into Markdown (`public/js/pdf-text.js`): headings from text size and bold lines, paragraphs, numbered and bulleted lists, and tables. Bordered tables follow the PDF's ruling lines (cells keep their wrapped text); borderless label-and-text layouts and column layouts become tables too. Running headers, footers and page numbers are left out
+- Thai is repaired on the way: legacy shifted-mark characters (U+F700–F71A), `ํา` for ำ, marks out of order, and Word's PDF-export faults (`จ ำกัด`, `ก าหนด`, bold `กิจกำร`, common words that lose ำ such as `กาไร`)
+- Pages whose stored Thai is damaged by the program that made the PDF (letters and symbols inside words, as from Safari or Microsoft Forms) and scanned pages without text are named in the status line; reading those needs OCR (a later step)
 
 The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinanceFeedback) (`public/js/markup/pdf-markup.js`).
 
@@ -87,7 +90,7 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 |---|---|---|
 | Chart from Excel | Sharp SVG charts in the team colours; Thai labels embedded (LINE Seed Sans TH) | Needs a tidy table; other fonts are only named in the SVG |
 | Excel to Word table | Word table styles; copy into Word or download a real .docx; wide form sheets become readable question/answer blocks | Values only, formulas become results; very wide sheets cannot stay one table |
-| PDF editing | Thai rich text boxes, highlights, shapes, drafts, full screen | Adds marks on top: cannot edit the PDF's own text or fill form fields; 12 MB limit |
+| PDF editing | Thai rich text boxes, highlights, shapes, drafts, full screen; PDF text to Markdown with tables and Thai repairs | Adds marks on top: cannot edit the PDF's own text or fill form fields; 12 MB limit; Markdown needs text in the PDF (no OCR yet); slides and posters convert roughly; Canva's lost tone marks are not detected |
 | Gantt Chart Creator | Quick Gantt or timeline from typed tasks or Excel; PNG/SVG match the preview | No dependencies or critical path; tasks stay in this browser |
 | Excel editing (beta) | Excel-like ribbon, live formulas, no size limit, Format as table, many export formats | Charts, images and pivot tables are dropped; filtered-out rows hidden on screen only |
 | Markdown editing | Fast writing with a live preview; Excel ranges paste as tables; .md, .html, Word, PDF downloads | PDF goes through the print window; images must be web addresses (no upload); Word file is .doc (web format) |
@@ -111,6 +114,7 @@ public/js/ribbon.js                 # ribbon (tabs + groups) for the Excel, Word
 public/js/gradient.js               # gradient fill for the charts (Gantt, Chart from Excel)
 public/js/xlsx-core.js              # spreadsheet helpers: formats, styles, reference shifting, TEXT() fix
 public/js/rich-text.js              # typed arrows and editing helpers
+public/js/pdf-text.js               # PDF text to blocks (headings, lists, tables, Thai repairs) and Markdown
 public/js/themes.js                 # appearance (light/dark/device) and chart colour themes
 public/css/themes.css               # interface colours for light and dark
 public/js/md-edit.js                # Markdown editor (marked + DOMPurify)

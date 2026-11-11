@@ -1,0 +1,415 @@
+// PDF -> structured text (headings, paragraphs, lists, simple tables) -> Markdown.
+// Reads the text a PDF already holds (pdf.js getTextContent), so it works for PDFs made on a computer; scanned
+// pages have no text and are listed in `scanned` (OCR is a later step). Thai is cleaned on the way in: legacy
+// "shifted mark" characters (U+F700–F71A), ํ + า written for ำ, and marks stored out of order.
+
+// Microsoft/Apple private-use Thai glyph variants (marks shifted left or down, letters without their tail).
+const PUA = {
+  0xF700: 0x0E10, 0xF701: 0x0E34, 0xF702: 0x0E35, 0xF703: 0x0E36, 0xF704: 0x0E37, 0xF705: 0x0E48, 0xF706: 0x0E49,
+  0xF707: 0x0E4A, 0xF708: 0x0E4B, 0xF709: 0x0E4C, 0xF70A: 0x0E48, 0xF70B: 0x0E49, 0xF70C: 0x0E4A, 0xF70D: 0x0E4B,
+  0xF70E: 0x0E4C, 0xF70F: 0x0E0D, 0xF710: 0x0E31, 0xF711: 0x0E4D, 0xF712: 0x0E47, 0xF713: 0x0E48, 0xF714: 0x0E49,
+  0xF715: 0x0E4A, 0xF716: 0x0E4B, 0xF717: 0x0E4C, 0xF718: 0x0E38, 0xF719: 0x0E39, 0xF71A: 0x0E3A,
+};
+// Common words in which Word's PDF export turns ำ into า. None of the misspellings is itself a Thai word.
+const AM_WORDS = Object.fromEntries(['กำไร', 'ชำระ', 'จำหน่าย', 'สำหรับ', 'จำนวน', 'กำหนด', 'สำคัญ', 'ดำเนิน', 'คำนวณ', 'ตำแหน่ง', 'กำกับ',
+  'สำนัก', 'ทำให้', 'ประจำปี', 'อำนาจ', 'สำรอง', 'ลำดับ', 'ทำหน้าที่', 'นำไป', 'นำมา', 'ทำงาน', 'จำกัด', 'คำนึง', 'สำเร็จ', 'คำสั่ง',
+  'ทำการ', 'กำลัง', 'ดำรง', 'จำเป็น', 'สำเนา', 'ค้ำประกัน', 'อำนวย', 'ตำบล', 'อำเภอ', 'สำนักงาน', 'ทำรายการ', 'จำแนก'].map((w) => [w.replace(/\u0E33/g, '\u0E32'), w]));
+const LOST_AM = new RegExp(Object.keys(AM_WORDS).sort((a, b) => b.length - a.length).join('|'), 'g');
+export function cleanThai(s) {
+  return s
+    .replace(/[-]/g, (c) => String.fromCharCode(PUA[c.charCodeAt(0)]))
+    .replace(/ํ([่-๋]?)า/g, '$1ำ') // ํ (tone) า -> (tone) ำ
+    .replace(/ำา/g, 'ำ') // ำ copied with its own า tail
+    .replace(/([ก-ฮ][่-๋]?) (?=ำ)/g, '$1') // "จ ำกัด": ำ never starts a word (Word's PDF export)
+    .replace(/([ก-ฮ][่-๋]?) า/g, '$1ำ') // "ก าหนด": nor does า, so this was ำ
+    .replace(/\.{4,}/g, ' … ') // contents-page dot leaders
+    .replace(/([่-์])([ัิ-ฺ็])/g, '$2$1') // vowel mark before tone mark
+    .replace(/ /g, ' ')
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '') // control characters some PDFs map unknown shapes to
+    .normalize('NFC');
+}
+
+const MARKS = /^[\p{M}ัิ-ฺ็-๎-]+$/u;
+const THAI = /[฀-๿]/;
+const MARKER_ONLY = /^(?:[•●▪■◦○◆❖➢➤►✓✔\-–—*·]|\(?(?:\d{1,3}|[๐-๙]{1,3}|[a-zA-Zก-ฮ])[.)])$/;
+const BOLD = /bold|black|heavy|semibold|demi|,b$/i;
+const ITALIC = /italic|oblique/i;
+const LIST = /^\s*(?:([•●▪■◦○◆❖➢➤►✓✔\-–—*·])|(\d{1,3})[.)]|([๐-๙]{1,3}|[a-zA-Zก-ฮ])[.)]|\(([\d๐-๙]{1,3}|[a-zA-Zก-ฮ])\))\s+/;
+
+// One page -> lines (top to bottom). A line is cells (split at wide gaps); a cell is runs { t, b, i }.
+async function pageLines(page) {
+  const ops = await page.getOperatorList(); // also loads the fonts, so their names (Bold, Italic) can be read
+  const tc = await page.getTextContent();
+  // A font that writes ำ where า belongs (TH Sarabun bold in Word's PDF export: "กิจกำร"): it has many ำ and no า.
+  const amaa = {};
+  tc.items.forEach((it) => { const c = (amaa[it.fontName] ||= [0, 0]); c[0] += (it.str?.match(/ำ/g) || []).length; c[1] += (it.str?.match(/า/g) || []).length; });
+  const swapAm = (name) => amaa[name] && amaa[name][0] >= 4 && amaa[name][1] === 0;
+  const fontOf = {};
+  for (const name of Object.keys(tc.styles)) {
+    let f = null; try { f = page.commonObjs.get(name); } catch { /* not loaded */ }
+    const n = f?.name || tc.styles[name].fontFamily || '';
+    fontOf[name] = { b: !!f?.bold || BOLD.test(n), i: !!f?.italic || ITALIC.test(n) };
+  }
+  const vp = page.getViewport({ scale: 1 });
+  // Items -> chunks; a chunk that is only combining marks belongs to the chunk before it (stream order), so marks
+  // drawn slightly left of their letter do not jump ahead of it when the line is sorted by x.
+  const chunks = [];
+  for (let it of tc.items) {
+    if (!('str' in it) || !it.str.trim()) continue; // spaces and tabs: the gap between chunks says where they were
+    const [a, b, c, d, e, f] = it.transform;
+    if (Math.abs(b) > 0.01 || Math.abs(c) > 0.01) continue; // rotated text (stamps, side notes)
+    const size = Math.abs(d) || Math.abs(a) || it.height; const st = fontOf[it.fontName] || {};
+    if (swapAm(it.fontName)) it = { ...it, str: it.str.replace(/ำ/g, 'า') };
+    const prev = chunks[chunks.length - 1];
+    if (prev && MARKS.test(it.str) && Math.abs(prev.y - f) < size * 0.6) { prev.runs.push({ t: it.str, b: st.b, i: st.i }); prev.x2 = Math.max(prev.x2, e + it.width); continue; }
+    chunks.push({ x: e, x2: e + it.width, y: f, size, runs: [{ t: it.str, b: st.b, i: st.i }] });
+  }
+  // Bordered tables: the page's ruling lines give the cell grid; text inside a grid goes to its cells.
+  const tables = gridTables(rulesOf(ops, vp)).map((t) => ({ ...t, cells: t.ys.slice(1).map(() => t.xs.slice(1).map(() => [])) }));
+  const rest = [];
+  for (const ch of chunks) {
+    const cx = (ch.x + ch.x2) / 2; const cy = ch.y + ch.size * 0.3;
+    const t = tables.find((g) => cx > g.xs[0] && cx < g.xs.at(-1) && cy < g.ys[0] && cy > g.ys.at(-1));
+    if (!t) { rest.push(ch); continue; }
+    const i = t.ys.findIndex((y, k) => k && cy > y) - 1; const j = t.xs.findIndex((x, k) => k && ch.x + 1 < x) - 1;
+    t.cells[Math.max(i, 0)][Math.max(j, 0)].push(ch);
+  }
+  // A grid with text in only one column is a box around text (a frame, a callout): its text goes back to the page.
+  const grids = [];
+  tables.forEach((t) => {
+    const used = t.xs.slice(1).map((_, j) => t.cells.some((r) => r[j].length)).filter(Boolean).length;
+    if (used < 2) { t.cells.flat(2).forEach((ch) => rest.push(ch)); return; }
+    let rows = t.cells.map((r) => r.map((chs) => cellRuns(linesOf(chs, vp))));
+    rows = rows.filter((r) => r.some((c) => c.length));
+    const keep = rows[0].map((_, j) => rows.some((r) => r[j].length));
+    grids.push({ y: t.ys[0], top: vp.height - t.ys[0], rows: rows.map((r) => r.filter((_, j) => keep[j])) });
+  });
+  grids.sort((p, q) => q.y - p.y);
+  const images = ops.fnArray.filter((fn) => fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintImageXObjectRepeat).length;
+  return { lines: linesOf(rest, vp), tables: grids, height: vp.height, width: vp.width, images };
+}
+
+// Chunks -> lines (top to bottom); a line's chunks split into cells at wide gaps.
+function linesOf(chunks, vp) {
+  const lines = [];
+  for (const ch of chunks) {
+    const ln = lines.find((l) => Math.abs(l.y - ch.y) < Math.min(l.size, ch.size) * 0.45);
+    if (ln) { ln.items.push(ch); ln.size = Math.max(ln.size, ch.size); } else lines.push({ y: ch.y, size: ch.size, items: [ch] });
+  }
+  lines.sort((p, q) => q.y - p.y);
+  lines.forEach((ln) => ln.items.sort((p, q) => p.x - q.x));
+  // Column edges: x positions where text starts on 3 or more lines (at the line start or after a gap). A gap that
+  // ends on a column edge separates columns; a gap elsewhere is justified spacing inside a sentence.
+  const starts = new Map();
+  const mark = (x) => { const k = Math.round(x / 2); starts.set(k, (starts.get(k) || 0) + 1); };
+  lines.forEach((ln) => ln.items.forEach((ch, k) => { if (!k || ch.x - ln.items[k - 1].x2 > ln.size * 0.9) mark(ch.x); }));
+  const edge = (x) => [-1, 0, 1].reduce((n, d) => n + (starts.get(Math.round(x / 2) + d) || 0), 0) >= 3;
+  for (const ln of lines) {
+    ln.cells = []; let cell = null; let last = null;
+    for (const ch of ln.items) {
+      const gap = last ? ch.x - last.x2 : 0;
+      if (!cell || gap > ln.size * 3 || (gap > ln.size * 0.9 && edge(ch.x))) { cell = { x: ch.x, x2: ch.x2, runs: [] }; ln.cells.push(cell); }
+      else if (gap > ln.size * 0.18 && !/\s$/.test(last.runs.at(-1).t) && !/^\s/.test(ch.runs[0].t)) cell.runs.push({ t: ' ', b: false, i: false });
+      cell.runs.push(...ch.runs); cell.x2 = Math.max(cell.x2, ch.x2); last = ch;
+    }
+    ln.cells.forEach((c) => { c.runs = mergeRuns(c.runs.map((r) => ({ ...r, t: cleanThai(r.t) }))); c.text = c.runs.map((r) => r.t).join('').trim(); });
+    ln.cells = ln.cells.filter((c) => c.text);
+    // "1." or "•" alone in the first cell is a list marker with a hanging indent, not a column
+    if (ln.cells.length >= 2 && MARKER_ONLY.test(ln.cells[0].text)) {
+      const [m, c] = ln.cells; ln.cells.splice(0, 2, { x: m.x, x2: c.x2, runs: mergeRuns([...m.runs, { t: ' ', b: false, i: false }, ...c.runs]), text: `${m.text} ${c.text}` });
+    }
+    ln.x = ln.cells[0]?.x ?? 0; ln.x2 = ln.cells.at(-1)?.x2 ?? 0; ln.text = ln.cells.map((c) => c.text).join(' ');
+    ln.top = vp.height - ln.y;
+  }
+  return lines.filter((l) => l.text);
+}
+
+// The text of one table cell: its lines joined as a paragraph, except that a line starting with a list marker
+// starts a new line in the cell ("\n").
+function cellRuns(lines) {
+  const wide = Math.max(...lines.map((l) => l.x2), 0);
+  return lines.reduce((out, l, k) => addLine(out, l, lines[k - 1], wide), []);
+}
+// Adds line l to a cell's runs: a new line ("\n") when l starts a list item or the line before it stopped short;
+// otherwise the same paragraph.
+function addLine(out, l, prev, wide) {
+  const runs = runsOf(l);
+  if (!out.length) return runs;
+  if (LIST.test(l.text) || /^[-•●▪*]/.test(l.text) || (prev && prev.x2 < wide - prev.size * 3)) return mergeRuns([...out, { t: '\n', b: false, i: false }, ...runs]);
+  return joinRuns(out, runs);
+}
+
+// pdf.js operator numbers used here (pdf.js 4.x OPS).
+const OPS = { save: 10, restore: 11, transform: 12, moveTo: 13, lineTo: 14, curveTo: 15, curveTo2: 16, curveTo3: 17, closePath: 18,
+  rectangle: 19, stroke: 20, closeStroke: 21, fill: 22, eoFill: 23, fillStroke: 24, eoFillStroke: 25, closeFillStroke: 26,
+  closeEOFillStroke: 27, endPath: 28, paintFormXObjectBegin: 74, paintFormXObjectEnd: 75, paintImageXObject: 85,
+  paintInlineImageXObject: 86, paintImageXObjectRepeat: 88, constructPath: 91 };
+export const PDF_OPS = OPS; // checked against the loaded pdf.js in testing
+const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+const at = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+
+// Horizontal and vertical ruling lines on the page (stroked lines, thin filled bars, rectangle edges), in PDF units.
+function rulesOf(ops, vp) {
+  const H = []; const V = []; let m = [1, 0, 0, 1, 0, 0]; const stack = [];
+  const paints = new Set([OPS.stroke, OPS.closeStroke, OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke]);
+  const seg = ([x1, y1], [x2, y2]) => {
+    if (Math.abs(y1 - y2) < 0.8 && Math.abs(x1 - x2) > 4) H.push({ y: (y1 + y2) / 2, a: Math.min(x1, x2), b: Math.max(x1, x2) });
+    else if (Math.abs(x1 - x2) < 0.8 && Math.abs(y1 - y2) > 4) V.push({ x: (x1 + x2) / 2, a: Math.min(y1, y2), b: Math.max(y1, y2) });
+  };
+  const { fnArray: fn, argsArray: args } = ops;
+  for (let i = 0; i < fn.length; i++) {
+    const f = fn[i]; const a = args[i];
+    if (f === OPS.save) stack.push(m);
+    else if (f === OPS.restore) m = stack.pop() || m;
+    else if (f === OPS.transform) m = mul(m, a);
+    else if (f === OPS.paintFormXObjectBegin) { stack.push(m); if (a?.[0]) m = mul(m, a[0]); }
+    else if (f === OPS.paintFormXObjectEnd) m = stack.pop() || m;
+    else if (f === OPS.constructPath) {
+      const next = fn.slice(i + 1, i + 4).find((x) => paints.has(x) || x === OPS.endPath || x === OPS.constructPath);
+      if (!paints.has(next)) continue; // clipping paths and paths never drawn
+      const [sub, co] = a; let k = 0; let cur = null; let start = null;
+      for (const op of sub) {
+        if (op === OPS.moveTo) { cur = start = at(m, co[k], co[k + 1]); k += 2; }
+        else if (op === OPS.lineTo) { const q = at(m, co[k], co[k + 1]); k += 2; if (cur) seg(cur, q); cur = q; }
+        else if (op === OPS.rectangle) {
+          const [x, y, w, h] = co.slice(k, k + 4); k += 4;
+          const c = [at(m, x, y), at(m, x + w, y), at(m, x + w, y + h), at(m, x, y + h)];
+          const wide = Math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1]); const tall = Math.hypot(c[3][0] - c[0][0], c[3][1] - c[0][1]);
+          if (wide > vp.width * 0.9 && tall > vp.height * 0.9) continue; // page background
+          if (tall < 3) seg([c[0][0], (c[0][1] + c[3][1]) / 2], [c[1][0], (c[1][1] + c[2][1]) / 2]); // a thin bar is a line
+          else if (wide < 3) seg([(c[0][0] + c[1][0]) / 2, c[0][1]], [(c[3][0] + c[2][0]) / 2, c[3][1]]);
+          else for (let e = 0; e < 4; e++) seg(c[e], c[(e + 1) % 4]);
+          cur = start = c[0];
+        } else if (op === OPS.closePath) { if (cur && start) seg(cur, start); cur = start; }
+        else if (op === OPS.curveTo) { cur = at(m, co[k + 4], co[k + 5]); k += 6; }
+        else if (op === OPS.curveTo2 || op === OPS.curveTo3) { cur = at(m, co[k + 2], co[k + 3]); k += 4; }
+      }
+    }
+  }
+  const merge = (list, key) => {
+    list.sort((p, q) => p[key] - q[key] || p.a - q.a); const out = [];
+    for (const l of list) {
+      const o = out.find((x) => Math.abs(x[key] - l[key]) < 1.5 && l.a <= x.b + 2 && l.b >= x.a - 2);
+      if (o) { o.a = Math.min(o.a, l.a); o.b = Math.max(o.b, l.b); } else out.push({ ...l });
+    }
+    return out;
+  };
+  return { H: merge(H, 'y'), V: merge(V, 'x') };
+}
+
+// Ruling lines that touch each other form a table; its grid is every distinct line position in the group.
+function gridTables({ H, V }) {
+  const n = H.length + V.length; const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  H.forEach((h, i) => V.forEach((v, j) => {
+    if (v.x >= h.a - 2 && v.x <= h.b + 2 && h.y >= v.a - 2 && h.y <= v.b + 2) parent[find(i)] = find(H.length + j);
+  }));
+  const groups = new Map();
+  for (let i = 0; i < n; i++) { const g = find(i); if (!groups.has(g)) groups.set(g, { ys: [], xs: [] }); if (i < H.length) groups.get(g).ys.push(H[i].y); else groups.get(g).xs.push(V[i - H.length].x); }
+  const uniq = (xs) => xs.sort((a, b) => a - b).filter((x, i, s) => !i || x - s[i - 1] > 3);
+  return [...groups.values()].map((g) => ({ ys: uniq(g.ys).reverse(), xs: uniq(g.xs) })).filter((g) => g.ys.length >= 2 && g.xs.length >= 2);
+}
+
+function mergeRuns(runs) {
+  const out = [];
+  // a space or tab takes the style of the text before it, so "*1.* *heading*" stays one italic run
+  for (const r of runs) { const p = out.at(-1); if (p && ((p.b === r.b && p.i === r.i) || (!r.t.trim() && r.t !== '\n'))) p.t += r.t; else out.push({ ...r }); }
+  return out;
+}
+const joinRuns = (a, b) => {
+  // Thai wraps without a space; anything else gets one back.
+  const end = a.at(-1)?.t.slice(-1) || ''; const start = b[0]?.t[0] || '';
+  const sep = !end || /\s/.test(end) || /^\s/.test(start) ? '' : THAI.test(end) && THAI.test(start) ? '' : end === '-' && /[a-z]/i.test(start) ? null : ' ';
+  const left = a.map((r) => ({ ...r }));
+  if (sep === null) left.at(-1).t = left.at(-1).t.slice(0, -1);
+  else if (sep) left.push({ t: sep, b: false, i: false });
+  return mergeRuns([...left, ...b]);
+};
+const runsOf = (ln) => mergeRuns(ln.cells.flatMap((c, i) => (i ? [{ t: ' ', b: false, i: false }, ...c.runs] : c.runs)));
+
+// Whole document -> blocks: { type: 'h', level, runs } | { type: 'p', runs } | { type: 'li', marker, ordered, runs }
+// | { type: 'table', rows: [[text]] }. Also { pages, scanned: [page numbers without text] }.
+export async function pdfToBlocks(doc, { onPage = () => {} } = {}) {
+  const pages = [];
+  for (let n = 1; n <= doc.numPages; n++) { onPage(n, doc.numPages); pages.push(await pageLines(await doc.getPage(n))); }
+  const scanned = pages.map((p, i) => (p.lines.reduce((s, l) => s + l.text.length, 0) < 10 && p.images ? i + 1 : 0)).filter(Boolean);
+  // Damaged Thai: some programs store Thai shapes under the wrong codes, so letters and symbols turn up inside Thai
+  // words ("เ2ยประ1น;ขภาพ", Safari/Microsoft Forms), or store shifted marks as spaces ("เสี ยง", "เป น", Canva).
+  // Copying from such a PDF gives the same; only reading the page image (OCR) recovers it.
+  const ODD = /[฀-๿][0-9A-Za-z;:@\\^_`{|}~$#<=>+*&%!?]{1,2}(?=[฀-๿])/g; // symbols inside a word
+  // a space where a mark was: after ั (ปั จจัย), between ํ and า (ตํ า), after เ + one letter (เป น) or เ + letters + ี/ื
+  // (เสี ยง); none of these ends a Thai word
+  const GAP = /ั (?=[ก-ฮ])|ํ า|เ[ก-ฮ](?:[ก-ฮ]?[ีื])? (?=[ก-ฮ])/g;
+  const damaged = pages.map((p, i) => {
+    const t = p.lines.map((l) => l.text).join(' ') + p.tables.flatMap((g) => g.rows.flat(2).map((r) => r.t)).join(' ');
+    const thai = (t.match(/[฀-๿]+/g) || []).length; const odd = (t.match(ODD) || []).length + (t.match(GAP) || []).length;
+    return thai >= 10 && odd >= 3 && odd / thai > 0.03 ? i + 1 : 0;
+  }).filter(Boolean);
+
+  // Running headers and footers: lines in the top or bottom 9% of the page that repeat (numbers ignored) on at least
+  // half the pages, and lone page numbers.
+  const key = (t) => t.replace(/[\d๐-๙]+/g, '#').replace(/\s+/g, ' ').trim();
+  const edge = (p, l) => l.top < p.height * 0.09 || l.top > p.height * 0.91;
+  const seen = new Map();
+  pages.forEach((p) => new Set(p.lines.filter((l) => edge(p, l)).map((l) => key(l.text))).forEach((k) => seen.set(k, (seen.get(k) || 0) + 1)));
+  const PAGE_NO = /^[-–(]?\s*(?:page|หน้า(?:ที่)?)?\s*#\s*(?:(?:\/|of|จาก)\s*#)?\s*[-–)]?$/i;
+  pages.forEach((p) => { p.lines = p.lines.filter((l) => !(edge(p, l) && (PAGE_NO.test(key(l.text)) || (pages.length >= 3 && seen.get(key(l.text)) >= Math.max(2, pages.length / 2))))); });
+
+  // Body size: the size most characters use. Larger sizes become heading levels 1–3.
+  const bySize = new Map();
+  pages.forEach((p) => p.lines.forEach((l) => { const s = Math.round(l.size * 2) / 2; bySize.set(s, (bySize.get(s) || 0) + l.text.length); }));
+  const body = [...bySize].sort((a, b) => b[1] - a[1])[0]?.[0] || 12;
+  const big = [...bySize.keys()].filter((s) => s > body * 1.15).sort((a, b) => b - a);
+  const levelOf = (size) => { const i = big.indexOf(Math.round(size * 2) / 2); return i < 0 ? 0 : Math.min(i + 1, 3); };
+
+  const blocks = [];
+  let carry = null; // a paragraph that may continue on the next page
+  for (const p of pages) {
+    const ls = p.lines;
+    const gaps = ls.slice(1).map((l, i) => ls[i].y - l.y).filter((g) => g > 0).sort((a, b) => a - b);
+    const lead = gaps[Math.floor(gaps.length / 2)] || body * 1.4; // usual line spacing on this page
+    const left = Math.min(...ls.filter((l) => l.cells.length === 1).map((l) => l.x), Infinity);
+    const right = Math.max(...ls.map((l) => l.x2), 0);
+    let cur = null; let table = null;
+    const grids = [...p.tables];
+    const flushGrids = (y) => { while (grids.length && grids[0].y > y) { close(); closeTable(); carry = null; blocks.push({ type: 'table', rows: grids.shift().rows }); } };
+    const close = () => { if (cur) blocks.push(cur); cur = null; };
+    const closeTable = () => {
+      if (!table) return;
+      if (table.length >= 2) blocks.push(tableBlock(table));
+      else table[0].cells.forEach((c) => splitLines(c.runs).forEach((runs) => blocks.push(asBlock(runs)))); // a label beside its text
+      table = null;
+    };
+    ls.forEach((l, i) => {
+      flushGrids(l.y);
+      const prev = ls[i - 1]; const gap = prev ? prev.y - l.y : 0;
+      const runs = runsOf(l);
+      // Rows with columns (wide gaps) gather into a table.
+      const row = table?.at(-1);
+      // The next line belongs to the row above when it follows at normal line spacing and either the row's last line
+      // ran to the margin in words (a cell wrapped; numbers at the margin are a new row of figures), or it is one
+      // piece that starts under one of the row's cells.
+      const wrapped = row && row.last.cells.some((c) => c.x2 >= right - l.size * 2 && /[\p{L}\p{M}]$/u.test(c.text));
+      const under = row && l.cells.length === 1 && (l.x > row.cells[0].x2 || row.cells.some((c) => Math.abs(c.x - l.x) < 3));
+      if (row && gap < lead * 1.3 && (wrapped || under)) {
+        l.cells.forEach((part) => {
+          // the cell whose left edge is nearest, among those starting no further right than about one character
+          const c = row.cells.filter((x) => x.x <= part.x + l.size * 1.5).reduce((a, x) => (!a || Math.abs(x.x - part.x) < Math.abs(a.x - part.x) ? x : a), null) || row.cells[0];
+          const piece = { text: part.text, cells: [part], x2: part.x2, size: l.size };
+          c.wide = Math.max(c.wide || c.x2, c.x2, part.x2);
+          c.runs = addLine(c.runs, piece, c.prev || { x2: c.x2, size: l.size }, c.wide); c.prev = piece; c.text = c.runs.map((r) => r.t).join('').trim();
+        });
+        row.last = l; return;
+      }
+      // Rows with columns (wide gaps) gather into a table.
+      if (l.cells.length >= 2) { close(); if (table && gap > lead * 2.2) closeTable(); l.last = l; (table ||= []).push(l); carry = null; return; }
+      closeTable();
+      const level = levelOf(l.size);
+      const m = LIST.exec(l.text);
+      const allBold = runs.every((r) => r.b || !r.t.trim());
+      if (level) {
+        if (cur?.type === 'h' && cur.level === level && gap < lead * 1.6) { cur.runs = joinRuns(cur.runs, runs); return; }
+        close(); carry = null; cur = { type: 'h', level, runs }; return;
+      }
+      if (m) {
+        close(); carry = null;
+        const stripped = stripMarker(runs, m[0].length);
+        cur = { type: 'li', ordered: !!m[2], marker: m[2] ? `${m[2]}.` : m[1] ? '-' : m[0].trim(), runs: stripped, x: l.x }; return;
+      }
+      const sizeChange = prev && Math.abs(prev.size - l.size) > body * 0.1;
+      // New paragraph: a size change, a wider gap, a first-line indent, or the line above stopped short of the
+      // margin. A list item goes on while its lines are indented past its marker.
+      const broke = sizeChange || gap > lead * 1.35 || (prev && /…\s*\S{1,4}$/.test(prev.text)); // a contents line ends at its page number
+      const newPara = !cur || cur.type === 'h' || broke
+        || (cur.type === 'li' ? l.x <= cur.x + l.size * 0.3 : l.x > left + l.size * 0.9 || (prev && prev.x2 < right - l.size * 4));
+      if (!cur && carry && !l.cells[0].runs[0]?.b && l.x <= left + l.size * 0.9 && blocks.at(-1) === carry) { cur = blocks.pop(); cur.runs = joinRuns(cur.runs, runs); return; }
+      if (newPara) { close(); cur = { type: 'p', runs, bold: allBold, lines: 1 }; return; }
+      cur.runs = joinRuns(cur.runs, runs); cur.lines = (cur.lines || 1) + 1;
+    });
+    close(); closeTable(); flushGrids(-Infinity);
+    const lastB = blocks.at(-1);
+    carry = lastB?.type === 'p' && !/[.!?:。]\s*$/.test(lastB.runs.map((r) => r.t).join('')) ? lastB : null;
+  }
+  // A short, all-bold, one-line paragraph is a sub-heading.
+  const sub = Math.min(big.length + 1, 4);
+  blocks.forEach((b) => { if (b.type === 'p' && b.bold && b.lines === 1 && b.runs.map((r) => r.t).join('').trim().length < 80) { b.type = 'h'; b.level = sub; } });
+  // Word's PDF export can also drop ำ outright ("กาไร" for กำไร); fixed on whole paragraphs, as a word may span pieces.
+  blocks.forEach((b) => (b.rows ? b.rows.flat() : [b.runs]).forEach((rs) => rs.forEach((r) => { r.t = r.t.replace(LOST_AM, (w) => AM_WORDS[w]); })));
+  return { blocks, pages: pages.length, scanned, damaged };
+}
+
+// Runs with "\n" -> one runs list per line.
+function splitLines(runs) {
+  const parts = [[]];
+  runs.forEach((r) => r.t.split('\n').forEach((t, k) => { if (k) parts.push([]); if (t) parts.at(-1).push({ ...r, t }); }));
+  return parts.filter((x) => x.some((r) => r.t.trim()));
+}
+// One line of runs -> a list item (if it starts with a marker) or a paragraph.
+function asBlock(runs) {
+  const text = runs.map((r) => r.t).join(''); const m = LIST.exec(text);
+  return m ? { type: 'li', ordered: !!m[2], marker: m[2] ? `${m[2]}.` : m[1] ? '-' : m[0].trim(), runs: stripMarker(runs, m[0].length) } : { type: 'p', runs };
+}
+
+function stripMarker(runs, n) {
+  const out = runs.map((r) => ({ ...r })); let k = n;
+  while (k > 0 && out.length) { const r = out[0]; if (r.t.length <= k) { k -= r.t.length; out.shift(); } else { r.t = r.t.slice(k); k = 0; } }
+  if (out[0]) out[0].t = out[0].t.replace(/^\s+/, '');
+  return out;
+}
+
+// Rows of cells -> a grid: columns from the row with the most cells; each cell goes to the column it overlaps most.
+function tableBlock(rows) {
+  const anchor = rows.reduce((a, r) => (r.cells.length > a.cells.length ? r : a)).cells.map((c) => ({ x: c.x, x2: c.x2 }));
+  rows.forEach((r) => r.cells.forEach((c) => { // widen the columns to everything that lands in them
+    const j = colOf(anchor, c); anchor[j].x = Math.min(anchor[j].x, c.x); anchor[j].x2 = Math.max(anchor[j].x2, c.x2);
+  }));
+  return {
+    type: 'table',
+    rows: rows.map((r) => {
+      const out = anchor.map(() => []);
+      r.cells.forEach((c) => out[colOf(anchor, c)].push(c.runs));
+      return out.map((parts) => parts.reduce((a, b) => (a.length ? joinRuns(a, [{ t: ' ', b: false, i: false }, ...b]) : b), []));
+    }),
+  };
+}
+function colOf(cols, c) {
+  let best = 0; let score = -Infinity;
+  cols.forEach((k, j) => {
+    const ov = Math.min(k.x2, c.x2) - Math.max(k.x, c.x);
+    const s = ov > 0 ? ov : -Math.abs((k.x + k.x2) / 2 - (c.x + c.x2) / 2) - 1e4;
+    if (s > score) { score = s; best = j; }
+  });
+  return best;
+}
+
+// ---------- Markdown ----------
+const esc = (t) => t.replace(/([\\`*_[\]<>|])/g, '\\$1');
+function inline(runs) {
+  if (runs.some((r) => r.t.includes('\n'))) {
+    const parts = [[]]; runs.forEach((r) => r.t.split('\n').forEach((t, k) => { if (k) parts.push([]); if (t) parts.at(-1).push({ ...r, t }); }));
+    return parts.map(inline).filter(Boolean).join('<br>');
+  }
+  return mergeRuns(runs).map((r) => {
+    const m = /^(\s*)(.*?)(\s*)$/s.exec(r.t); const [, a, body, z] = m;
+    if (!body) return r.t;
+    const mark = r.b && r.i ? '***' : r.b ? '**' : r.i ? '*' : '';
+    return a + mark + esc(body) + mark + z;
+  }).join('').replace(/\s+/g, ' ').replace(/(?:\s*(?:…|\.{2,})\s*){2,}/g, ' … ').trim();
+}
+const lineStart = (t) => t.replace(/^(#{1,6}\s|>|[-+]\s|\d+[.)]\s)/, '\\$1');
+
+export function blocksToMd(blocks) {
+  const out = [];
+  blocks.forEach((b, i) => {
+    const prev = blocks[i - 1];
+    if (i && !(b.type === 'li' && prev?.type === 'li')) out.push('');
+    if (b.type === 'h') out.push(`${'#'.repeat(b.level)} ${inline(b.runs.map((r) => ({ ...r, b: false })))}`);
+    else if (b.type === 'li') out.push(`${b.ordered || b.marker === '-' ? b.marker : `- ${esc(b.marker)}`} ${inline(b.runs)}`);
+    else if (b.type === 'table') {
+      const w = Math.max(...b.rows.map((r) => r.length));
+      const row = (r) => `| ${Array.from({ length: w }, (_, j) => inline(r[j] || [])).join(' | ')} |`;
+      out.push(row(b.rows[0]), `|${' --- |'.repeat(w)}`, ...b.rows.slice(1).map(row));
+    } else out.push(lineStart(inline(b.runs)));
+  });
+  return `${out.join('\n').trim()}\n`;
+}

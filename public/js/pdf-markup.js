@@ -653,7 +653,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     return out.save();
   }
 
-  return { marks: () => structuredClone(st.marks), isDirty: () => st.dirty, clean: () => { st.dirty = false; }, exportPdf, name };
+  return { marks: () => structuredClone(st.marks), isDirty: () => st.dirty, clean: () => { st.dirty = false; }, exportPdf, name, doc };
 }
 
 // A text box drawn by the browser at 4x (so Thai vowels and tone marks are placed correctly), as PNG bytes, its size
