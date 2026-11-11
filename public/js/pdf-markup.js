@@ -11,8 +11,7 @@
 import { normHex, pairHex } from './hex-color.js';
 import { addFontFile, fontStack, loadUserFonts, siteFont, textWriter } from './pdf-realtext.js';
 import { damagedThai, madeByCanva, pageParagraphs } from './pdf-text.js';
-import { removeText } from './pdf-redact.js';
-import { ocrPage } from './pdf-ocr.js';
+// pdf-redact.js (Edit text) and pdf-ocr.js (scanned pages) load only when used: the Feedback site leaves both out.
 import { ICON, clampZoom, floatBar, fullScreen, pinchZoom, viewBar, zoomAround } from './view-tools.js';
 
 const PDFJS_BASE = Promise.withResolvers ? 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/' : 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/legacy/build/';
@@ -154,7 +153,8 @@ const exec = (cmd, v = null) => { try { return document.execCommand(cmd, false, 
 // Opens the editor in `root`. bytes: the PDF (ArrayBuffer); name: file name; draft: saved marks or null.
 // t(en, th) translates labels. Resolves an editor handle { marks(), isDirty(), exportPdf() }.
 // defaults (admin console, v2.13): { size, textColor, shapeColor, font } of new text boxes and shapes; TEXT where not given.
-export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) => en, onDraft = () => {}, onStatus = () => {}, defaults = {}, maxBytes = MAX_BYTES }) {
+// editText: the Edit text tool (and its OCR of scanned or damaged pages, when ocr is on). Feedback turns both off.
+export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) => en, onDraft = () => {}, onStatus = () => {}, defaults = {}, maxBytes = MAX_BYTES, editText = true, ocr = true }) {
   const textSize = defaults.size || TEXT.size;
   const userFonts = (await loadUserFonts()).filter((f) => !FONTS.includes(f)); // fonts added from this computer before
   const fontOptions = (sel) => [...FONTS, ...userFonts].map((f) => `<option ${f === sel ? 'selected' : ''}>${f}</option>`).join('');
@@ -162,7 +162,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   const limit = Math.round(maxBytes / 1048576);
   if (bytes.byteLength > maxBytes) throw new Error(t(`This file is over ${limit} MB, so it cannot be marked. Open it in Drive instead.`, `ไฟล์ใหญ่เกิน ${limit} MB จึงทำเครื่องหมายไม่ได้ กรุณาเปิดใน Drive`));
   root.innerHTML = `<div class="mk" data-tool="select"><div class="mk-bar" role="toolbar" aria-label="${t('PDF tools', 'เครื่องมือ PDF')}">
-      <div class="mk-tools">${TOOLS.map(([k, en, th]) => `<button type="button" data-tool="${k}" aria-pressed="false">${t(en, th)}</button>`).join('')}</div>
+      <div class="mk-tools">${TOOLS.filter(([k]) => editText || k !== 'edit').map(([k, en, th]) => `<button type="button" data-tool="${k}" aria-pressed="false">${t(en, th)}</button>`).join('')}</div>
       <div class="mk-g mk-g-text">
         <div class="mk-fmt" role="group" aria-label="${t('Text format', 'รูปแบบตัวอักษร')}">${FMT.map(([cmd, , face, en, th]) => `<button type="button" data-fmt="${cmd}" aria-pressed="false" title="${t(en, th)}" aria-label="${t(en, th)}">${face}</button>`).join('')}</div>
         <label class="mk-ctl">${t('Font', 'แบบอักษร')} <select id="mk-f">${fontOptions(font0)}</select></label><button type="button" class="mk-addf" id="mk-addf" title="${t('Add a font from this computer (.ttf, .otf)', 'เพิ่มแบบอักษรจากเครื่องนี้ (.ttf, .otf)')}" aria-label="${t('Add a font from this computer', 'เพิ่มแบบอักษรจากเครื่องนี้')}">＋</button><input type="file" id="mk-ffile" accept=".ttf,.otf,font/ttf,font/otf" multiple hidden>
@@ -498,10 +498,16 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   };
 
   let drag = null;
-  // A second finger during a stroke or a move is a pinch: undo what the first finger started.
+  // A second finger during a finger stroke or move is a pinch: undo what the first finger started.
   const cancelDrag = () => { const d = drag; drag = null; if (!d) return; st.marks = JSON.parse(st.undo.pop()); paint(); };
+  // Apple Pencil (from TUSUFinanceFeedback): once a pen has been used, finger touches no longer draw (a resting palm
+  // would); switch to Select to scroll by finger. A touch during a pen stroke is the palm: it is ignored.
+  let penSeen = false;
+  const penOnly = () => penSeen && ['pen', 'line', 'arrow', 'rect'].includes(st.tool);
   pagesEl.addEventListener('pointerdown', (e) => {
-    if (drag && e.pointerType === 'touch') { cancelDrag(); return; }
+    if (e.pointerType === 'pen') penSeen = true;
+    if (drag) { if (e.pointerType === 'touch' && drag.ptype !== 'pen') cancelDrag(); return; }
+    if (e.pointerType === 'touch' && penOnly()) return;
     if (e.button !== 0) return;
     // Inside the open text box the browser places the caret and selects text. A press anywhere else first saves it.
     const ed = editingBox();
@@ -530,14 +536,14 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       if (!id) return;
       const m = selMark();
       if (m.type === 'text' && e.detail === 2) { editBox(p, id, false, [e.clientX, e.clientY]); e.preventDefault(); return; }
-      snapshot(); drag = { kind: 'move', p, last: pt, m, moved: false };
+      snapshot(); drag = { kind: 'move', p, last: pt, m, moved: false, id: e.pointerId, ptype: e.pointerType };
       pel.setPointerCapture(e.pointerId); e.preventDefault();
       return;
     }
     snapshot();
     const base = { id: uid(), page: +pel.dataset.page, color: st.shapeColor, width: st.width };
     const m = st.tool === 'pen' ? { ...base, type: 'pen', pts: [pt] } : st.tool === 'rect' ? { ...base, type: 'rect', x: pt[0], y: pt[1], w: 0, h: 0 } : { ...base, type: st.tool, a: pt, b: pt };
-    st.marks.push(m); drag = { kind: 'draw', p, start: pt, m };
+    st.marks.push(m); drag = { kind: 'draw', p, start: pt, m, id: e.pointerId, ptype: e.pointerType };
     pel.setPointerCapture(e.pointerId); e.preventDefault(); paint();
   });
   // Double-click opens a text box with the Select tool where pointerdown carries no click count.
@@ -547,7 +553,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     editBox(pages[+pel.dataset.page], hit.dataset.id, false, [e.clientX, e.clientY]);
   });
   pagesEl.addEventListener('pointermove', (e) => {
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.id) return;
     const pt = at(drag.p, e); const m = drag.m;
     if (drag.kind === 'move') {
       const dx = pt[0] - drag.last[0], dy = pt[1] - drag.last[1]; drag.last = pt; drag.moved = true;
@@ -565,8 +571,8 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     } else m.b = snap(drag.start, pt, e.shiftKey);
     paint();
   });
-  const endDrag = () => {
-    if (!drag) return;
+  const endDrag = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
     const { m, kind, moved } = drag; drag = null;
     if (kind === 'move' && !moved) { st.undo.pop(); return; } // a click that only selected
     const tiny = (m.type === 'rect' && m.w < 2 && m.h < 2) || ((m.type === 'line' || m.type === 'arrow') && Math.hypot(m.b[0] - m.a[0], m.b[1] - m.a[1]) < 2) || (m.type === 'pen' && m.pts.length < 2);
@@ -574,7 +580,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     changed();
   };
   pagesEl.addEventListener('pointerup', endDrag);
-  pagesEl.addEventListener('pointercancel', cancelDrag);
+  pagesEl.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.id) cancelDrag(); });
 
   // Highlight: the text selected with the Highlight tool gets the highlight colour. Over the PDF's own text that is a
   // highlight mark (boxes over those words); inside a text box it is those characters. A mouse highlights on release;
@@ -686,10 +692,11 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const own = await pageParagraphs(p.page);
     const text = own.map((u) => u.text).join(' ');
     const damaged = text.trim().length >= 10 && damagedThai(text, { canva: await canva });
-    if (text.trim().length >= 10 && !damaged) return own;
+    if ((text.trim().length >= 10 && !damaged) || !ocr) return own;
     try {
       onStatus(damaged ? t('The Thai text in this page is damaged in the PDF: reading it with OCR…', 'ข้อความภาษาไทยในหน้านี้เสียหาย กำลังอ่านด้วย OCR…')
         : t('Reading this scanned page with OCR…', 'กำลังอ่านหน้าสแกนด้วย OCR…'));
+      const { ocrPage } = await import('./pdf-ocr.js');
       const items = await ocrPage(p.page, onStatus); p.scanned = !damaged; // a damaged page still has text to remove
       const read = await pageParagraphs(p.page, items);
       const chk = (items.check || []).slice(0, 6).map(([w, s]) => (s ? `${w} (${s}?)` : w)).join(', ');
@@ -751,6 +758,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     // Edited paragraphs: their old text is removed from the page (search and copy no longer find it); where it cannot
     // be removed (text inside a form XObject), it is covered with the page's background colour.
     const edits = st.marks.filter((m) => m.type === 'text' && m.cover); let covered = 0;
+    const { removeText } = edits.length ? await import('./pdf-redact.js') : {};
     for (const n of [...new Set(edits.map((m) => m.page))]) {
       const mine = edits.filter((m) => m.page === n); const areas = mine.flatMap((m) => m.cover.rects);
       const hits = removeText(out, PDFLib, n, areas); let k = 0;

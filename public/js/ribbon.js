@@ -53,17 +53,121 @@ export const RI = {
 //   { color: id, title, icon }  (a colour box with a small icon above it; the editor pairs it with HEX + scrub)
 //   { input: id, title, width?, placeholder? }   { html: '…' } (anything else)
 // `start`: the tab open at first (the File tab comes first, as in Office, but the editor opens on Home).
+// Thai labels for the ribbons, for a page shown in Thai (the Feedback site): setRibbonLang(t) with its t(en, th).
+// Labels not in the list stay in English.
+let say = (en) => en;
+export const setRibbonLang = (t) => { say = (en) => (TH_LABELS[en] ? t(en, TH_LABELS[en]) : en); };
+const TH_LABELS = {
+  "Align left": "จัดชิดซ้าย",
+  "Align right": "จัดชิดขวา",
+  "Alignment": "การจัดแนว",
+  "Arrow": "ลูกศร",
+  "AutoSum": "ผลรวมอัตโนมัติ",
+  "Bold (Ctrl+B)": "ตัวหนา (Ctrl+B)",
+  "Borders": "เส้นขอบ",
+  "Bottom": "ชิดล่าง",
+  "Bullets": "สัญลักษณ์หัวข้อ",
+  "Center": "กึ่งกลาง",
+  "Clear filters": "ล้างตัวกรอง",
+  "Clear formatting": "ล้างการจัดรูปแบบ",
+  "Clear": "ล้าง",
+  "Clipboard": "คลิปบอร์ด",
+  "Columns": "คอลัมน์",
+  "Comma style": "ลักษณะจุลภาค",
+  "Copy (Ctrl+C)": "คัดลอก (Ctrl+C)",
+  "Cut (Ctrl+X)": "ตัด (Ctrl+X)",
+  "Data": "ข้อมูล",
+  "Decrease indent (Shift+Tab in a list)": "ลดการเยื้อง (Shift+Tab ในรายการ)",
+  "Delete columns": "ลบคอลัมน์",
+  "Delete rows": "ลบแถว",
+  "Draw on the page": "วาดบนหน้า",
+  "Draw": "วาด",
+  "Edit the header and footer (or double-click one)": "แก้หัวกระดาษและท้ายกระดาษ (หรือดับเบิลคลิก)",
+  "Export Markdown (.md)": "ส่งออก Markdown (.md)",
+  "Export PDF (print to PDF)": "ส่งออก PDF (พิมพ์เป็น PDF)",
+  "Export plain text (.txt)": "ส่งออกข้อความ (.txt)",
+  "Export web page (.html)": "ส่งออกหน้าเว็บ (.html)",
+  "Export": "ส่งออก",
+  "Fewer decimals": "ลดทศนิยม",
+  "File name": "ชื่อไฟล์",
+  "File": "ไฟล์",
+  "Fill colour": "สีพื้น",
+  "Filter": "ตัวกรอง",
+  "Find & export": "ค้นหาและส่งออก",
+  "Find & replace": "ค้นหาและแทนที่",
+  "Find and replace (Ctrl+F / Ctrl+H)": "ค้นหาและแทนที่ (Ctrl+F / Ctrl+H)",
+  "Find": "ค้นหา",
+  "Font colour": "สีตัวอักษร",
+  "Font size": "ขนาดตัวอักษร",
+  "Font": "แบบอักษร",
+  "Format as table": "จัดรูปแบบเป็นตาราง",
+  "Format as table: header row and banded rows in a colour theme": "จัดรูปแบบเป็นตาราง: แถวหัวและแถวสลับสีตามธีม",
+  "Formulas": "สูตร",
+  "Freeze panes": "ตรึงแนว",
+  "Functions": "ฟังก์ชัน",
+  "Header & footer": "หัวและท้ายกระดาษ",
+  "Highlight colour": "สีไฮไลต์",
+  "Home": "หน้าแรก",
+  "Increase indent (Tab in a list)": "เพิ่มการเยื้อง (Tab ในรายการ)",
+  "Insert columns left": "แทรกคอลัมน์ทางซ้าย",
+  "Insert columns right": "แทรกคอลัมน์ทางขวา",
+  "Insert function": "แทรกฟังก์ชัน",
+  "Insert rows above": "แทรกแถวด้านบน",
+  "Insert rows below": "แทรกแถวด้านล่าง",
+  "Insert": "แทรก",
+  "Italic (Ctrl+I)": "ตัวเอียง (Ctrl+I)",
+  "Justify": "จัดเต็มบรรทัด",
+  "Keep a draft on this device": "เก็บฉบับร่างไว้ในเครื่องนี้",
+  "Line spacing": "ระยะห่างบรรทัด",
+  "Line width": "ความหนาเส้น",
+  "Line": "เส้น",
+  "Merge & center": "ผสานและจัดกึ่งกลาง",
+  "Middle": "กึ่งกลางแนวตั้ง",
+  "More decimals": "เพิ่มทศนิยม",
+  "New": "ใหม่",
+  "Number format": "รูปแบบตัวเลข",
+  "Number": "ตัวเลข",
+  "Numbering": "ลำดับเลข",
+  "Open…": "เปิด…",
+  "Page numbers": "เลขหน้า",
+  "Page numbers: format, first number, start and stop page": "เลขหน้า: รูปแบบ เลขแรก หน้าเริ่มและหน้าสุดท้าย",
+  "Paragraph": "ย่อหน้า",
+  "Paste (Ctrl+V)": "วาง (Ctrl+V)",
+  "Percent style": "ลักษณะเปอร์เซ็นต์",
+  "Rectangle": "สี่เหลี่ยม",
+  "Rows": "แถว",
+  "Save draft": "บันทึกฉบับร่าง",
+  "Save": "บันทึก",
+  "Shape and text box colour": "สีรูปร่างและกล่องข้อความ",
+  "Shape style": "ลักษณะรูปร่าง",
+  "Sort & filter": "เรียงและกรอง",
+  "Sort A to Z (smallest first)": "เรียง ก ถึง ฮ (น้อยไปมาก)",
+  "Sort Z to A (largest first)": "เรียง ฮ ถึง ก (มากไปน้อย)",
+  "Start a new document": "เริ่มเอกสารใหม่",
+  "Strikethrough": "ขีดฆ่า",
+  "Styles": "ลักษณะ",
+  "Text box": "กล่องข้อความ",
+  "Top": "ชิดบน",
+  "Type in the document": "พิมพ์ในเอกสาร",
+  "Underline (Ctrl+U)": "ขีดเส้นใต้ (Ctrl+U)",
+  "View": "มุมมอง",
+  "Wrap text": "ตัดข้อความ",
+  "Open a Word file (.docx)": "เปิดไฟล์ Word (.docx)",
+  "Download .docx": "ดาวน์โหลด .docx",
+  "Download": "ดาวน์โหลด",
+  "Open a file": "เปิดไฟล์",
+};
 export function ribbon(spec, prefix, start = 0) {
   const el = document.createElement('div'); el.className = 'rb';
-  const tabs = spec.map((t, i) => `<button type="button" role="tab" class="rb-tab${t.file ? ' rb-file' : ''}" id="${prefix}-tab-${i}" aria-selected="${i === start}" aria-controls="${prefix}-pan-${i}">${esc(t.tab)}</button>`).join('');
+  const tabs = spec.map((t, i) => `<button type="button" role="tab" class="rb-tab${t.file ? ' rb-file' : ''}" id="${prefix}-tab-${i}" aria-selected="${i === start}" aria-controls="${prefix}-pan-${i}">${esc(say(t.tab))}</button>`).join('');
   const item = (it) => {
-    if (it.btn) return `<button type="button" class="rb-btn" id="${it.btn}" title="${esc(it.title)}" aria-label="${esc(it.title)}"${it.toggle ? ' aria-pressed="false"' : ''}>${it.icon}${it.text ? `<span class="rb-txt">${esc(it.text)}</span>` : ''}</button>`;
-    if (it.select) return `<select class="rb-sel" id="${it.select}" title="${esc(it.title)}" aria-label="${esc(it.title)}"${it.width ? ` style="width:${it.width}px"` : ''}>${it.options.map((o) => (Array.isArray(o) ? `<option value="${esc(o[0])}">${esc(o[1])}</option>` : `<option>${esc(o)}</option>`)).join('')}</select>`;
-    if (it.color) return `<label class="rb-color" title="${esc(it.title)}">${it.icon}<input type="color" id="${it.color}" aria-label="${esc(it.title)}"></label>`;
+    if (it.btn) return `<button type="button" class="rb-btn" id="${it.btn}" title="${esc(say(it.title))}" aria-label="${esc(say(it.title))}"${it.toggle ? ' aria-pressed="false"' : ''}>${it.icon}${it.text ? `<span class="rb-txt">${esc(say(it.text))}</span>` : ''}</button>`;
+    if (it.select) return `<select class="rb-sel" id="${it.select}" title="${esc(say(it.title))}" aria-label="${esc(say(it.title))}"${it.width ? ` style="width:${it.width}px"` : ''}>${it.options.map((o) => (Array.isArray(o) ? `<option value="${esc(o[0])}">${esc(o[1])}</option>` : `<option>${esc(o)}</option>`)).join('')}</select>`;
+    if (it.color) return `<label class="rb-color" title="${esc(say(it.title))}">${it.icon}<input type="color" id="${it.color}" aria-label="${esc(say(it.title))}"></label>`;
     if (it.input) return `<input class="rb-in" id="${it.input}" title="${esc(it.title)}" aria-label="${esc(it.title)}" placeholder="${esc(it.placeholder || '')}" autocomplete="off" spellcheck="false"${it.width ? ` style="width:${it.width}px"` : ''}>`;
     return it.html || '';
   };
-  const panels = spec.map((t, i) => `<div class="rb-pan" role="tabpanel" id="${prefix}-pan-${i}" aria-labelledby="${prefix}-tab-${i}"${i !== start ? ' hidden' : ''}>${t.groups.map((g) => `<div class="rb-grp" role="group" aria-label="${esc(g.label)}"><div class="rb-items">${g.items.map(item).join('')}</div><span class="rb-glabel">${esc(g.label)}</span></div>`).join('')}</div>`).join('');
+  const panels = spec.map((t, i) => `<div class="rb-pan" role="tabpanel" id="${prefix}-pan-${i}" aria-labelledby="${prefix}-tab-${i}"${i !== start ? ' hidden' : ''}>${t.groups.map((g) => `<div class="rb-grp" role="group" aria-label="${esc(say(g.label))}"><div class="rb-items">${g.items.map(item).join('')}</div><span class="rb-glabel">${esc(say(g.label))}</span></div>`).join('')}</div>`).join('');
   el.innerHTML = `<div class="rb-tabs" role="tablist">${tabs}</div><div class="rb-pans">${panels}</div>`;
   el.querySelector('.rb-tabs').addEventListener('click', (e) => {
     const b = e.target.closest('.rb-tab'); if (!b) return;

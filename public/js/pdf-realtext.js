@@ -9,7 +9,9 @@
 // Fonts from the user's computer (addFontFile): kept in this browser only (IndexedDB), shown with FontFace and
 // embedded like the site's own; a file of EucrosiaUPC replaces reading it from the computer (so Safari can use it).
 
-const FONT_DIR = new URL('../fonts/', import.meta.url).href;
+let FONT_DIR = new URL('../fonts/', import.meta.url).href;
+// Where the font files are, when this module is not in js/ beside fonts/ (the Feedback site keeps it in js/markup/).
+export const setFontDir = (url) => { FONT_DIR = new URL(url, document.baseURI).href.replace(/\/?$/, '/'); };
 const FONTKIT = 'https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js';
 
 // family -> files per style (r, b, i, bi); a missing style is made from the nearest one (bold: outline stroke,
