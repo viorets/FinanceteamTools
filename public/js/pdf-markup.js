@@ -165,7 +165,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
         <label class="mk-ctl">${t('Opacity', 'ความทึบ')} <span><input type="range" id="mk-o" min="10" max="100" step="5" value="${HL_OPACITY * 100}"><output id="mk-ov">${HL_OPACITY * 100}%</output></span></label>
       </div>
       <span class="mk-grow"></span>
-      ${viewBar('mk', t, { open: true })}
+      ${viewBar('mk', t, { open: true, help: true })}
     </div><div class="mk-pages" id="mk-pages"><p class="mk-wait">${t('Loading…', 'กำลังโหลด…')}</p></div></div>`;
   const [pdfjs, PDFLib] = await loadLibs();
   await loadFonts([font0, ...(draft || []).filter((m) => m.type === 'text').map(fontOf)]);

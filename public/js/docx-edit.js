@@ -416,7 +416,7 @@ export async function openDocxEditor(root, bytes) {
   const scroller = $('.de-doc'); const box = $('.oe');
   scroller.append(sheet);
   const rb = ribbon(spec, 'de', 1); $('.de-top').append(rb);
-  const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('de'); $('.de-top').append(tools);
+  const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('de', undefined, { help: true }); $('.de-top').append(tools);
   const view = cssZoom(box, scroller, () => sheet, 'de');
   requestAnimationFrame(() => { const room = scroller.clientWidth - 48; if (room > 0 && page.offsetWidth > room) view.zoomTo(room / page.offsetWidth); });
   fullScreen(box, 'de', 'oe-full');

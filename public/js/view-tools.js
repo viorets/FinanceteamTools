@@ -13,6 +13,7 @@ export const ICON = {
   sample: svg('<path d="M12 3l1.9 4.6 4.6 1.9-4.6 1.9L12 16l-1.9-4.6-4.6-1.9 4.6-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/>'),
   save: svg('<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>'),
   open: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1"/><path d="M3 7v10a2 2 0 0 0 2 2h13l3-9H8l-3 9"/>'),
+  help: svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>'),
   dl: svg('<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>'),
   chev: svg('<path d="m6 9 6 6 6-6"/>'),
   hl: svg('<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>'),
@@ -22,9 +23,9 @@ export const clampZoom = (z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round
 export const iconBtn = (id, label, face) => `<button type="button" id="${id}" class="vt-ic" title="${label}" aria-label="${label}">${face}</button>`;
 // Zoom − / % / + and Save draft, Download, Undo, Redo, Delete, Full screen, as one markup string. `t(en, th)` translates.
 // Save draft and Download sit here so they work in full screen too; the page wires them (index.html, fileActions).
-// opts.open: an Open button first (the PDF editor, which has no File tab).
-export const viewBar = (p, t = (en) => en, { open = false } = {}) => `<div class="vt-zoom" role="group" aria-label="${t('Zoom', 'ซูม')}">${iconBtn(`${p}-zout`, t('Zoom out', 'ซูมออก'), ICON.zout)}<button type="button" id="${p}-zfit" class="vt-zpct" title="${t('Back to 100%', 'กลับเป็น 100%')}">100%</button>${iconBtn(`${p}-zin`, t('Zoom in', 'ซูมเข้า'), ICON.zin)}</div>
-  <div class="vt-acts">${open ? iconBtn(`${p}-open`, t('Open another file', 'เปิดไฟล์อื่น'), ICON.open) : ''}${iconBtn(`${p}-draft`, t('Save draft on this device', 'บันทึกฉบับร่างในเครื่องนี้'), ICON.save)}${iconBtn(`${p}-dl`, t('Download', 'ดาวน์โหลด'), ICON.dl)}${iconBtn(`${p}-undo`, t('Undo (Ctrl+Z)', 'เลิกทำ (Ctrl+Z)'), ICON.undo)}${iconBtn(`${p}-redo`, t('Redo (Ctrl+Y)', 'ทำซ้ำ (Ctrl+Y)'), ICON.redo)}${iconBtn(`${p}-del`, t('Delete', 'ลบ'), ICON.del)}${iconBtn(`${p}-full`, t('Full screen', 'เต็มจอ'), ICON.full)}</div>`;
+// opts.open: an Open button first (the PDF editor, which has no File tab); opts.help: a "?" button last (tips).
+export const viewBar = (p, t = (en) => en, { open = false, help = false } = {}) => `<div class="vt-zoom" role="group" aria-label="${t('Zoom', 'ซูม')}">${iconBtn(`${p}-zout`, t('Zoom out', 'ซูมออก'), ICON.zout)}<button type="button" id="${p}-zfit" class="vt-zpct" title="${t('Back to 100%', 'กลับเป็น 100%')}">100%</button>${iconBtn(`${p}-zin`, t('Zoom in', 'ซูมเข้า'), ICON.zin)}</div>
+  <div class="vt-acts">${open ? iconBtn(`${p}-open`, t('Open another file', 'เปิดไฟล์อื่น'), ICON.open) : ''}${iconBtn(`${p}-draft`, t('Save draft on this device', 'บันทึกฉบับร่างในเครื่องนี้'), ICON.save)}${iconBtn(`${p}-dl`, t('Download', 'ดาวน์โหลด'), ICON.dl)}${iconBtn(`${p}-undo`, t('Undo (Ctrl+Z)', 'เลิกทำ (Ctrl+Z)'), ICON.undo)}${iconBtn(`${p}-redo`, t('Redo (Ctrl+Y)', 'ทำซ้ำ (Ctrl+Y)'), ICON.redo)}${iconBtn(`${p}-del`, t('Delete', 'ลบ'), ICON.del)}${iconBtn(`${p}-full`, t('Full screen', 'เต็มจอ'), ICON.full)}${help ? iconBtn(`${p}-help`, t('Tips and shortcuts', 'เคล็ดลับและคีย์ลัด'), ICON.help) : ''}</div>`;
 
 // Zoom gestures on `el`: Ctrl/⌘ + wheel (Chrome and Edge also send a trackpad pinch this way; a plain wheel still
 // scrolls), and finger pinch: Safari (iPad, Mac trackpad) sends gesture events with the scale, other browsers two
@@ -126,6 +127,25 @@ export function fullScreen(box, p, cls, t = (en) => en, onChange = () => {}) {
     set(true);
   };
   return { isOn };
+}
+
+// Tips and shortcuts under the "?" button: a small panel in the editor box (so it shows in full screen too); the button
+// opens and closes it, as do Escape and a click outside.
+export function helpPop(btn, html) {
+  btn.setAttribute('aria-expanded', 'false');
+  btn.onclick = () => {
+    const box = btn.closest('.oe, .mk') || document.body;
+    let m = box.querySelector(':scope > .vt-help');
+    if (m && !m.hidden) { m.hidden = true; btn.setAttribute('aria-expanded', 'false'); return; }
+    if (!m) { m = document.createElement('div'); m.className = 'vt-help'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Tips and shortcuts'); m.tabIndex = -1; box.append(m); }
+    m.innerHTML = `<h3>Tips and shortcuts</h3>${html}`;
+    const r = btn.getBoundingClientRect();
+    m.hidden = false; m.style.top = `${r.bottom + 6}px`; m.style.left = `${Math.max(8, Math.min(r.right - 340, innerWidth - 348))}px`;
+    btn.setAttribute('aria-expanded', 'true'); m.focus({ preventScroll: true });
+    const close = (e) => { if (e && (m.contains(e.target) || btn.contains(e.target))) return; m.hidden = true; btn.setAttribute('aria-expanded', 'false'); removeEventListener('pointerdown', close, true); removeEventListener('keydown', key, true); };
+    const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); btn.focus(); } };
+    addEventListener('pointerdown', close, true); addEventListener('keydown', key, true);
+  };
 }
 
 // A small menu under `btn` (the Download button's file formats): items [[value, label, note]]; onPick(value). Placed

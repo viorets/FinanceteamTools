@@ -139,7 +139,7 @@ export async function openXlsxEditor(root, bytes) {
   const $ = (s) => root.querySelector(s);
   const box = $('.oe'); const grid = $('#xe-grid'); const canvas = $('.xe-canvas'); const fxin = $('#xe-fxin'); const nameBox = $('#xe-name');
   const rb = ribbon(spec, 'xe', 1); $('.xe-top').append(rb);
-  const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('xe'); $('.xe-top').append(tools);
+  const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('xe', undefined, { help: true }); $('.xe-top').append(tools);
   const zoom = cssZoom(box, grid, () => canvas, 'xe');
   fullScreen(box, 'xe', 'oe-full');
   floatBar(box, $('.oe-bar'));

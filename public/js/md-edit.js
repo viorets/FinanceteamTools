@@ -5,7 +5,7 @@
 // Markdown is turned into HTML by marked (GitHub-flavoured: tables, task lists, strikethrough) and cleaned by
 // DOMPurify before it is shown. Drafts are kept in this browser (localStorage), by file name.
 import { fileTab, markSaved, ribbon, RI, setPressed } from './ribbon.js';
-import { actionMenu, clampZoom, fullScreen, pinchZoom, viewBar } from './view-tools.js';
+import { actionMenu, clampZoom, fullScreen, helpPop, pinchZoom, viewBar } from './view-tools.js';
 import { ARROWS } from './rich-text.js';
 
 const MARKED = 'https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js';
@@ -99,8 +99,15 @@ export function openMd(root, { download }) {
   const $ = (s) => root.querySelector(s);
   const ta = $('#mdSrc'); const doc = $('.md-doc'); const prev = $('.md-prev'); const panes = $('.md-panes'); const box = $('#mdBox');
   const rb = ribbon(spec, 'md', 1); $('.md-top').append(rb);
-  const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('md'); $('.md-top').append(tools);
+  const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('md', undefined, { help: true }); $('.md-top').append(tools);
   fullScreen(box, 'md', 'oe-full');
+  helpPop($('#md-help'), `<ul>
+    <li>Type Markdown on the left or edit the formatted page on the right; each follows the other. Click on the right to find the place on the left.</li>
+    <li><kbd>Enter</kbd> continues a list (on an empty item it ends the list); <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> indent it.</li>
+    <li><kbd>Ctrl</kbd>+<kbd>B</kbd> bold, <kbd>Ctrl</kbd>+<kbd>I</kbd> italic, <kbd>Ctrl</kbd>+<kbd>K</kbd> link, <kbd>Ctrl</kbd>+<kbd>F</kbd> find and replace.</li>
+    <li>Typing <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜ (not inside code).</li>
+    <li>Paste a range copied from Excel to get a table; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> pastes it as plain text. In a table on the right, <kbd>Tab</kbd> moves to the next cell.</li>
+    <li>Tick the boxes on the right to tick tasks. Files up to 5 MB; drafts are kept in this browser by file name.</li></ul>`);
   const style = document.createElement('style'); document.head.append(style);
   const say = (t) => { $('#mdStatus').textContent = t; };
 

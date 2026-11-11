@@ -91,7 +91,7 @@
 /* The backdrop: fixed behind everything (a pseudo-element, since iPad Safari ignores background-attachment: fixed). */
 body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: var(--backdrop); }
 /* Glass surfaces. Inputs and buttons inside keep their own solid backgrounds, so form text keeps full contrast. */
-.glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu {
+.glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu, .vt-help {
   background: var(--glass-tint);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
@@ -101,8 +101,8 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-even
 /* Editor bars float over white documents: in dark mode they take a denser tint so light text keeps its contrast. */
 .mk-bar, .oe-bar { background: var(--glass-bar-tint, var(--glass-tint)); }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu { background: var(--glass-solid); }
+  .glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu, .vt-help { background: var(--glass-solid); }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu, .vt-help { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
