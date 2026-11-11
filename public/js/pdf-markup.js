@@ -10,7 +10,7 @@
 // visible area, so long files and high zoom stay inside iPad Safari's canvas memory limit.
 import { normHex, pairHex } from './hex-color.js';
 import { fontStack, siteFont, textWriter } from './pdf-realtext.js';
-import { pageParagraphs } from './pdf-text.js';
+import { damagedThai, madeByCanva, pageParagraphs } from './pdf-text.js';
 import { removeText } from './pdf-redact.js';
 import { ocrPage } from './pdf-ocr.js';
 import { ICON, clampZoom, floatBar, fullScreen, pinchZoom, viewBar, zoomAround } from './view-tools.js';
@@ -176,6 +176,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   const [pdfjs, PDFLib] = await loadLibs();
   await loadFonts([font0, ...(draft || []).filter((m) => m.type === 'text').map(fontOf)]);
   const doc = await pdfjs.getDocument({ data: bytes.slice(0) }).promise;
+  const canva = madeByCanva(doc); // Canva PDFs can lose tone marks: such pages are read by OCR for Edit text
   const mk = root.querySelector('.mk');
   const pagesEl = root.querySelector('#mk-pages');
   const $ = (s) => root.querySelector(s);
@@ -659,15 +660,20 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     };
     st.marks.push(m); st.sel = m.id; changed(); editBox(p, m.id, true);
   }
-  // The page's paragraphs; a page without text (a scan) is read by OCR first, once.
+  // The page's paragraphs; a page without text (a scan), or whose Thai text the PDF holds damaged, is read by OCR
+  // first, once.
   async function pageText(p) {
     const own = await pageParagraphs(p.page);
-    if (own.reduce((s, u) => s + u.text.trim().length, 0) >= 10) return own;
+    const text = own.map((u) => u.text).join(' ');
+    const damaged = text.trim().length >= 10 && damagedThai(text, { canva: await canva });
+    if (text.trim().length >= 10 && !damaged) return own;
     try {
-      onStatus(t('Reading this scanned page with OCR…', 'กำลังอ่านหน้าสแกนด้วย OCR…'));
-      const items = await ocrPage(p.page, onStatus); p.scanned = true;
+      onStatus(damaged ? t('The Thai text in this page is damaged in the PDF: reading it with OCR…', 'ข้อความภาษาไทยในหน้านี้เสียหาย กำลังอ่านด้วย OCR…')
+        : t('Reading this scanned page with OCR…', 'กำลังอ่านหน้าสแกนด้วย OCR…'));
+      const items = await ocrPage(p.page, onStatus); p.scanned = !damaged; // a damaged page still has text to remove
       const read = await pageParagraphs(p.page, items);
-      onStatus(t(`Scanned page read by OCR: ${read.length} paragraphs to edit. Check names and figures.`, `อ่านหน้าสแกนแล้ว ${read.length} ย่อหน้า กรุณาตรวจชื่อและตัวเลข`));
+      onStatus(damaged ? t(`Page read by OCR: ${read.length} paragraphs to edit. Check names and figures.`, `อ่านหน้านี้ด้วย OCR แล้ว ${read.length} ย่อหน้า กรุณาตรวจชื่อและตัวเลข`)
+        : t(`Scanned page read by OCR: ${read.length} paragraphs to edit. Check names and figures.`, `อ่านหน้าสแกนแล้ว ${read.length} ย่อหน้า กรุณาตรวจชื่อและตัวเลข`));
       return read;
     } catch (err) { p.paras = null; onStatus(err.message); return own; }
   }

@@ -68,11 +68,16 @@ async function pageLines(page, items = null, { findGrids = true } = {}) {
   // Items -> chunks; a chunk that is only combining marks belongs to the chunk before it (stream order), so marks
   // drawn slightly left of their letter do not jump ahead of it when the line is sorted by x.
   const chunks = [];
+  // Text drawn again over itself (Canva's outline and shadow effects draw each piece or each line two or three
+  // times): a piece that repeats one already on the page at almost the same place is left out, with the marks that follow it.
+  const drawn = new Map(); let dup = false;
   for (let it of tc.items) {
     if (!('str' in it) || !it.str.trim()) continue; // spaces and tabs: the gap between chunks says where they were
     const [a, b, c, d, e, f] = it.transform;
     if (Math.abs(b) > 0.01 || Math.abs(c) > 0.01) continue; // rotated text (stamps, side notes)
     const size = Math.abs(d) || Math.abs(a) || it.height; const st = fontOf[it.fontName] || {};
+    if (MARKS.test(it.str) ? dup : (dup = !!drawn.get(it.str)?.some((o) => Math.abs(o.x - e) < size * 0.3 && Math.abs(o.y - f) < size * 0.3))) continue;
+    if (!drawn.has(it.str)) drawn.set(it.str, []); drawn.get(it.str).push({ x: e, y: f });
     if (swapAm(it.fontName)) it = { ...it, str: it.str.replace(/ำ/g, 'า') };
     const prev = chunks[chunks.length - 1];
     if (prev && MARKS.test(it.str) && Math.abs(prev.y - f) < size * 0.6) { prev.runs.push({ t: it.str, b: st.b, i: st.i }); prev.x2 = Math.max(prev.x2, e + it.width); continue; }
@@ -290,21 +295,40 @@ function joinTables(prev, t) {
   prev.rows.push(...rows); prev.page = t.page; return true;
 }
 
+// Damaged Thai: some programs store Thai shapes under the wrong codes, so letters and symbols turn up inside Thai
+// words ("เ2ยประ1น;ขภาพ", Safari/Microsoft Forms), or store shifted marks as spaces ("เสี ยง", "เป น", Canva), or drop
+// a tone mark that sits on an upper vowel ("เสียง" for เสี่ยง, "ที" for ที่: Canva). Copying from such a PDF gives the
+// same; only reading the page image (OCR) recovers it.
+const ODD = /[฀-๿][0-9A-Za-z;:@\\^_`{|}~$#<=>+*&%!?]{1,2}(?=[฀-๿])/g; // symbols inside a word
+// a space where a mark was: after ั (ปั จจัย), between ํ and า (ตํ า), after เ + one letter (เป น) or เ + letters + ี/ื
+// (เสี ยง); none of these ends a Thai word
+const GAP = /ั (?=[ก-ฮ])|ํ า|เ[ก-ฮ](?:[ก-ฮ]?[ีื])? (?=[ก-ฮ])/g;
+// Words that lost a stacked tone mark or upper vowel (ที for ที่, ชือ for ชื่อ, เปด for เปิด), as Canva's PDFs have them.
+// None is a Thai word by itself. In the team's Thai documents (~15,000 words) they turn up at most once per file;
+// in a 135-page Canva file, on 22 pages.
+const LOST_MARK = new Set(['ที', 'นี', 'ชือ', 'อืน', 'ขึน', 'เพิม', 'เปด', 'ปด', 'ซึง', 'ทัง', 'ตัง', 'นัน', 'เมือ', 'เพือ', 'เชือ', 'ทัว', 'ครัง', 'ผู', 'แลว', 'ดวย', 'อยู']);
+const wordSeg = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
+export function damagedThai(t, { canva = false } = {}) {
+  const thai = (t.match(/[฀-๿]+/g) || []).length; const odd = (t.match(ODD) || []).length + (t.match(GAP) || []).length;
+  if (thai >= 10 && odd >= 3 && odd / thai > 0.03) return true;
+  if (!wordSeg) return false;
+  let words = 0; let lost = 0;
+  for (const { segment } of wordSeg.segment(t)) { if (!/[ก-ฮ]/.test(segment)) continue; words++; if (LOST_MARK.has(segment)) lost++; }
+  return canva ? lost >= 1 : lost >= 2 && lost / words >= 0.01;
+}
+// Made by Canva (Producer or Creator): its PDFs are the ones known to drop stacked tone marks.
+export async function madeByCanva(doc) {
+  try { const { info } = await doc.getMetadata(); return /canva/i.test(`${info?.Producer || ''} ${info?.Creator || ''}`); } catch { return false; }
+}
+
 export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = () => {} } = {}) {
   const pages = [];
   for (let n = 1; n <= doc.numPages; n++) { onPage(n, doc.numPages); pages.push(await pageLines(await doc.getPage(n))); }
   const scanned = pages.map((p, i) => (p.lines.reduce((s, l) => s + l.text.length, 0) < 10 && p.images ? i + 1 : 0)).filter(Boolean);
-  // Damaged Thai: some programs store Thai shapes under the wrong codes, so letters and symbols turn up inside Thai
-  // words ("เ2ยประ1น;ขภาพ", Safari/Microsoft Forms), or store shifted marks as spaces ("เสี ยง", "เป น", Canva).
-  // Copying from such a PDF gives the same; only reading the page image (OCR) recovers it.
-  const ODD = /[฀-๿][0-9A-Za-z;:@\\^_`{|}~$#<=>+*&%!?]{1,2}(?=[฀-๿])/g; // symbols inside a word
-  // a space where a mark was: after ั (ปั จจัย), between ํ and า (ตํ า), after เ + one letter (เป น) or เ + letters + ี/ื
-  // (เสี ยง); none of these ends a Thai word
-  const GAP = /ั (?=[ก-ฮ])|ํ า|เ[ก-ฮ](?:[ก-ฮ]?[ีื])? (?=[ก-ฮ])/g;
+  const canva = await madeByCanva(doc);
   const damaged = pages.map((p, i) => {
     const t = p.lines.map((l) => l.text).join(' ') + p.tables.flatMap((g) => g.rows.flat(2).map((r) => r.t)).join(' ');
-    const thai = (t.match(/[฀-๿]+/g) || []).length; const odd = (t.match(ODD) || []).length + (t.match(GAP) || []).length;
-    return thai >= 10 && odd >= 3 && odd / thai > 0.03 ? i + 1 : 0;
+    return damagedThai(t, { canva }) ? i + 1 : 0;
   }).filter(Boolean);
   const ocred = ocr ? [...new Set([...scanned, ...damaged])].sort((a, b) => a - b) : [];
   for (const [k, n] of ocred.entries()) {
