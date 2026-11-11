@@ -71,6 +71,8 @@ The editor comes from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinan
 - Typing helpers: Enter continues a list (Enter on an empty item ends it), Tab / Shift+Tab indent, `-->` gives →, `==>` gives ➜; Ctrl+B / I / K
 - Paste a range copied from Excel and it becomes a Markdown table (number columns aligned right); Ctrl+Shift+V pastes the plain text
 - Tick a checkbox in the preview to tick the task in the text
+- **Edit on the formatted page too**: type, press Enter, or use Bold, Italic, Strikethrough, Code, headings, lists, quote and link from the ribbon. After a short pause only the changed blocks become Markdown again (Turndown), so the rest of the text keeps its exact spelling; Undo works on both sides. In tables Enter stays in the cell and Tab moves to the next one; an edited table or list is rewritten in standard Markdown (`-` bullets, `| --- |` dividers)
+- Click anywhere on the formatted page and the cursor in the text moves to the same place (in a table, the same cell)
 - **Save draft** keeps the text in this browser by file name; **Download as** Markdown, a web page (.html), Word (.doc) or PDF (print); full screen keeps Save draft and Download in the toolbar
 - Markdown is converted by [marked](https://marked.js.org/) (GitHub-flavoured) and cleaned by [DOMPurify](https://github.com/cure53/DOMPurify) before it is shown
 
