@@ -6,6 +6,8 @@
 // (same letter widths; nothing to embed). EucrosiaUPC is a Windows font we may not host: Chrome/Edge on a PC can read
 // it from the computer (Local Font Access, with the user's permission); elsewhere it falls back to TH Sarabun New.
 // Georgia has no file we may embed: those boxes stay a picture (js/pdf-markup.js textPng).
+// Fonts from the user's computer (addFontFile): kept in this browser only (IndexedDB), shown with FontFace and
+// embedded like the site's own; a file of EucrosiaUPC replaces reading it from the computer (so Safari can use it).
 
 const FONT_DIR = new URL('../fonts/', import.meta.url).href;
 const FONTKIT = 'https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js';
@@ -30,7 +32,7 @@ export const fontStack = (family) => {
 export const canEmbed = (family) => !!FACES[family];
 
 let fontkitP = null;
-const loadFontkit = () => fontkitP ||= window.fontkit ? Promise.resolve(window.fontkit) : new Promise((res, rej) => {
+export const loadFontkit = () => fontkitP ||= window.fontkit ? Promise.resolve(window.fontkit) : new Promise((res, rej) => {
   const s = document.createElement('script'); s.src = FONTKIT; s.crossOrigin = 'anonymous';
   s.onload = () => res(window.fontkit); s.onerror = () => { fontkitP = null; rej(new Error('Could not load the font tools. Try again.')); }; document.head.append(s);
 });
@@ -63,16 +65,17 @@ export async function textWriter(pdf, PDFLib) {
       let f = FACES[family]; if (!f) return null;
       if (f.std) return { std: true, font: await pdf.embedFont(PDFLib.StandardFonts[f.std[st]]), family };
       let bytes; let synthB = false; let synthI = false;
-      if (f.local) {
+      if (f.local && !f.files) {
         eucrosia ??= await localFont(f.local);
         bytes = eucrosia?.[f.local[st]] || eucrosia?.[f.local[st & 1]] || eucrosia?.[f.local[0]];
         if (!bytes) { notes.add(`${family} is not available here, so TH Sarabun New was used`); return face(f.fallback, st); }
         synthB = !!(st & 1) && !eucrosia[f.local[st]] && !eucrosia[f.local[1]]; synthI = !!(st & 2) && !eucrosia[f.local[st]];
       } else {
-        const want = KEYS[st]; const file = f[want] || (st & 1 && f.b) || (st & 2 && f.i) || f.r;
-        synthB = !!(st & 1) && !(f[want] || f.b) || (st === 3 && !f.bi && !f.b);
-        synthI = !!(st & 2) && !(f[want] || f.i);
-        bytes = await fetchFont(file);
+        const src = f.files || f; // a user's font: its bytes; a site font: its file names
+        const want = KEYS[st]; const file = src[want] || (st & 1 && src.b) || (st & 2 && src.i) || src.r;
+        synthB = !!(st & 1) && !(src[want] || src.b) || (st === 3 && !src.bi && !src.b);
+        synthI = !!(st & 2) && !(src[want] || src.i);
+        bytes = f.files ? file : await fetchFont(file);
       }
       // two copies: `font` for ordinary glyphs, `alt` for glyphs whose text value is changed (ำ, see place())
       const font = await pdf.embedFont(bytes, { subset: true }); const alt = await pdf.embedFont(bytes, { subset: true });
@@ -204,4 +207,35 @@ export function siteFont(name) {
   const hit = Object.keys(FACES).find((f) => fkey(f) === fkey(name)); if (hit) return hit;
   return /upc|psk|new$|thai|angsana|cordia|browallia|leelawadee|tahoma|kanit|prompt|mitr|sarabun|th /i.test(name) ? 'TH Sarabun New'
     : /times|georgia|cambria|garamond|serif|book|minion/i.test(name) ? 'Times New Roman' : 'Arial';
+}
+
+// ---------- fonts from the user's computer ----------
+const FONT_DB = 'tusu-fonts';
+const fontDb = () => new Promise((res, rej) => { const q = indexedDB.open(FONT_DB, 1); q.onupgradeneeded = () => q.result.createObjectStore('fonts'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+const dbDo = async (mode, fn) => { const db = await fontDb(); return new Promise((res, rej) => { const tx = db.transaction('fonts', mode); const r = fn(tx.objectStore('fonts')); tx.oncomplete = () => res(r?.result); tx.onerror = () => rej(tx.error); }); };
+async function registerFont(family, key, bytes) {
+  const f = (FACES[family] ||= { user: true, fallback: 'TH Sarabun New' }); f.files ||= {}; f.files[key] = bytes;
+  const ff = new FontFace(family, bytes.slice(0), { weight: key === 'b' || key === 'bi' ? 'bold' : 'normal', style: key === 'i' || key === 'bi' ? 'italic' : 'normal' });
+  await ff.load(); document.fonts.add(ff);
+}
+// A .ttf or .otf file -> { family, key } (key: r, b, i, bi from its own style name). The site's own fonts stay as
+// they are ({ family, site: true }); EucrosiaUPC and new families are added.
+export async function addFontFile(file) {
+  const fk = await loadFontkit(); const bytes = await file.arrayBuffer(); let font;
+  try { font = fk.create(new Uint8Array(bytes)); } catch { throw new Error(`${file.name} is not a font file (.ttf or .otf).`); }
+  if (font.fonts) throw new Error(`${file.name} holds several fonts (.ttc): choose a single .ttf or .otf file.`);
+  const family = (font.familyName || file.name.replace(/\.[^.]+$/, '')).trim(); const sub = String(font.subfamilyName || '').toLowerCase();
+  const key = /bold/.test(sub) && /italic|oblique/.test(sub) ? 'bi' : /bold/.test(sub) ? 'b' : /italic|oblique/.test(sub) ? 'i' : 'r';
+  if (FACES[family] && !FACES[family].user && !FACES[family].local) return { family, site: true };
+  await registerFont(family, key, bytes);
+  try { await dbDo('readwrite', (s) => s.put(bytes, `${family}|${key}`)); } catch { /* storage off: the font lasts until the page closes */ }
+  return { family, key };
+}
+// Fonts added before, from this browser's storage. Resolves the families now usable.
+export async function loadUserFonts() {
+  try {
+    const keys = await dbDo('readonly', (s) => s.getAllKeys()) || [];
+    for (const k of keys) { const [family, key] = String(k).split('|'); if (FACES[family]?.files?.[key]) continue; const bytes = await dbDo('readonly', (s) => s.get(k)); if (bytes) await registerFont(family, key, bytes); }
+  } catch { /* no storage */ }
+  return Object.keys(FACES).filter((f) => FACES[f].files);
 }

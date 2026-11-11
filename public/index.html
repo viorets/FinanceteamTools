@@ -608,7 +608,7 @@
                     <h2>Mark up a PDF</h2>
                     <p>Edit the PDF's own text, add text, highlights, lines, arrows and drawings, then download a marked copy, or turn the PDF's text into Word or Markdown. The original file is not changed.</p>
                     <button type="button" class="action-btn ed-open" data-open="pdf">Open a file</button>
-                    <p class="ed-limit">PDF up to 12 MB · or drop it here · drafts stay on this device</p>
+                    <p class="ed-limit">PDF up to 100 MB (over 12 MB can be slow on iPad) · or drop it here · drafts stay on this device</p>
                     <p class="help-text ed-help">Text box: select letters and press <b>B</b>, <i>I</i>, <u>U</u>, <s>S</s> or the highlighter (Ctrl+B / I / U, Ctrl+Shift+X). Typing <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜. Hold Shift for straight lines and squares. Zoom with Ctrl + mouse wheel, a pinch, or − / +.</p>
                 </div>
             </div>
@@ -1146,7 +1146,7 @@
 
     <!-- TOOL 3-5 LOGIC: PDF EDITING (editor module from TUSUFinanceFeedback), EXCEL and WORD EDITING (prototypes) -->
     <script type="module">
-        import { openPdfEditor, MAX_BYTES } from './js/pdf-markup.js';
+        import { openPdfEditor, MAX_BYTES, WARN_BYTES } from './js/pdf-markup.js';
         import { openXlsxEditor } from './js/xlsx-edit.js';
         import { openDocxEditor } from './js/docx-edit.js';
         import { pairHex } from './js/hex-color.js';
@@ -1214,7 +1214,7 @@
             status(`Opening ${f.name} (${mb(bytes.byteLength)})…`);
             try {
                 editor = await openPdfEditor($('pdfEditor'), { bytes, name: f.name, draft, onStatus: status });
-                status(`${f.name} · ${mb(bytes.byteLength)}${draft ? ' · draft restored' : ''}`);
+                status(`${f.name} · ${mb(bytes.byteLength)}${draft ? ' · draft restored' : ''}${bytes.byteLength > WARN_BYTES ? ' · a large file: on iPad save a draft often, and saving may take a while' : ''}`);
                 barActions($('pdfEditor'), 'mk', { open: () => $('pdfFileInput').click(), draft: pdfDraft, download: pdfDownload, more: PDF_FORMATS, tips: TIPS.pdf });
                 if (pdfLocked) lockedNotice(f.name).then(() => fontCaution(editor.doc, f.name)).catch((err) => console.warn('font check', err));
                 else fontCaution(editor.doc, f.name).catch((err) => console.warn('font check', err));
@@ -1251,13 +1251,17 @@
         async function pdfText(fmt) {
             const base = fileName.replace(/\.pdf$/i, '');
             // Scanned pages and pages with damaged Thai are read by OCR (models load the first time, about 10 MB).
+            let ocrFixed = 0; const ocrCheck = [];
             const r = await pdfToBlocks(editor.doc, {
                 onPage: (n, all) => status(`Reading the text of page ${n} of ${all}…`),
-                ocr: (page) => ocrPage(page, status), onOcr: (k, all, n) => status(`Reading page ${n} with OCR (${k} of ${all})…`),
+                ocr: async (page) => { const it = await ocrPage(page, status); ocrFixed += it.fixed || 0; (it.check || []).forEach(([w, s]) => ocrCheck.push(`${w}${s ? ` (${s}?)` : ''} p.${page.pageNumber}`)); return it; },
+                onOcr: (k, all, n) => status(`Reading page ${n} with OCR (${k} of ${all})…`),
             });
             const text = blocksToMd(r.blocks);
             const notes = [];
             if (r.ocred.length) notes.push(`page${r.ocred.length > 1 ? 's' : ''} ${range(r.ocred)} ${r.ocred.length > 1 ? 'were' : 'was'} read by OCR (${r.scanned.length ? 'scanned' : ''}${r.scanned.length && r.damaged.length ? ' or ' : ''}${r.damaged.length ? 'Thai text in the PDF damaged' : ''}): check names and figures there`);
+            if (ocrFixed) notes.push(`OCR words put right from the Thai word list: ${ocrFixed}`);
+            if (ocrCheck.length) notes.push(`OCR words to check: ${ocrCheck.slice(0, 8).join(', ')}${ocrCheck.length > 8 ? ` and ${ocrCheck.length - 8} more` : ''}`);
             if (!r.blocks.length) { status(`No text found in ${fileName}${notes.length ? `: ${notes.join('; ')}` : ''}.`); return; }
             const tables = r.blocks.filter((b) => b.type === 'table').length;
             const done = `${r.pages} page${r.pages > 1 ? 's' : ''}${tables ? `, ${tables} table${tables > 1 ? 's' : ''}` : ''}`;
@@ -1284,7 +1288,7 @@
             status('Writing the marked PDF…');
             try {
                 const out = await editor.exportPdf();
-                if (out.byteLength > MAX_BYTES) { status(`Marked PDF is ${mb(out.byteLength)}: over the 12 MB limit`); return; }
+                if (out.byteLength > MAX_BYTES) { status(`Marked PDF is ${mb(out.byteLength)}: over the ${MAX_BYTES / 1048576} MB limit`); return; }
                 download(out, fileName.replace(/\.pdf$/i, '') + ' (marked).pdf', 'application/pdf');
                 const notes = editor.notes(); // e.g. a font that is not on this computer
                 status(`Marked PDF downloaded (${mb(out.byteLength)})${notes.length ? `. ${notes.join('; ')}.` : ''}`);
@@ -1295,7 +1299,7 @@
         // An editor's file actions, wherever they sit: the File tab (Open…, Save draft, Download) and the quick icons
         // beside zoom (which also work in full screen). `more` lists download formats, shown as a menu. A saved
         // draft shows its time beside Save draft.
-        const TIPS = {pdf: "<ul><li>Tools: <b>Edit text</b> (click a paragraph of the PDF and type over it; the old words are removed from the downloaded PDF, so search finds only the new text), text box, highlight text, draw, line, arrow, rectangle. Hold <kbd>Shift</kbd> for straight lines and squares.</li><li>Select a mark to move it, change its width or colour, or delete it.</li><li>In a text box: <kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> highlight; <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜.</li><li>Zoom with <kbd>Ctrl</kbd> + mouse wheel, a pinch, or − / +. Undo <kbd>Ctrl</kbd>+<kbd>Z</kbd>, redo <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li><li><b>Download as</b> gives the marked PDF, or the PDF's own text as Word (.docx) or Markdown, with headings, lists and tables. <b>Open in Markdown editor</b> lets you check and edit it first. Scanned pages, and pages whose Thai is damaged inside the PDF, are read by OCR on this device (the Thai OCR models, about 20 MB, load the first time).</li><li>Files up to 12 MB. Drafts stay on this device; the original file is never changed.</li></ul>", xlsx: "<ul><li>Click a cell and type; <kbd>F2</kbd> or a double-click edits it. <kbd>Enter</kbd> / <kbd>Tab</kbd> / arrows move, <kbd>Esc</kbd> cancels.</li><li>Drag or <kbd>Shift</kbd>+click to select a range; <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> work with Excel and Google Sheets.</li><li>Drag the small square at the corner to fill a series. The Name Box jumps to an address such as B12.</li><li>Formulas calculate live; Formulas tab lists the functions. Sheets are tabs at the bottom.</li><li>Download as gives the workbook, or this sheet as CSV UTF-8, TSV, Unicode text, JSON or HTML. Charts, images and pivot tables are not kept.</li></ul>", docx: "<ul><li>Edit the page as in Word. <kbd>Enter</kbd> starts a paragraph, <kbd>Shift</kbd>+<kbd>Enter</kbd> a line break; in a list <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> change the level.</li><li><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>; <kbd>Ctrl</kbd>+<kbd>F</kbd> find, <kbd>Ctrl</kbd>+<kbd>H</kbd> replace.</li><li>Right-click a style (or Modify…) to change it; ticked styles are remembered in this browser.</li><li>Insert draws text boxes, lines, arrows, rectangles and pen strokes, saved as Word drawings.</li><li>The document is shown in pages. Double-click a header or footer (or Insert &gt; Header &amp; footer) to type in it; <kbd>Esc</kbd> goes back to the text.</li><li>Insert &gt; Page numbers: format (1, i, I, a, ๑…), text before, the total, the first number, and the page to start and stop on. Word works the numbers out when it opens the file.</li></ul>"};
+        const TIPS = {pdf: "<ul><li>Tools: <b>Edit text</b> (click a paragraph of the PDF and type over it; the old words are removed from the downloaded PDF, so search finds only the new text), text box, highlight text, draw, line, arrow, rectangle. Hold <kbd>Shift</kbd> for straight lines and squares.</li><li>Select a mark to move it, change its width or colour, or delete it.</li><li>In a text box: <kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> highlight; <code>--&gt;</code> gives → and <code>==&gt;</code> gives ➜.</li><li>Zoom with <kbd>Ctrl</kbd> + mouse wheel, a pinch, or − / +. Undo <kbd>Ctrl</kbd>+<kbd>Z</kbd>, redo <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li><li><b>Download as</b> gives the marked PDF, or the PDF's own text as Word (.docx) or Markdown, with headings, lists and tables. <b>Open in Markdown editor</b> lets you check and edit it first. Scanned pages, and pages whose Thai is damaged inside the PDF, are read by OCR on this device (the Thai OCR models, about 20 MB, load the first time).</li><li>Files up to 100 MB (over 12 MB can be slow on iPad: save a draft often). Drafts stay on this device; the original file is never changed.</li></ul>", xlsx: "<ul><li>Click a cell and type; <kbd>F2</kbd> or a double-click edits it. <kbd>Enter</kbd> / <kbd>Tab</kbd> / arrows move, <kbd>Esc</kbd> cancels.</li><li>Drag or <kbd>Shift</kbd>+click to select a range; <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> work with Excel and Google Sheets.</li><li>Drag the small square at the corner to fill a series. The Name Box jumps to an address such as B12.</li><li>Formulas calculate live; Formulas tab lists the functions. Sheets are tabs at the bottom.</li><li>Download as gives the workbook, or this sheet as CSV UTF-8, TSV, Unicode text, JSON or HTML. Charts, images and pivot tables are not kept.</li></ul>", docx: "<ul><li>Edit the page as in Word. <kbd>Enter</kbd> starts a paragraph, <kbd>Shift</kbd>+<kbd>Enter</kbd> a line break; in a list <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> change the level.</li><li><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd>; <kbd>Ctrl</kbd>+<kbd>F</kbd> find, <kbd>Ctrl</kbd>+<kbd>H</kbd> replace.</li><li>Right-click a style (or Modify…) to change it; ticked styles are remembered in this browser.</li><li>Insert draws text boxes, lines, arrows, rectangles and pen strokes, saved as Word drawings.</li><li>The document is shown in pages. Double-click a header or footer (or Insert &gt; Header &amp; footer) to type in it; <kbd>Esc</kbd> goes back to the text.</li><li>Insert &gt; Page numbers: format (1, i, I, a, ๑…), text before, the total, the first number, and the page to start and stop on. Word works the numbers out when it opens the file.</li></ul>"};
         function barActions(root, p, { open, draft, download: dl, more = null, tips = '' }) {
             const on = (id, fn) => { const b = root.querySelector(`#${id}`); if (b) b.onclick = fn; };
             const h = root.querySelector(`#${p}-help`); if (h && tips) helpPop(h, tips);
@@ -1396,6 +1400,19 @@
         openBatchRename($('renameTool'), { download });
         bindOffice('xlsx', openXlsxEditor, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         bindOffice('docx', openDocxEditor, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+        // On a Mac (and an iPad with a keyboard) the shortcut key is ⌘: labels and tips say ⌘ where they say Ctrl (every
+        // shortcut already takes ⌘ or Ctrl). Tools draw their bars later, so new elements are put right as they appear.
+        if (/Mac|iPhone|iPad/.test(navigator.platform || '')) {
+            const mac = (v) => v.replace(/Ctrl\+Shift\+/g, '⇧⌘').replace(/Ctrl\/⌘/g, '⌘').replace(/Ctrl\s*\+\s*/g, '⌘');
+            const fix = (el) => { for (const a of ['title', 'aria-label']) { const v = el.getAttribute(a); if (v?.includes('Ctrl')) el.setAttribute(a, mac(v)); } };
+            const walk = (n) => {
+                if (n.nodeType !== 1) return;
+                fix(n); n.querySelectorAll('[title*="Ctrl"], [aria-label*="Ctrl"]').forEach(fix);
+                n.querySelectorAll('kbd').forEach((k) => { if (k.textContent === 'Ctrl') k.textContent = '⌘'; });
+            };
+            walk(document.body); new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach(walk))).observe(document.body, { childList: true, subtree: true });
+        }
 
         addEventListener('beforeunload', (e) => { if (editor?.isDirty() || office.xlsx?.isDirty() || office.docx?.isDirty() || md.isDirty()) e.preventDefault(); });
     </script>

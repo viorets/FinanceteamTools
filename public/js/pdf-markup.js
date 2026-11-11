@@ -9,7 +9,7 @@
 // Zoom: Ctrl/⌘ + mouse wheel, trackpad or finger pinch, or the − / + buttons. Pages are drawn only while near the
 // visible area, so long files and high zoom stay inside iPad Safari's canvas memory limit.
 import { normHex, pairHex } from './hex-color.js';
-import { fontStack, siteFont, textWriter } from './pdf-realtext.js';
+import { addFontFile, fontStack, loadUserFonts, siteFont, textWriter } from './pdf-realtext.js';
 import { damagedThai, madeByCanva, pageParagraphs } from './pdf-text.js';
 import { removeText } from './pdf-redact.js';
 import { ocrPage } from './pdf-ocr.js';
@@ -19,7 +19,10 @@ const PDFJS_BASE = Promise.withResolvers ? 'https://cdnjs.cloudflare.com/ajax/li
 const PDFJS = `${PDFJS_BASE}pdf.min.mjs`;
 const PDFJS_WORKER = `${PDFJS_BASE}pdf.worker.min.mjs`;
 const PDFLIB = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
-export const MAX_BYTES = 12 * 1024 * 1024; // marked files: 12 MB (decided 20 Oct)
+// Size: up to 100 MB; above 12 MB the page warns that iPad Safari may run short of memory and saving is slow
+// (decided 11 Nov 2026; was a 12 MB limit). The Feedback site passes its own maxBytes (12 MB, its upload limit).
+export const WARN_BYTES = 12 * 1024 * 1024;
+export const MAX_BYTES = 100 * 1024 * 1024;
 // Text box default (decided 20 Oct): LINE Seed Sans TH, 11 pt, #990000, clear background, no border.
 export const TEXT = { font: 'LINE Seed Sans TH', size: 11, color: '#990000', lineHeight: 1.35 };
 // Fonts a text box can use (js/pdf-realtext.js FACES: files and the fallback for letters a font lacks). All but
@@ -151,15 +154,18 @@ const exec = (cmd, v = null) => { try { return document.execCommand(cmd, false, 
 // Opens the editor in `root`. bytes: the PDF (ArrayBuffer); name: file name; draft: saved marks or null.
 // t(en, th) translates labels. Resolves an editor handle { marks(), isDirty(), exportPdf() }.
 // defaults (admin console, v2.13): { size, textColor, shapeColor, font } of new text boxes and shapes; TEXT where not given.
-export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) => en, onDraft = () => {}, onStatus = () => {}, defaults = {} }) {
+export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) => en, onDraft = () => {}, onStatus = () => {}, defaults = {}, maxBytes = MAX_BYTES }) {
   const textSize = defaults.size || TEXT.size;
-  const font0 = FONTS.includes(defaults.font) ? defaults.font : TEXT.font;
-  if (bytes.byteLength > MAX_BYTES) throw new Error(t('This file is over 12 MB, so it cannot be marked. Open it in Drive instead.', 'ไฟล์ใหญ่เกิน 12 MB จึงทำเครื่องหมายไม่ได้ กรุณาเปิดใน Drive'));
+  const userFonts = (await loadUserFonts()).filter((f) => !FONTS.includes(f)); // fonts added from this computer before
+  const fontOptions = (sel) => [...FONTS, ...userFonts].map((f) => `<option ${f === sel ? 'selected' : ''}>${f}</option>`).join('');
+  const font0 = FONTS.includes(defaults.font) || userFonts.includes(defaults.font) ? defaults.font : TEXT.font;
+  const limit = Math.round(maxBytes / 1048576);
+  if (bytes.byteLength > maxBytes) throw new Error(t(`This file is over ${limit} MB, so it cannot be marked. Open it in Drive instead.`, `ไฟล์ใหญ่เกิน ${limit} MB จึงทำเครื่องหมายไม่ได้ กรุณาเปิดใน Drive`));
   root.innerHTML = `<div class="mk" data-tool="select"><div class="mk-bar" role="toolbar" aria-label="${t('PDF tools', 'เครื่องมือ PDF')}">
       <div class="mk-tools">${TOOLS.map(([k, en, th]) => `<button type="button" data-tool="${k}" aria-pressed="false">${t(en, th)}</button>`).join('')}</div>
       <div class="mk-g mk-g-text">
         <div class="mk-fmt" role="group" aria-label="${t('Text format', 'รูปแบบตัวอักษร')}">${FMT.map(([cmd, , face, en, th]) => `<button type="button" data-fmt="${cmd}" aria-pressed="false" title="${t(en, th)}" aria-label="${t(en, th)}">${face}</button>`).join('')}</div>
-        <label class="mk-ctl">${t('Font', 'แบบอักษร')} <select id="mk-f">${FONTS.map((f) => `<option ${f === font0 ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
+        <label class="mk-ctl">${t('Font', 'แบบอักษร')} <select id="mk-f">${fontOptions(font0)}</select></label><button type="button" class="mk-addf" id="mk-addf" title="${t('Add a font from this computer (.ttf, .otf)', 'เพิ่มแบบอักษรจากเครื่องนี้ (.ttf, .otf)')}" aria-label="${t('Add a font from this computer', 'เพิ่มแบบอักษรจากเครื่องนี้')}">＋</button><input type="file" id="mk-ffile" accept=".ttf,.otf,font/ttf,font/otf" multiple hidden>
         <label class="mk-ctl">${t('Text size', 'ขนาดตัวอักษร')} <span><input type="number" id="mk-s" min="6" max="72" step="1" value="${textSize}"> pt</span></label>
       </div>
       <div class="mk-g mk-g-shape"><label class="mk-ctl">${t('Width', 'ความหนา')} <span><input type="range" id="mk-w" min="1" max="12" step="0.5" value="2"><output id="mk-wv">2</output></span></label></div>
@@ -412,6 +418,20 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const m = selMark(); if (m?.type === 'highlight') tweak(m, (x) => { x.opacity = st.hlOpacity; });
   };
   // Font: the picked text box, and every new one after it.
+  // "Add a font from this computer": .ttf/.otf files, kept in this browser only; a family's bold and italic files too.
+  $('#mk-addf').onclick = () => $('#mk-ffile').click();
+  $('#mk-ffile').onchange = async (e) => {
+    const files = [...e.target.files]; e.target.value = ''; let last = null;
+    for (const f of files) {
+      try {
+        const r = await addFontFile(f); last = r.family;
+        if (r.site) onStatus(t(`${r.family} is already one of the site's fonts.`, `${r.family} มีอยู่ในเว็บแล้ว`));
+        else { if (!FONTS.includes(r.family) && !userFonts.includes(r.family)) userFonts.push(r.family); onStatus(t(`Font added: ${r.family} (kept in this browser only)`, `เพิ่มแบบอักษรแล้ว: ${r.family} (เก็บไว้ในเบราว์เซอร์นี้เท่านั้น)`)); }
+      } catch (err) { onStatus(err.message); }
+    }
+    $('#mk-f').innerHTML = fontOptions(last || st.font);
+    if (last) $('#mk-f').dispatchEvent(new Event('change'));
+  };
   $('#mk-f').onchange = async (e) => {
     st.font = e.target.value;
     await loadFonts([st.font]);
@@ -672,8 +692,10 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
         : t('Reading this scanned page with OCR…', 'กำลังอ่านหน้าสแกนด้วย OCR…'));
       const items = await ocrPage(p.page, onStatus); p.scanned = !damaged; // a damaged page still has text to remove
       const read = await pageParagraphs(p.page, items);
-      onStatus(damaged ? t(`Page read by OCR: ${read.length} paragraphs to edit. Check names and figures.`, `อ่านหน้านี้ด้วย OCR แล้ว ${read.length} ย่อหน้า กรุณาตรวจชื่อและตัวเลข`)
-        : t(`Scanned page read by OCR: ${read.length} paragraphs to edit. Check names and figures.`, `อ่านหน้าสแกนแล้ว ${read.length} ย่อหน้า กรุณาตรวจชื่อและตัวเลข`));
+      const chk = (items.check || []).slice(0, 6).map(([w, s]) => (s ? `${w} (${s}?)` : w)).join(', ');
+      const more = chk ? t(` Words to check: ${chk}${items.check.length > 6 ? '…' : ''}.`, ` คำที่ควรตรวจ: ${chk}${items.check.length > 6 ? '…' : ''}`) : '';
+      onStatus((damaged ? t(`Page read by OCR: ${read.length} paragraphs to edit. Check names and figures.`, `อ่านหน้านี้ด้วย OCR แล้ว ${read.length} ย่อหน้า กรุณาตรวจชื่อและตัวเลข`)
+        : t(`Scanned page read by OCR: ${read.length} paragraphs to edit. Check names and figures.`, `อ่านหน้าสแกนแล้ว ${read.length} ย่อหน้า กรุณาตรวจชื่อและตัวเลข`)) + more);
       return read;
     } catch (err) { p.paras = null; onStatus(err.message); return own; }
   }

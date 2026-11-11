@@ -23,6 +23,7 @@
 .mk-bar button[aria-pressed="true"] { background: var(--primary, #006371); color: var(--on-primary, #fff); }
 .mk-bar button:disabled { opacity: .4; cursor: default; }
 .mk-bar button:focus-visible { outline: 2px solid var(--accent, #2babc2); outline-offset: 1px; }
+.mk-bar .mk-addf { padding: 6px 12px; min-width: 40px; } /* add a font from this computer */
 @media (hover: hover) { .mk-tools button:hover:not([aria-pressed="true"]) { background: var(--border, rgba(43, 171, 194, .18)); } }
 .mk-grow { flex: 1; }
 .mk-bar .vt-zoom button, .mk-bar .vt-acts button { border-radius: 10px; padding: 0; }

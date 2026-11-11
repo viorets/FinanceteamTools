@@ -3,6 +3,8 @@
 // pdf.js-like text items in PDF units, so js/pdf-text.js builds paragraphs, lists and tables from them as usual.
 // Engine (public/vendor/ort/) and models (public/models/ocr/) are served from this site and load on first use only.
 
+import { fixThai, loadWords } from './thai-check.js';
+
 const ORT = new URL('../vendor/ort/', import.meta.url).href; // onnxruntime-web 1.20.1, served from this site
 const MODELS = new URL('../models/ocr/', import.meta.url).href;
 const MAX_SIDE = 1600; // detection input, longest side (px)
@@ -70,7 +72,12 @@ export async function ocrPage(page, onProgress = () => {}) {
     const y = mid(ln.map((r) => r.mid)) - size * 0.39;
     ln.forEach((r) => { r.size = size; r.y = y; });
   }
-  return read.map((r) => ({ str: r.str, transform: [r.size, 0, 0, r.size, r.x, r.y], width: r.w, height: r.size, fontName: 'ocr' }));
+  // Each line's Thai is checked against the word list: a word missing one mark is put right; words close to real ones
+  // but not changed are returned in items.check ([word, suggestion]) for the user to look at.
+  let dict = null; try { dict = await loadWords(); } catch { /* no word list: the lines stay as read */ }
+  const check = []; let fixed = 0;
+  const items = read.map((r) => { const f = fixThai(r.str, dict); fixed += f.fixed.length; check.push(...f.unsure); return { str: f.text, transform: [r.size, 0, 0, r.size, r.x, r.y], width: r.w, height: r.size, fontName: 'ocr' }; });
+  return Object.assign(items, { check, fixed });
 }
 const mid = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 
