@@ -22,6 +22,7 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 - Wide sheets (such as Google Form responses): Word tables hold at most 63 columns and only about 15 fit a page readably, so by default a sheet that is too wide becomes one block per row (question | answer, blank answers left out); or choose to split the columns into several tables
 
 ### Appearance and chart colours
+- Titles (the site name, section titles and empty-state titles) are in the CI gradient as on Feedback: `#006371` → `#2babc2`, lighter cyan in dark
 - Side navigation (top): Light, Dark or Follow device for the site. Dark follows [TUSU Finance Feedback](https://tusu-budget-pitching-feedback.web.app): a deep navy page with a slight blue gradient, dark teal-grey panels, light-teal labels and cyan focus rings
 - Filled controls (main buttons, the open tool, selected tabs and toggles, dialog OK buttons) use the Budget Pitching site's teal-to-cyan gradient (`#006371` → `#0097b2`) with white text, in both light and dark
 - Chart colours: TUSU Finance (the team CI, Mosaic Blue #00758F; default), TUSU Finance CI (the internal deck's teals #006371, #077989, #2babc2, #5f9aa3, ice #e8f9ff), 7 team palettes (Sakura Dusk, Midnight Violet, Old Rose, Mulled Wine, Winter Dawn, Autumn Harvest, Kombu Moss) and 10 theme-factory themes, shown as colour strips; they set the default colours of the charts, Gantt chart and Word tables
@@ -110,7 +111,8 @@ The editor came from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinanc
 - Tick a checkbox in the preview to tick the task in the text
 - **Edit on the formatted page too**: type, press Enter, or use Bold, Italic, Strikethrough, Code, headings, lists, quote and link from the ribbon. After a short pause only the changed blocks become Markdown again (Turndown), so the rest of the text keeps its exact spelling; Undo works on both sides. In tables Enter stays in the cell and Tab moves to the next one; an edited table or list is rewritten in standard Markdown (`-` bullets, `| --- |` dividers)
 - Click anywhere on the formatted page and the cursor in the text moves to the same place (in a table, the same cell)
-- **Save draft** keeps the text in this browser by file name; **Download as** Markdown, a web page (.html), Word (.doc) or PDF (print); full screen keeps Save draft and Download in the toolbar
+- **Save draft** keeps the text in this browser by file name; **Download as** Markdown, a web page (.html), Word (.docx: headings, bold and italic, bullet and numbered lists, task items as ☐/☑, tables) or PDF (print); full screen keeps Save draft and Download in the toolbar
+- **Save as…** (File tab): Chrome and Edge ask for the folder and file name; other browsers download the file and say so
 - Markdown is converted by [marked](https://marked.js.org/) (GitHub-flavoured) and cleaned by [DOMPurify](https://github.com/cure53/DOMPurify) before it is shown
 
 ## Pros and cons at a glance
@@ -122,7 +124,7 @@ The editor came from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinanc
 | PDF editing | Edit the PDF's own text (old words removed, Thai shaped); Thai rich text boxes, highlights, shapes, drafts, full screen; PDF text to Word or Markdown with tables and Thai repairs | Edited text does not move the text below; on scans, OCR can misread; no form filling; 100 MB limit (slow above 12 MB on iPad); OCR is slower and can miss small tone marks; slides and posters convert roughly; a lone lost tone mark that leaves a real word (เสี่ยง → เสียง) is not detected |
 | Gantt Chart Creator | Quick Gantt or timeline from typed tasks or Excel; PNG/SVG match the preview | No dependencies or critical path; tasks stay in this browser |
 | Excel editing (beta) | Excel-like ribbon, live formulas, no size limit, Format as table, many export formats | Charts, images and pivot tables are dropped; filtered-out rows hidden on screen only |
-| Markdown editing | Fast writing with a live preview; Excel ranges paste as tables; .md, .html, Word, PDF downloads | PDF goes through the print window; images must be web addresses (no upload); Word file is .doc (web format) |
+| Markdown editing | Fast writing with a live preview; Excel ranges paste as tables; .md, .html, Word, PDF downloads | PDF goes through the print window; images must be web addresses (no upload); the Word file keeps structure, not colours, links or images; Save as needs Chrome or Edge |
 | Word editing (beta) | Document in its own formatting, safe text edits, custom styles, TOC with leaders; pages, headers and footers, page numbers | Pages break only between paragraphs and table rows; fields other than PAGE, NUMPAGES, IF and = show their last result; editing formatting near links or fields rebuilds the paragraph |
 
 Everything runs in the browser and needs the internet for its libraries. Drafts, saved styles and Gantt tasks live in this browser only; clearing the site's data deletes them. The full list is in the plan doc's "Pros and cons" tab.
