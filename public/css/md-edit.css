@@ -10,7 +10,7 @@
 .md-src { box-sizing: border-box; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 20px 22px; resize: none; border: 1px solid var(--border-strong); border-radius: 12px;
   background: var(--surface); color: var(--ink); font: calc(15px * var(--md-z)) / 1.6 ui-monospace, "SF Mono", Menlo, Consolas, "Noto Sans Thai", monospace; tab-size: 2; outline: none; }
 .md-src:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
-.md-prev { min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #fff; } /* white paper in both modes */
+.md-prev { min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #fff; color-scheme: light; } /* white paper; dark below */
 .md-prev .md-doc { font-size: calc(16px * var(--md-z)); }
 .md-prev .md-doc li > input[type="checkbox"] { cursor: pointer; }
 .md-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 4px 6px 0; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
@@ -27,4 +27,35 @@
   #md-v-split { display: none; }
   .md-panes[data-view="split"] { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
   .md-prev .md-doc { padding: 24px 20px; }
+}
+
+/* Dark mode: the preview follows the site on screen (Feedback's dark colours). Downloads and print keep the white
+   page (their styles come from the module). */
+:root[data-mode="dark"] .md-prev { background: #1b2124; color-scheme: dark; }
+:root[data-mode="dark"] .md-prev .md-doc { background: #1b2124; color: #e3e9eb; }
+:root[data-mode="dark"] .md-prev .md-doc :is(h1, h2, h3, h4) { color: #7fd8e5; }
+:root[data-mode="dark"] .md-prev .md-doc h1 { border-bottom-color: #2babc2; }
+:root[data-mode="dark"] .md-prev .md-doc h2, :root[data-mode="dark"] .md-prev .md-doc hr { border-color: #2c4a50; }
+:root[data-mode="dark"] .md-prev .md-doc a { color: #4cc6d9; }
+:root[data-mode="dark"] .md-prev .md-doc blockquote { background: rgba(76, 198, 217, .08); border-left-color: #2c4a50; color: #a3adb1; }
+:root[data-mode="dark"] .md-prev .md-doc code { background: #1f2b2e; color: #e3e9eb; }
+:root[data-mode="dark"] .md-prev .md-doc pre { background: #0d1214; }
+:root[data-mode="dark"] .md-prev .md-doc pre code { background: none; }
+:root[data-mode="dark"] .md-prev .md-doc :is(th, td) { border-color: #2c4a50; }
+:root[data-mode="dark"] .md-prev .md-doc th { background: #0b7f8f; }
+:root[data-mode="dark"] .md-prev .md-doc tr:nth-child(even) td { background: rgba(76, 198, 217, .06); }
+@media (prefers-color-scheme: dark) {
+  :root[data-mode="auto"] .md-prev { background: #1b2124; color-scheme: dark; }
+  :root[data-mode="auto"] .md-prev .md-doc { background: #1b2124; color: #e3e9eb; }
+  :root[data-mode="auto"] .md-prev .md-doc :is(h1, h2, h3, h4) { color: #7fd8e5; }
+  :root[data-mode="auto"] .md-prev .md-doc h1 { border-bottom-color: #2babc2; }
+  :root[data-mode="auto"] .md-prev .md-doc h2, :root[data-mode="auto"] .md-prev .md-doc hr { border-color: #2c4a50; }
+  :root[data-mode="auto"] .md-prev .md-doc a { color: #4cc6d9; }
+  :root[data-mode="auto"] .md-prev .md-doc blockquote { background: rgba(76, 198, 217, .08); border-left-color: #2c4a50; color: #a3adb1; }
+  :root[data-mode="auto"] .md-prev .md-doc code { background: #1f2b2e; color: #e3e9eb; }
+  :root[data-mode="auto"] .md-prev .md-doc pre { background: #0d1214; }
+  :root[data-mode="auto"] .md-prev .md-doc pre code { background: none; }
+  :root[data-mode="auto"] .md-prev .md-doc :is(th, td) { border-color: #2c4a50; }
+  :root[data-mode="auto"] .md-prev .md-doc th { background: #0b7f8f; }
+  :root[data-mode="auto"] .md-prev .md-doc tr:nth-child(even) td { background: rgba(76, 198, 217, .06); }
 }
