@@ -122,6 +122,7 @@ export function pageNav(root, p, scroller, pages) {
   inp.addEventListener('blur', show);
   prev.onclick = () => go(current() - 1); next.onclick = () => go(current() + 1);
   show();
+  show.current = current; // the page at the top (index)
   return show;
 }
 

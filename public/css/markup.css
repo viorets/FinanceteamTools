@@ -31,6 +31,13 @@
 /* Controls for the tool in use: text, highlight, shape (data-mode, set by the editor). */
 .mk-g { display: none; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .mk[data-mode="text"] :is(.mk-g-text, .mk-g-color, .mk-g-hl), .mk[data-mode="highlight"] .mk-g-hl, .mk[data-mode="shape"] :is(.mk-g-shape, .mk-g-color) { display: flex; }
+/* Tables: the table group, and the font and text size (the text formatting buttons are for text boxes). */
+.mk[data-mode="table"] :is(.mk-g-table, .mk-g-text) { display: flex; }
+.mk[data-mode="table"] .mk-g-text :is(.mk-fmt, .mk-list, .mk-align) { display: none; }
+.mk-topts { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+.mk-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2, #3a3a3c); min-height: 40px; }
+.mk-chk input { width: 18px; height: 18px; accent-color: var(--primary, #006371); }
+.mk-trc { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 /* "Highlight selection" (touch and Pencil select first): only with the Highlight tool. */
 .mk:not([data-tool="highlight"]) .mk-hl-btn { display: none; }
 .mk-ctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2, #3a3a3c); }
@@ -90,6 +97,17 @@
 .mk-box.on, .mk-box.editing { outline: 1px dashed #2babc2; outline-offset: 2px; } /* only on screen; never in the saved file */
 .mk[data-tool="text"] .mk-box { cursor: text; }
 .mk .mk-box.editing { cursor: text; -webkit-user-select: text; user-select: text; touch-action: auto; }
+/* Tables on the page: cells laid out like the Excel to Word table (js/word-table.js); only on screen the outline. */
+.mk-table { position: absolute; pointer-events: auto; cursor: move; -webkit-user-select: none; user-select: none; }
+.mk-table table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.mk-table td { vertical-align: top; overflow-wrap: anywhere; }
+.mk-tc { min-height: 1lh; white-space: pre-wrap; outline: none; }
+.mk-table.on, .mk-table.editing { outline: 1px dashed #2babc2; outline-offset: 3px; }
+.mk .mk-table.editing { cursor: text; }
+.mk .mk-table.editing .mk-tc { cursor: text; -webkit-user-select: text; user-select: text; touch-action: auto; }
+.mk-table.editing .mk-tc:focus { box-shadow: inset 0 0 0 2px rgba(43, 171, 194, .6); }
+.mk[data-tool=select] .mk-table, .mk[data-tool=table] .mk-table:not(.editing) { touch-action: none; }
+.mk[data-tool="table"] .mk-page { cursor: copy; }
 
 /* pdf.js text layer: invisible text over the page, selectable only with the Highlight tool. */
 .textLayer { position: absolute; inset: 0; overflow: hidden; line-height: 1; opacity: 1; pointer-events: none; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; z-index: 1; }

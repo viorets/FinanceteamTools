@@ -11,6 +11,8 @@
 import { normHex, pairHex } from './hex-color.js';
 import { addFontFile, fontStack, loadUserFonts, siteFont, textWriter } from './pdf-realtext.js';
 import { damagedThai, madeByCanva, pageParagraphs } from './pdf-text.js';
+import { currentTheme } from './themes.js';
+import { STYLES as TABLE_STYLES, looks } from './word-table.js';
 // pdf-redact.js (Edit text) and pdf-ocr.js (scanned pages) load only when used: the Feedback site leaves both out.
 import { ICON, clampZoom, floatBar, fullScreen, iconBtn, pageNav, pinchZoom, viewBar, zoomAround } from './view-tools.js';
 
@@ -33,11 +35,17 @@ const HIGHLIGHT = '#ffe14d';
 const HL_OPACITY = 0.45; // highlights from older drafts have no colour or opacity: these
 const MAX_CANVAS_PX = 8e6; // pixels per page canvas (iPad Safari: 16.7M per canvas, ~384 MB for all canvases)
 // Typed arrows: the text before the caret is replaced when ">" is typed. "—>" is "-->" after iPad smart punctuation.
+const ADD_PAGE_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6M9 14h6"/></svg>';
+// Tables (12 Nov 2026): the Excel to Word table tool's styles and Table Style Options (js/word-table.js).
+const TABLE_OPTS = [['header', 'Header row', 'แถวหัวตาราง'], ['total', 'Total row', 'แถวผลรวม'], ['bandRows', 'Banded rows', 'แถวสลับสี'], ['first', 'First column', 'คอลัมน์แรก']];
+const TABLE_RC = [['row+', '+ Row', '+ แถว'], ['row-', '− Row', '− แถว'], ['col+', '+ Column', '+ คอลัมน์'], ['col-', '− Column', '− คอลัมน์']];
+const TABLE_O = { style: 'grid4', header: true, total: false, bandRows: true, first: false, last: false, bandCols: false, alignNum: true };
+const PLAIN = (() => { const d = document.createElement('div'); d.contentEditable = 'plaintext-only'; return d.contentEditable === 'plaintext-only' ? 'plaintext-only' : 'true'; })();
 const RESET_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="m9.5 9.5 5 5M14.5 9.5l-5 5"/></svg>';
 const ARROWS = { '-->': '→', '==>': '➜', '—>': '→' };
 const TOOLS = [
   ['select', 'Select', 'เลือก'], ['edit', 'Edit text', 'แก้ข้อความ'], ['text', 'Text box', 'กล่องข้อความ'], ['highlight', 'Highlight', 'ไฮไลต์'],
-  ['pen', 'Draw', 'วาด'], ['line', 'Line', 'เส้น'], ['arrow', 'Arrow', 'ลูกศร'], ['rect', 'Rectangle', 'สี่เหลี่ยม'],
+  ['pen', 'Draw', 'วาด'], ['line', 'Line', 'เส้น'], ['arrow', 'Arrow', 'ลูกศร'], ['rect', 'Rectangle', 'สี่เหลี่ยม'], ['table', 'Table', 'ตาราง'],
 ];
 // Text formats: [execCommand name, run key, button face, English, Thai]
 const FMT = [
@@ -218,13 +226,19 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       </div>
       <div class="mk-g mk-g-shape"><label class="mk-ctl">${t('Width', 'ความหนา')} <span><input type="range" id="mk-w" min="1" max="12" step="0.5" value="2"><output id="mk-wv">2</output></span></label></div>
       <div class="mk-g mk-g-color"><label class="mk-ctl">${t('Colour', 'สี')} <span><input type="color" id="mk-c" value="${defaults.shapeColor || TEXT.color}"></span></label><span class="mk-recent" role="group" aria-label="${t('Recent colours', 'สีที่ใช้ล่าสุด')}"></span></div>
+      <div class="mk-g mk-g-table">
+        <label class="mk-ctl">${t('Table style', 'รูปแบบตาราง')} <select id="mk-tst">${TABLE_STYLES.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}</select></label>
+        <span class="mk-topts">${TABLE_OPTS.map(([k, en, th]) => `<label class="mk-chk"><input type="checkbox" data-topt="${k}"> ${t(en, th)}</label>`).join('')}</span>
+        <label class="mk-ctl">${t('Accent', 'สีหลัก')} <span><input type="color" id="mk-ta"></span></label>
+        <span class="mk-trc" role="group" aria-label="${t('Rows and columns', 'แถวและคอลัมน์')}">${TABLE_RC.map(([k, en, th]) => `<button type="button" data-trc="${k}">${t(en, th)}</button>`).join('')}</span>
+      </div>
       <div class="mk-g mk-g-hl">
         <button type="button" id="mk-hl" class="mk-hl-btn">${t('Highlight selection', 'ไฮไลต์ข้อความที่เลือก')}</button>
         <label class="mk-ctl">${t('Highlight colour', 'สีไฮไลต์')} <span><input type="color" id="mk-hc" value="${HIGHLIGHT}"></span></label>
         <label class="mk-ctl">${t('Opacity', 'ความทึบ')} <span><input type="range" id="mk-o" min="10" max="100" step="5" value="${HL_OPACITY * 100}"><output id="mk-ov">${HL_OPACITY * 100}%</output></span></label>
       </div>
       <span class="mk-grow"></span>
-      ${viewBar('mk', t, { open: true, help: true, pages: true })}${iconBtn('mk-reset', t('Reset edits: remove every mark (Undo brings them back)', 'ล้างการแก้ไข: ลบเครื่องหมายทั้งหมด (เลิกทำเพื่อนำกลับมา)'), RESET_ICON)}
+      ${viewBar('mk', t, { open: true, help: true, pages: true })}${iconBtn('mk-addpage', t('Add a blank page after this one (the same size)', 'เพิ่มหน้าว่างต่อจากหน้านี้ (ขนาดเดียวกัน)'), ADD_PAGE_ICON)}${iconBtn('mk-reset', t('Reset edits: remove every mark (Undo brings them back)', 'ล้างการแก้ไข: ลบเครื่องหมายทั้งหมด (เลิกทำเพื่อนำกลับมา)'), RESET_ICON)}
       <span class="mk-emode" role="group" aria-label="${t('New text in Edit text', 'ข้อความใหม่ในการแก้ข้อความ')}"><button type="button" data-emode="edit" title="${t('New text takes the format of the paragraph', 'ข้อความใหม่ใช้รูปแบบเดิมของย่อหน้า')}">${t('Edit', 'แก้ไข')}</button><button type="button" data-emode="markup" title="${t('New text takes your text colour, so the changes stand out', 'ข้อความใหม่ใช้สีข้อความของคุณ ให้เห็นการแก้ไขชัด')}">${t('Markup', 'มาร์กอัป')}</button></span>
       <p class="mk-caution" role="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>${t('Edit text: the text below an edit does not move. A longer edit can overlap it (amber outline); a shorter one leaves a gap.', 'แก้ข้อความ: ข้อความด้านล่างจะไม่เลื่อนตาม ถ้าแก้ให้ยาวขึ้นอาจทับข้อความด้านล่าง (กรอบสีส้ม) ถ้าสั้นลงจะเหลือช่องว่าง')}</span></p>
     </div><div class="mk-pages" id="mk-pages"><p class="mk-wait">${t('Loading…', 'กำลังโหลด…')}</p></div></div>`;
@@ -256,12 +270,11 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     p.el.style.setProperty('--scale-factor', p.scale);
   };
 
-  for (let n = 1; n <= doc.numPages; n++) {
-    const page = await doc.getPage(n);
-    const base = page.getViewport({ scale: 1 });
+  // A page on screen. page: the PDF's page (pdf.js), or null for a blank page added here.
+  function makePage(base, page) {
     const fit = Math.min(1.6, avail() / base.width);
     const el = document.createElement('div');
-    el.className = 'mk-page'; el.dataset.page = n - 1;
+    el.className = 'mk-page'; el.dataset.page = pages.length;
     const canvas = document.createElement('canvas');
     const text = document.createElement('div'); text.className = 'textLayer';
     const mkSvg = (cls) => { const s = svgEl('svg', { viewBox: `0 0 ${base.width} ${base.height}` }); s.classList.add(cls); return s; };
@@ -269,14 +282,20 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const boxes = document.createElement('div'); boxes.className = 'mk-boxes';
     el.append(canvas, hls, text, svg, boxes);
     pagesEl.append(el);
-    const p = { el, canvas, hls, svg, boxes, text, page, base, fit, scale: fit, w: base.width, h: base.height, gen: 0, done: null, near: false, task: null };
-    size(p); pages.push(p);
+    const p = { el, canvas, hls, svg, boxes, text, page, base, fit, scale: fit * st.zoom, w: base.width, h: base.height, gen: 0, done: null, near: false, task: null };
+    size(p); return p;
+  }
+  const orig = []; // the PDF's own pages, in order
+  for (let n = 1; n <= doc.numPages; n++) {
+    const page = await doc.getPage(n);
+    const p = makePage(page.getViewport({ scale: 1 }), page); orig.push(p); pages.push(p);
   }
 
   // ---------- drawing pages (only near the visible area) ----------
   let queue = Promise.resolve();
   async function renderPage(p) {
     if (!p.near || p.done === p.scale) return;
+    if (!p.page) { p.done = p.scale; return; } // an added blank page: white paper, nothing to draw
     const gen = ++p.gen; const scale = p.scale;
     const vp = p.page.getViewport({ scale });
     const k = Math.min(window.devicePixelRatio || 1, Math.sqrt(MAX_CANVAS_PX / (vp.width * vp.height)));
@@ -300,6 +319,25 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     if (p.near) want(p); else drop(p);
   }), { root: pagesEl, rootMargin: '150% 0px' });
   pages.forEach((p) => io.observe(p.el));
+  // Added pages are marks { id, type: 'page', page, w, h } (so drafts, Undo and Reset keep them): page is its place in
+  // the document. The PDF's own pages fill the other places in order.
+  const blanks = new Map(); let pageKey = '';
+  function syncPages() {
+    const adds = st.marks.filter((m) => m.type === 'page').sort((a, b) => a.page - b.page);
+    const key = adds.map((m) => `${m.id}:${m.page}`).join(); if (key === pageKey) return; pageKey = key;
+    const list = new Array(orig.length + adds.length).fill(null);
+    adds.forEach((m) => {
+      let p = blanks.get(m.id);
+      if (!p) { p = makePage({ width: m.w, height: m.h }, null); blanks.set(m.id, p); io.observe(p.el); }
+      list[Math.min(m.page, list.length - 1)] = p;
+    });
+    let k = 0; list.forEach((p, i) => { if (!p) list[i] = orig[k++]; });
+    blanks.forEach((p, id) => { if (!adds.some((m) => m.id === id)) { io.unobserve(p.el); p.el.remove(); blanks.delete(id); } });
+    pages.length = 0; pages.push(...list.filter(Boolean));
+    pages.forEach((p, i) => { p.el.dataset.page = i; pagesEl.append(p.el); });
+    nav?.();
+  }
+  let nav = null; // the page box (set below)
   let renderTimer = 0;
   const rerender = () => { clearTimeout(renderTimer); renderTimer = setTimeout(() => pages.forEach((p) => p.near && want(p)), 160); };
 
@@ -312,6 +350,24 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   const changed = () => { st.dirty = true; onDraft(st.marks); paint(); };
   const selMark = () => st.marks.find((x) => x.id === st.sel);
   const editingBox = () => root.querySelector('.mk-box.editing');
+  const editingTable = () => root.querySelector('.mk-table.editing');
+  // A table on screen: the cells' looks come from the table tool's style (js/word-table.js looks), sized in page units.
+  function tableEl(m, p) {
+    const s = p.scale; const el = document.createElement('div');
+    el.className = `mk-table${st.sel === m.id ? ' on' : ''}`; el.dataset.id = m.id;
+    el.style.cssText = `left:${m.x * s}px;top:${m.y * s}px;width:${m.w * s}px;font-family:${fontStack(fontOf(m))};font-size:${m.size * s}px;line-height:${TEXT.lineHeight}`;
+    const tb = document.createElement('table');
+    const border = (css) => { const b = css && /([\d.]+)pt (\w+) (#[0-9a-f]{6})/i.exec(css); return b ? `${Math.max(0.5, +b[1] * s)}px ${b[2]} ${b[3]}` : 'none'; };
+    looks(m.rows, m.o).forEach((row, r) => {
+      const tr = tb.insertRow();
+      row.forEach((x, c) => {
+        const td = tr.insertCell(); td.dataset.r = r; td.dataset.c = c;
+        td.style.cssText = `border-top:${border(x.b[0])};border-right:${border(x.b[1])};border-bottom:${border(x.b[2])};border-left:${border(x.b[3])};${x.bg ? `background:${x.bg};` : ''}color:${x.color};font-weight:${x.bold ? 700 : 400};${x.caps ? 'text-transform:uppercase;' : ''}text-align:${x.align};padding:${2 * s}px ${5.4 * s}px`;
+        const d = document.createElement('div'); d.className = 'mk-tc'; d.dataset.r = r; d.dataset.c = c; d.textContent = x.text; td.append(d);
+      });
+    });
+    el.append(tb); return el;
+  }
   // Open arrow head like ←: two strokes from the tip, 30° either side, drawn with the line's own width and round ends.
   const arrowHead = (a, b, w) => {
     const ang = Math.atan2(b[1] - a[1], b[0] - a[0]); const L = 7 + w * 2.6; const s = Math.PI / 6;
@@ -326,9 +382,11 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     if (m.type === 'highlight') m.rects.forEach(([x, y, w, h]) => g.append(svgEl('rect', { x, y, width: w, height: h, fill: m.color || HIGHLIGHT, 'fill-opacity': m.opacity ?? HL_OPACITY, class: 'mk-hl' })));
   }
   function paint() {
+    syncPages();
     pages.forEach((p, i) => {
       p.svg.replaceChildren(); p.hls.replaceChildren(); p.boxes.replaceChildren();
-      st.marks.filter((m) => m.page === i).forEach((m) => {
+      st.marks.filter((m) => m.page === i && m.type !== 'page').forEach((m) => {
+        if (m.type === 'table') { p.boxes.append(tableEl(m, p)); return; }
         if (m.type === 'text') {
           const b = document.createElement('div');
           b.className = `mk-box${st.sel === m.id ? ' on' : ''}`; b.dataset.id = m.id;
@@ -366,6 +424,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   // Which controls show: text (text tool, a picked or open text box), highlight, shape, or none.
   function mode() {
     const m = selMark();
+    if (st.tool === 'table' || m?.type === 'table' || editingTable()) return 'table';
     if (st.tool === 'text' || st.tool === 'edit' || m?.type === 'text' || editingBox()) return 'text';
     if (st.tool === 'highlight' || m?.type === 'highlight') return 'highlight';
     if (m || ['pen', 'line', 'arrow', 'rect'].includes(st.tool)) return 'shape';
@@ -377,7 +436,8 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const m = selMark();
     mk.dataset.mode = mode();
     $('#mk-del').disabled = !st.sel;
-    if (m?.type === 'text') { $('#mk-s').value = m.size; $('#mk-f').value = fontOf(m); } // the picked text box's size and font
+    if (m?.type === 'text' || m?.type === 'table') { $('#mk-s').value = m.size; $('#mk-f').value = fontOf(m); } // the picked box's size and font
+    showTableOpts();
     $('#mk-c').value = m && m.type !== 'highlight' && m.color ? m.color : textMode() ? st.textColor : st.shapeColor; syncC(); showRecent();
     $('#mk-hc').value = m?.type === 'highlight' ? m.color || HIGHLIGHT : st.hlColor; syncHC();
     const op = Math.round((m?.type === 'highlight' ? m.opacity ?? HL_OPACITY : st.hlOpacity) * 100);
@@ -523,6 +583,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     e.target.value = v; st.size = v;
     const m = selMark();
     if (m?.type === 'text' && m.size !== v) { snapshot(); m.size = v; changed(); }
+    if (m?.type === 'table' && m.size !== v) tableChange((x) => { x.size = v; });
   };
   $('#mk-c').oninput = (e) => {
     const v = e.target.value;
@@ -575,6 +636,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     await loadFonts([st.font]);
     const m = selMark();
     if (m?.type === 'text' && fontOf(m) !== st.font) { snapshot(); m.font = st.font; changed(); }
+    if (m?.type === 'table' && fontOf(m) !== st.font) tableChange((x) => { x.font = st.font; });
   };
   const undo = () => { editingBox()?.blur(); if (!st.undo.length) return; st.redo.push(JSON.stringify(st.marks)); st.marks = JSON.parse(st.undo.pop()); st.sel = null; changed(); };
   const redo = () => { editingBox()?.blur(); if (!st.redo.length) return; st.undo.push(JSON.stringify(st.marks)); st.marks = JSON.parse(st.redo.pop()); st.sel = null; changed(); };
@@ -582,6 +644,98 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   // Reset edits (from TUSUFinanceFeedback v2.16): every mark goes in one step; Undo brings them back.
   const reset = () => { editingBox()?.blur(); if (!st.marks.length) return; snapshot(); st.marks = []; st.sel = null; changed(); };
   $('#mk-undo').onclick = undo; $('#mk-redo').onclick = redo; $('#mk-del').onclick = del; $('#mk-reset').onclick = reset;
+
+  // ---------- tables ----------
+  // Table tool: tap the page for a 3 × 4 table (the header row on top), tap a table to type in its cells; in Select,
+  // double-tap it. Tab goes to the next cell; cells pasted from Excel (tab-separated) fill the table from the cell
+  // with the caret, adding rows and columns as needed. Style, options and accent are kept for the next table.
+  function tableO() { try { return { ...TABLE_O, ...JSON.parse(localStorage.getItem('mk-table') || '{}') }; } catch { return { ...TABLE_O }; } }
+  function markOf(el) { return st.marks.find((x) => x.id === el?.dataset.id); }
+  const readCells = (el, m) => el.querySelectorAll('.mk-tc').forEach((d) => { m.rows[+d.dataset.r][+d.dataset.c] = d.innerText.replace(/\n$/, ''); });
+  function editTable(p, id, [r, c] = [0, 0], undoStep = true) {
+    const el = p.boxes.querySelector(`[data-id="${id}"]`); if (!el || el.classList.contains('editing')) return;
+    if (undoStep) snapshot();
+    el.classList.add('editing'); mk.dataset.mode = 'table'; showTableOpts();
+    const cells = [...el.querySelectorAll('.mk-tc')];
+    cells.forEach((d) => { d.contentEditable = PLAIN; d.spellcheck = false; });
+    const d = el.querySelector(`.mk-tc[data-r="${r}"][data-c="${c}"]`) || cells[0];
+    d.focus({ preventScroll: true }); const rg = document.createRange(); rg.selectNodeContents(d); rg.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+    el.onkeydown = (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault(); const i = cells.indexOf(document.activeElement); const n = cells[i + (e.shiftKey ? -1 : 1)];
+        if (n) { n.focus(); const x = document.createRange(); x.selectNodeContents(n); sel.removeAllRanges(); sel.addRange(x); }
+        else if (!e.shiftKey) tableChange((m) => { m.rows.push(m.rows[0].map(() => '')); }, [m0().rows.length, 0]); // Tab in the last cell: a new row
+      } else if (e.key === 'Escape') { e.preventDefault(); document.activeElement.blur(); }
+    };
+    const m0 = () => markOf(el);
+    el.onpaste = (e) => {
+      const cell = e.target.closest?.('.mk-tc') || document.activeElement?.closest?.('.mk-tc'); if (!cell) return;
+      e.preventDefault(); const tx = (e.clipboardData?.getData('text/plain') || '').replace(/\r/g, '').replace(/\n$/, '');
+      if (!/[\t\n]/.test(tx)) { exec('insertText', tx); return; }
+      const grid = tx.split('\n').map((l) => l.split('\t')); const r0 = +cell.dataset.r; const c0 = +cell.dataset.c;
+      tableChange((m) => {
+        const nC = Math.max(m.rows[0].length, c0 + Math.max(...grid.map((g) => g.length)));
+        while (m.rows.length < r0 + grid.length) m.rows.push([]);
+        m.rows = m.rows.map((row) => Array.from({ length: nC }, (_, i) => row[i] ?? ''));
+        grid.forEach((g, i) => g.forEach((v, j) => { m.rows[r0 + i][c0 + j] = v; }));
+      }, [r0, c0]);
+    };
+    el.addEventListener('focusout', (e) => {
+      if (el.contains(e.relatedTarget)) return;
+      setTimeout(() => { if (!el.isConnected || el.contains(document.activeElement) || !el.classList.contains('editing')) return; closeTable(el); }, 0);
+    });
+  }
+  function closeTable(el) {
+    const m = markOf(el); el.classList.remove('editing'); el.querySelectorAll('.mk-tc').forEach((d) => { d.contentEditable = 'false'; });
+    if (m) readCells(el, m); changed();
+  }
+  // A change to the picked or open table (one undo step; an open table stays open at cell rc, or where the caret was).
+  function tableChange(fn, rc = null) {
+    const el = editingTable(); const m = el ? markOf(el) : selMark()?.type === 'table' ? selMark() : null; if (!m) return;
+    const at = document.activeElement?.closest?.('.mk-tc'); const keep = rc || (at ? [+at.dataset.r, +at.dataset.c] : [0, 0]);
+    if (el) { readCells(el, m); el.classList.remove('editing'); } else snapshot();
+    fn(m); changed();
+    if (el) { const p = pages[m.page]; editTable(p, m.id, [Math.min(keep[0], m.rows.length - 1), Math.min(keep[1], m.rows[0].length - 1)], false); }
+  }
+  function showTableOpts() {
+    const m = editingTable() ? markOf(editingTable()) : selMark()?.type === 'table' ? selMark() : null; const o = m ? m.o : tableO();
+    $('#mk-tst').value = o.style; root.querySelectorAll('[data-topt]').forEach((b) => { b.checked = !!o[b.dataset.topt]; });
+    $('#mk-ta').value = o.accent || currentTheme().chart[0];
+    root.querySelectorAll('[data-trc]').forEach((b) => { b.disabled = !m; });
+  }
+  const setOpt = (k, v) => {
+    try { localStorage.setItem('mk-table', JSON.stringify({ ...tableO(), [k]: v })); } catch { /* not kept */ }
+    if (editingTable() || selMark()?.type === 'table') tableChange((m) => { m.o = { ...m.o, [k]: v }; }); else showTableOpts();
+  };
+  $('#mk-tst').onchange = (e) => setOpt('style', e.target.value);
+  root.querySelectorAll('[data-topt]').forEach((b) => { b.onchange = () => setOpt(b.dataset.topt, b.checked); });
+  $('#mk-ta').onchange = (e) => setOpt('accent', e.target.value);
+  const tGroup = $('.mk-g-table');
+  tGroup.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) e.preventDefault(); }); // keep the caret in the cell
+  tGroup.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
+  tGroup.addEventListener('click', (e) => {
+    const k = e.target.closest('[data-trc]')?.dataset.trc; if (!k) return;
+    const at = document.activeElement?.closest?.('.mk-tc'); const r = at ? +at.dataset.r : null; const c = at ? +at.dataset.c : null;
+    tableChange((m) => {
+      const nR = m.rows.length; const nC = m.rows[0].length;
+      if (k === 'row+') m.rows.splice(r == null ? nR : r + 1, 0, Array(nC).fill(''));
+      if (k === 'row-' && nR > 1) m.rows.splice(r == null ? nR - 1 : r, 1);
+      if (k === 'col+') m.rows.forEach((row) => row.splice(c == null ? nC : c + 1, 0, ''));
+      if (k === 'col-' && nC > 1) m.rows.forEach((row) => row.splice(c == null ? nC - 1 : c, 1));
+    }, k === 'row+' && r != null ? [r + 1, c] : k === 'col+' && c != null ? [r, c + 1] : null);
+  });
+
+  // ---------- add a page ----------
+  // A blank page after the page at the top of the view, the size of that page; marks on later pages move with them.
+  $('#mk-addpage').onclick = () => {
+    editingBox()?.blur(); if (editingTable()) document.activeElement?.blur();
+    const at = (nav?.current?.() ?? pages.length - 1) + 1; const ref = pages[at - 1] || pages[0];
+    snapshot();
+    st.marks.forEach((m) => { if (m.page >= at) m.page += 1; });
+    st.marks.push({ id: uid(), type: 'page', page: at, w: ref.w, h: ref.h }); st.sel = null; changed();
+    const r = pages[at].el.getBoundingClientRect(); const bar = $('.mk-bar').getBoundingClientRect();
+    pagesEl.scrollTop += r.top - bar.bottom - 12;
+  };
 
   // ---------- zoom ----------
   // z: zoom against "fit to width"; (cx, cy): the screen point that stays put (the cursor or the pinch centre).
@@ -610,7 +764,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
 
   // ---------- full screen (tools on top) ----------
   fullScreen(mk, 'mk', 'mk-full', t);
-  pageNav(mk, 'mk', pagesEl, () => pages.map((p) => p.el));
+  nav = pageNav(mk, 'mk', pagesEl, () => pages.map((p) => p.el));
 
   const onKey = (e) => {
     if (!root.isConnected) { document.removeEventListener('keydown', onKey); return; }
@@ -640,7 +794,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
 
   // A mark's box in page units [x, y, w, h] (a text box is measured on screen).
   function bbox(m, p) {
-    if (m.type === 'text') { const b = p?.boxes.querySelector(`[data-id="${m.id}"]`); return [m.x, m.y, (b?.offsetWidth || 0) / (p?.scale || 1), (b?.offsetHeight || 0) / (p?.scale || 1)]; }
+    if (m.type === 'text' || m.type === 'table') { const b = p?.boxes.querySelector(`[data-id="${m.id}"]`); return [m.x, m.y, (b?.offsetWidth || 0) / (p?.scale || 1), (b?.offsetHeight || 0) / (p?.scale || 1)]; }
     const pts = m.pts || (m.a ? [m.a, m.b] : m.rects ? m.rects.flatMap(([x, y, w, h]) => [[x, y], [x + w, y + h]]) : [[m.x, m.y], [m.x + m.w, m.y + m.h]]);
     const xs = pts.map((q) => q[0]); const ys = pts.map((q) => q[1]); const x = Math.min(...xs); const y = Math.min(...ys);
     return [x, y, Math.max(...xs) - x, Math.max(...ys) - y];
@@ -658,6 +812,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     if (o.a) { m.a = S(o.a); m.b = S(o.b); }
     if (o.type === 'rect') { [m.x, m.y] = S([o.x, o.y]); m.w = o.w * f; m.h = o.h * f; }
     if (o.type === 'text') { m.size = Math.min(72, Math.max(6, Math.round(o.size * f * 2) / 2)); if (o.wrap) m.wrap = o.wrap * m.size / o.size; }
+    if (o.type === 'table') m.w = Math.max(40, o.w * f); // a table gets wider or narrower; its text keeps its size
   }
 
   // Hold a picked mark (or right-click it) in Select: Copy, Duplicate, Delete. Hold the page after a Copy: Paste there.
@@ -740,11 +895,25 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     // Inside the open text box the browser places the caret and selects text. A press anywhere else first saves it.
     const ed = editingBox();
     if (ed) { if (ed.contains(e.target)) return; ed.blur(); }
+    const edT = editingTable();
+    if (edT) { if (edT.contains(e.target)) return; closeTable(edT); }
     tweakId = null;
-    const tgt = ed ? document.elementFromPoint(e.clientX, e.clientY) : e.target;
+    const tgt = ed || edT ? document.elementFromPoint(e.clientX, e.clientY) : e.target; // the open box or table was redrawn
     const pel = tgt?.closest('.mk-page'); if (!pel) return;
     const p = pages[+pel.dataset.page]; const pt = at(p, e);
     if (st.tool === 'highlight') return; // the text layer selects; pointerup turns the selection into a highlight
+    if (st.tool === 'table') { // tap a table to type in its cells; tap the page for a new table there
+      const hit = tgt.closest('.mk-table'); const cell = tgt.closest('.mk-tc'); const rc = cell ? [+cell.dataset.r, +cell.dataset.c] : [0, 0];
+      if (hit) { openOnTap(e, () => { st.sel = hit.dataset.id; paint(); editTable(p, hit.dataset.id, rc); }); e.preventDefault(); return; }
+      openOnTap(e, () => {
+        snapshot();
+        const w = Math.max(120, Math.min(p.w - pt[0] - 36, p.w * 0.8));
+        const m = { id: uid(), page: pages.indexOf(p), type: 'table', x: pt[0], y: pt[1], w, rows: Array.from({ length: 4 }, () => ['', '', '']), o: { ...tableO(), accent: tableO().accent || currentTheme().chart[0] }, size: st.size, font: st.font };
+        st.marks.push(m); st.sel = m.id; paint(); editTable(p, m.id, [0, 0], false);
+      });
+      e.preventDefault();
+      return;
+    }
     if (st.tool === 'edit') { // click a paragraph of the PDF to edit it in place
       const hit = tgt.closest('.mk-box'); const xy = [e.clientX, e.clientY];
       if (hit) { openOnTap(e, () => { st.sel = hit.dataset.id; paint(); editBox(p, hit.dataset.id, false, xy); }); e.preventDefault(); return; }
@@ -773,6 +942,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       if (!id) { if (clip && e.pointerType !== 'mouse') holdStart(e, () => showMenu(e.clientX, e.clientY, p, null, pt)); return; }
       const m = selMark();
       if (m.type === 'text' && e.detail === 2) { editBox(p, id, false, [e.clientX, e.clientY]); e.preventDefault(); return; }
+      if (m.type === 'table' && e.detail === 2) { const c = tgt.closest('.mk-tc'); editTable(p, id, c ? [+c.dataset.r, +c.dataset.c] : [0, 0]); e.preventDefault(); return; }
       snapshot(); drag = { kind: 'move', p, last: pt, m, moved: false, id: e.pointerId, ptype: e.pointerType, cx: e.clientX, cy: e.clientY };
       if (e.pointerType !== 'mouse') holdStart(e, () => { if (drag?.m === m && !drag.moved) { drag = null; st.undo.pop(); } showMenu(e.clientX, e.clientY, p, m); });
       pel.setPointerCapture(e.pointerId); e.preventDefault();
@@ -786,8 +956,10 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   });
   // Double-click opens a text box with the Select tool where pointerdown carries no click count.
   pagesEl.addEventListener('dblclick', (e) => {
-    if (st.tool !== 'select' || editingBox()) return;
-    const hit = e.target.closest('.mk-box'); const pel = e.target.closest('.mk-page'); if (!hit || !pel) return;
+    if (st.tool !== 'select' || editingBox() || editingTable()) return;
+    const pel = e.target.closest('.mk-page'); const tb = e.target.closest('.mk-table'); const c = e.target.closest('.mk-tc');
+    if (tb && pel) { editTable(pages[+pel.dataset.page], tb.dataset.id, c ? [+c.dataset.r, +c.dataset.c] : [0, 0]); return; }
+    const hit = e.target.closest('.mk-box'); if (!hit || !pel) return;
     editBox(pages[+pel.dataset.page], hit.dataset.id, false, [e.clientX, e.clientY]);
   });
   pagesEl.addEventListener('pointermove', (e) => {
@@ -934,6 +1106,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   // The paragraph under point pt (page units) becomes a text box in its place: its text, the nearest site font, its
   // size, line spacing and colour; the original is covered on screen and removed from the downloaded PDF.
   async function editAt(p, pt) {
+    if (!p.page) return; // an added blank page has no text of its own
     const paras = await (p.paras ||= pageText(p));
     const pad = 2; const u = paras.findLast(({ box: [x, y, w, h] }) => pt[0] >= x - pad && pt[0] <= x + w + pad && pt[1] >= y - pad && pt[1] <= y + h + pad);
     if (!u) return;
@@ -995,8 +1168,11 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   }
   // An edited paragraph's runs with its line breaks where the screen wraps them (the PDF has no wrapping).
   function wrapRuns(m) {
-    const runs = runsOf(m); const pv = pages[m.page]; const box = pv?.boxes.querySelector(`[data-id="${m.id}"]`);
-    if (!box) return runs;
+    const pv = pages[m.page]; const box = pv?.boxes.querySelector(`[data-id="${m.id}"]`);
+    return box ? wrapRunsIn(box, runsOf(m)) : runsOf(m);
+  }
+  // The runs with a line break where the text in `box` wraps on screen.
+  function wrapRunsIn(box, runs) {
     const breaks = new Set(); let off = 0; let top = null; const r = document.createRange();
     const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
     for (let t = walk.nextNode(); t; t = walk.nextNode()) {
@@ -1022,14 +1198,15 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   // ---------- writing the marked PDF ----------
   async function exportPdf() {
     document.activeElement?.blur?.();
-    await loadFonts(st.marks.filter((m) => m.type === 'text').map(fontOf));
+    await loadFonts(st.marks.filter((m) => m.type === 'text' || m.type === 'table').map(fontOf));
     const out = await PDFLib.PDFDocument.load(bytes.slice(0));
+    st.marks.filter((m) => m.type === 'page').sort((a, b) => a.page - b.page).forEach((m) => out.insertPage(m.page, [m.w, m.h])); // added pages, in place
     const { rgb, LineCapStyle } = PDFLib;
     const hex = (c) => { const [r, g, b] = rgbOf(c); return rgb(r / 255, g / 255, b / 255); };
     const outPages = out.getPages();
     const P0 = (n, [x, y]) => { const pg = outPages[n]; const { x: ox, y: oy } = pg.getMediaBox ? pg.getMediaBox() : { x: 0, y: 0 }; return { x: ox + x, y: oy + pages[n].h - y }; };
     // Text boxes as real text (searchable, copyable); a box whose font cannot be embedded is drawn as a picture.
-    const writer = st.marks.some((m) => m.type === 'text') ? await textWriter(out, PDFLib) : null;
+    const writer = st.marks.some((m) => m.type === 'text' || m.type === 'table') ? await textWriter(out, PDFLib) : null;
     // Edited paragraphs: their old text is removed from the page (search and copy no longer find it); where it cannot
     // be removed (text inside a form XObject), it is covered with the page's background colour.
     const edits = st.marks.filter((m) => m.type === 'text' && m.cover); let covered = 0;
@@ -1052,6 +1229,34 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       const P = ([x, y]) => ({ x: ox + x, y: oy + pv.h - y });
       const line = (a, b, w, c) => pg.drawLine({ start: P(a), end: P(b), thickness: w, color: hex(c), lineCap: LineCapStyle.Round });
       if (m.type === 'pen') pg.drawSvgPath(inkPath(m), { x: ox, y: oy + pv.h, color: hex(m.color) }); // the outline, as on screen
+      if (m.type === 'table') {
+        // As on screen: each cell's fill, then its borders (a double border is two thin lines), then its text as real
+        // text in the cell's width (a font that cannot be embedded is drawn as a picture).
+        const el = pv.boxes.querySelector(`[data-id="${m.id}"]`); if (!el) continue;
+        const pr = pv.el.getBoundingClientRect(); const u = (v) => v / pv.scale; const L = looks(m.rows, m.o);
+        const box = (n) => { const r = n.getBoundingClientRect(); return [u(r.left - pr.left), u(r.top - pr.top), u(r.width), u(r.height)]; };
+        const tds = [...el.querySelectorAll('td')]; const lk = (td) => L[+td.dataset.r][+td.dataset.c];
+        tds.forEach((td) => { const x = lk(td); if (!x.bg) return; const [l, tp, w, h] = box(td); const a = P([l - 0.2, tp + h + 0.2]); pg.drawRectangle({ x: a.x, y: a.y, width: w + 0.4, height: h + 0.4, color: hex(x.bg) }); }); // a hair wider: no seams between fills
+        tds.forEach((td) => {
+          const x = lk(td); const [l, tp, w, h] = box(td); const ends = [[[l, tp], [l + w, tp]], [[l + w, tp], [l + w, tp + h]], [[l, tp + h], [l + w, tp + h]], [[l, tp], [l, tp + h]]];
+          x.b.forEach((css, i) => {
+            const b = css && /([\d.]+)pt (\w+) #([0-9a-f]{6})/i.exec(css); if (!b) return;
+            const [a0, a1] = ends[i]; const wd = +b[1]; const c = hex(`#${b[3]}`); const sq = { lineCap: LineCapStyle.Projecting };
+            if (b[2] !== 'double') { pg.drawLine({ start: P(a0), end: P(a1), thickness: wd, color: c, ...sq }); return; }
+            const o = wd / 3; const [dx, dy] = i % 2 ? [o, 0] : [0, o];
+            [-1, 1].forEach((k) => pg.drawLine({ start: P([a0[0] + k * dx, a0[1] + k * dy]), end: P([a1[0] + k * dx, a1[1] + k * dy]), thickness: o, color: c, ...sq }));
+          });
+        });
+        for (const td of tds) {
+          const x = lk(td); const d = td.querySelector('.mk-tc'); if (!d || !x.text.trim()) continue;
+          const [l, tp, w] = box(d);
+          const tm = { id: '', type: 'text', x: l, y: tp, size: m.size, font: m.font, color: x.color, align: x.align === 'right' ? 'right' : undefined, wrap: w,
+            runs: wrapRunsIn(d, [{ t: x.caps ? x.text.toUpperCase() : x.text, ...(x.bold ? { b: 1 } : {}) }]) };
+          if (writer && await writer.draw(pg, tm, (xx, yy) => P([xx, yy]), { lineHeight: TEXT.lineHeight, fontFamily: fontOf })) continue;
+          const png = await textPng(tm); const img = await out.embedPng(png.bytes); const a = P([tm.x, tm.y - png.oy + png.h]);
+          pg.drawImage(img, { x: a.x, y: a.y, width: png.w, height: png.h });
+        }
+      }
       if (m.type === 'line' || m.type === 'arrow') line(m.a, m.b, m.width, m.color);
       if (m.type === 'arrow') { const [t, p1, p2] = arrowHead(m.a, m.b, m.width); line(p1, t, m.width, m.color); line(p2, t, m.width, m.color); }
       if (m.type === 'rect') {

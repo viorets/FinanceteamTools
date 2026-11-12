@@ -24,7 +24,7 @@ const B = (w, c, kind = 'solid') => `${w}pt ${kind} ${c}`;
 
 // A style gives each cell its borders [top, right, bottom, left], fill, text colour and weight, from the cell's place:
 // f = { head, total, first, last, band (banded row or column), edgeT, edgeB, edgeL, edgeR } and the accent a.
-const STYLES = [
+export const STYLES = [ // also used by the PDF editor's tables (js/pdf-markup.js)
   { id: 'grid', name: 'Table Grid', group: 'Plain Tables', cell: () => ({ b: Array(4).fill(B(0.5, '#000000')) }) },
   { id: 'plain1', name: 'Plain Table 1', group: 'Plain Tables', cell: (f) => ({
     b: [f.total ? B(1.5, '#bfbfbf', 'double') : B(0.5, '#bfbfbf'), B(0.5, '#bfbfbf'), B(0.5, '#bfbfbf'), B(0.5, '#bfbfbf')],
@@ -59,7 +59,7 @@ const DEFAULTS = { wide: 'auto', style: 'grid4', header: true, total: false, ban
 
 // Each cell's look from the style and options: { text, b: [top, right, bottom, left] CSS borders, bg, color, bold,
 // caps, align, head }. Shared by the page, Copy (HTML) and the .docx, so all three match.
-function looks(rows, o) {
+export function looks(rows, o) {
   const st = STYLES.find((s) => s.id === o.style) || STYLES[0];
   const a = o.accent || currentTheme().chart[0];
   const nR = rows.length; const nC = Math.max(1, ...rows.map((r) => r.length));
