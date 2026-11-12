@@ -41,6 +41,7 @@
 .mk-ctl select, .mk-ctl input[type=number] { box-sizing: border-box; font: inherit; font-size: 16px; padding: 4px 6px; border: 1px solid var(--border-strong, rgba(0, 0, 0, .15)); border-radius: 6px; background: var(--surface, #fff); color: var(--ink, #1d1d1f); }
 .mk-ctl input[type=number] { width: 4.5em; }
 .mk-fmt { display: inline-grid; grid-template-columns: repeat(5, 40px); gap: 4px; }
+.mk-fmt.mk-align { grid-template-columns: repeat(3, 40px); }
 .mk-bar .mk-fmt button { padding: 0; font-size: 16px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
 .mk-fmt [data-fmt="bold"] { font-weight: 700; }
 .mk-fmt [data-fmt="italic"] { font-style: italic; font-family: Georgia, serif; }

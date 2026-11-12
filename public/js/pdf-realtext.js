@@ -121,12 +121,12 @@ export async function textWriter(pdf, PDFLib) {
     const lines = [[]];
     m.runs.forEach((r) => r.t.split('\n').forEach((piece, i) => { if (i) lines.push([]); if (piece) lines.at(-1).push({ ...r, t: piece }); }));
     const color = hexRgb(m.color);
+    const lineW = (line) => line.reduce((s, r) => { ctx.font = css(r); return s + ctx.measureText(r.t).width; }, 0);
+    const span = m.align === 'center' || m.align === 'right' ? Math.max(m.wrap || 0, ...lines.map(lineW)) : 0; // the box's width, or its longest line
     for (const [i, line] of lines.entries()) {
       const base = m.y + i * lh + (lh - asc - desc) / 2 + asc; // baseline, as CSS places it (and textPng)
       let x = m.x;
-      if ((m.align === 'center' || m.align === 'right') && m.wrap) { // centred or right-aligned in the box's width, as on screen
-        const lw = line.reduce((s, r) => { ctx.font = css(r); return s + ctx.measureText(r.t).width; }, 0); x += (m.wrap - lw) / (m.align === 'center' ? 2 : 1);
-      }
+      if (span) x += (span - lineW(line)) / (m.align === 'center' ? 2 : 1); // centred or right-aligned, as on screen
       for (const r of line) {
         ctx.font = css(r); const w = ctx.measureText(r.t).width;
         if (r.hl) { const [p, q] = [at(x, base - asc), at(x + w, base + desc)]; pg.drawRectangle({ x: p.x, y: q.y, width: q.x - p.x, height: p.y - q.y, color: rgbOf(PDFLib, hexRgb(r.hl)), opacity: r.ha ?? 0.45, blendMode: PDFLib.BlendMode?.Multiply }); }

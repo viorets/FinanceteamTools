@@ -46,6 +46,13 @@ const FMT = [
   ['hilite', 'hl', ICON.hl, 'Highlight', 'ไฮไลต์'],
 ];
 const KEY = Object.fromEntries(FMT.map(([cmd, k]) => [cmd, k]));
+// Alignment of a text box's lines (within the box's width, or its longest line)
+const alignIcon = (d) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="${d}"/></svg>`;
+const ALIGN = [
+  ['left', alignIcon('M4 6h16M4 10h10M4 14h16M4 18h10'), 'Align left', 'ชิดซ้าย'],
+  ['center', alignIcon('M4 6h16M7 10h10M4 14h16M7 18h10'), 'Centre', 'กึ่งกลาง'],
+  ['right', alignIcon('M4 6h16M10 10h10M4 14h16M10 18h10'), 'Align right', 'ชิดขวา'],
+];
 
 let libs = null;
 export function loadLibs() { // pdf.js and pdf-lib, loaded once (also used by js/pdf-merge.js)
@@ -169,6 +176,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       <div class="mk-tools">${TOOLS.filter(([k]) => editText || k !== 'edit').map(([k, en, th]) => `<button type="button" data-tool="${k}" aria-pressed="false">${t(en, th)}</button>`).join('')}</div>
       <div class="mk-g mk-g-text">
         <div class="mk-fmt" role="group" aria-label="${t('Text format', 'รูปแบบตัวอักษร')}">${FMT.map(([cmd, , face, en, th]) => `<button type="button" data-fmt="${cmd}" aria-pressed="false" title="${t(en, th)}" aria-label="${t(en, th)}">${face}</button>`).join('')}</div>
+        <div class="mk-fmt mk-align" role="group" aria-label="${t('Alignment', 'การจัดแนว')}">${ALIGN.map(([v, face, en, th]) => `<button type="button" data-align="${v}" aria-pressed="false" title="${t(en, th)}" aria-label="${t(en, th)}">${face}</button>`).join('')}</div>
         <label class="mk-ctl">${t('Font', 'แบบอักษร')} <select id="mk-f">${fontOptions(font0)}</select></label><button type="button" class="mk-addf" id="mk-addf" title="${t('Add a font from this computer (.ttf, .otf, .ttc)', 'เพิ่มแบบอักษรจากเครื่องนี้ (.ttf, .otf, .ttc)')}" aria-label="${t('Add a font from this computer', 'เพิ่มแบบอักษรจากเครื่องนี้')}">＋</button><input type="file" id="mk-ffile" accept=".ttf,.otf,.ttc,font/ttf,font/otf,font/collection" multiple hidden>
         <label class="mk-ctl">${t('Text size', 'ขนาดตัวอักษร')} <span><input type="number" id="mk-s" min="6" max="72" step="1" value="${textSize}"> pt</span></label>
       </div>
@@ -356,6 +364,16 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       const k = KEY[b.dataset.fmt];
       b.setAttribute('aria-pressed', String(ed ? selectionHas(ed, k) : m ? runsOf(m).every((r) => r[k]) : false));
     });
+    const a = ed ? st.marks.find((x) => x.id === ed.dataset.id) : m;
+    root.querySelectorAll('[data-align]').forEach((b) => b.setAttribute('aria-pressed', String(!!a && (a.align || 'left') === b.dataset.align)));
+  }
+  // Left / Centre / Right: the open box (it is saved when it closes) or the picked box.
+  function align(v) {
+    const ed = editingBox(); const m = ed ? st.marks.find((x) => x.id === ed.dataset.id) : selMark()?.type === 'text' ? selMark() : null;
+    if (!m || (m.align || 'left') === v) return;
+    if (!ed) snapshot(); // an open box took its snapshot when it opened
+    if (v === 'left') delete m.align; else m.align = v;
+    if (ed) { ed.style.textAlign = v; updateFmt(); } else changed();
   }
   // B / I / U / S / highlight: on the selected characters of the open box, or on the whole picked box.
   function format(cmd) {
@@ -383,6 +401,10 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   fmtBar.addEventListener('pointerdown', (e) => e.preventDefault());
   fmtBar.addEventListener('mousedown', (e) => e.preventDefault());
   fmtBar.addEventListener('click', (e) => { const b = e.target.closest('[data-fmt]'); if (b) format(b.dataset.fmt); });
+  const alignBar = $('.mk-align');
+  alignBar.addEventListener('pointerdown', (e) => e.preventDefault());
+  alignBar.addEventListener('mousedown', (e) => e.preventDefault());
+  alignBar.addEventListener('click', (e) => { const b = e.target.closest('[data-align]'); if (b) align(b.dataset.align); });
   const onSel = () => { if (!root.isConnected) { document.removeEventListener('selectionchange', onSel); return; } if (editingBox()) updateFmt(); };
   document.addEventListener('selectionchange', onSel);
 
@@ -857,10 +879,11 @@ async function textPng(m) {
   const asc = mt.fontBoundingBoxAscent ?? px * 0.8; const desc = mt.fontBoundingBoxDescent ?? px * 0.25;
   const lay = lines.map((l) => { let x = 0; return l.map((r) => { ctx.font = fontFor(r); const w = ctx.measureText(r.t).width; const o = { r, x, w }; x += w; return o; }); });
   const pad = Math.max(0, (asc + desc - lh) / 2); // tall Thai fonts reach above and below the line box
-  let W = Math.max(1, ...lay.map((l) => (l.length ? l.at(-1).x + l.at(-1).w : 0))) + px * 0.15 + 2 * k;
-  if ((m.align === 'center' || m.align === 'right') && m.wrap) { // place each line in the box's width, as on screen
-    W = Math.max(W, m.wrap * k);
-    lay.forEach((l) => { const lw = l.length ? l.at(-1).x + l.at(-1).w : 0; const dx = (W - lw) / (m.align === 'center' ? 2 : 1); l.forEach((o) => { o.x += dx; }); });
+  const lineW = (l) => (l.length ? l.at(-1).x + l.at(-1).w : 0);
+  let W = Math.max(1, ...lay.map(lineW)) + px * 0.15 + 2 * k;
+  if (m.align === 'center' || m.align === 'right') { // place each line in the box's width (or its longest line), as on screen
+    const span = Math.max(...lay.map(lineW), (m.wrap || 0) * k); W = Math.max(W, span);
+    lay.forEach((l) => { const dx = (span - lineW(l)) / (m.align === 'center' ? 2 : 1); l.forEach((o) => { o.x += dx; }); });
   }
   c.width = Math.ceil(W); c.height = Math.ceil(lh * lines.length + 2 * pad);
   const top = (i) => pad + i * lh + (lh - asc - desc) / 2; // top of the font box on line i
