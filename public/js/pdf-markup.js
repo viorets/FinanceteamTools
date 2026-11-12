@@ -48,6 +48,13 @@ const FMT = [
 const KEY = Object.fromEntries(FMT.map(([cmd, k]) => [cmd, k]));
 // Alignment of a text box's lines (within the box's width, or its longest line)
 const alignIcon = (d) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="${d}"/></svg>`;
+// Bullets and numbering: "• " or "1. " at the start of each line (plain characters, so the PDF keeps them as text).
+const listIcon = (d) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">${d}</svg>`;
+const LISTS = [
+  ['bullet', listIcon('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/>'), 'Bullets', 'สัญลักษณ์แสดงหัวข้อย่อย'],
+  ['number', listIcon('<path d="M10 6h10M10 12h10M10 18h10"/><path d="M4 4.5h1.2V9M3.6 9h2.6" stroke-width="1.5"/><path d="M3.7 14.3c.3-.6 1.9-.8 2 .3.1.9-2.3 2-2.3 3.4h2.5" stroke-width="1.5"/>'), 'Numbering', 'ลำดับเลข'],
+];
+const LIST_MARK = /^(• |(\d+)\. )/;
 const ALIGN = [
   ['left', alignIcon('M4 6h16M4 10h10M4 14h16M4 18h10'), 'Align left', 'ชิดซ้าย'],
   ['center', alignIcon('M4 6h16M7 10h10M4 14h16M7 18h10'), 'Centre', 'กึ่งกลาง'],
@@ -158,6 +165,34 @@ function caretAt(x, y) {
   }
   return document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null;
 }
+// Character offsets inside an open text box, counted as readRuns counts them (a <br> is one character).
+function boxOffset(box, node, off) {
+  let end = null; // a position after an element's last child: count everything inside it
+  if (node.nodeType !== 3) { const c = node.childNodes[off]; if (c) { node = c; off = 0; } else end = node; }
+  let k = 0; let inside = false;
+  const walk = document.createTreeWalker(box, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    if (end) { if (end.contains(n)) inside = true; else if (inside) return k; }
+    else if (n === node) return k + (n.nodeType === 3 ? off : 0);
+    if (n.nodeType === 3) k += n.data.length; else if (n.nodeName === 'BR') k += 1;
+  }
+  return k;
+}
+function boxPos(box, k) {
+  const walk = document.createTreeWalker(box, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT); let last = null;
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    if (n.nodeType === 3) { if (k <= n.data.length) return [n, k]; k -= n.data.length; last = [n, n.data.length]; }
+    else if (n.nodeName === 'BR') { if (k === 0) return [n.parentNode, [...n.parentNode.childNodes].indexOf(n)]; k -= 1; last = [n.parentNode, [...n.parentNode.childNodes].indexOf(n) + 1]; }
+  }
+  return last || [box, box.childNodes.length];
+}
+// Runs with characters [a, z) replaced by str (in the style of the text around it, without highlight or lines).
+function spliceRuns(runs, a, z, str) {
+  const chars = runs.flatMap((r) => r.t.split('').map((ch) => ({ ...r, t: ch })));
+  const near = chars[a] || chars[a - 1] || {}; const { hl, ha, u, s, ...st } = near;
+  chars.splice(a, z - a, ...str.split('').map((ch) => ({ ...st, t: ch })));
+  return mergeRuns(chars);
+}
 const exec = (cmd, v = null) => { try { return document.execCommand(cmd, false, v); } catch { return false; } };
 
 // Opens the editor in `root`. bytes: the PDF (ArrayBuffer); name: file name; draft: saved marks or null.
@@ -176,6 +211,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       <div class="mk-tools">${TOOLS.filter(([k]) => editText || k !== 'edit').map(([k, en, th]) => `<button type="button" data-tool="${k}" aria-pressed="false">${t(en, th)}</button>`).join('')}</div>
       <div class="mk-g mk-g-text">
         <div class="mk-fmt" role="group" aria-label="${t('Text format', 'รูปแบบตัวอักษร')}">${FMT.map(([cmd, , face, en, th]) => `<button type="button" data-fmt="${cmd}" aria-pressed="false" title="${t(en, th)}" aria-label="${t(en, th)}">${face}</button>`).join('')}</div>
+        <div class="mk-fmt mk-list" role="group" aria-label="${t('Lists', 'รายการ')}">${LISTS.map(([v, face, en, th]) => `<button type="button" data-list="${v}" title="${t(en, th)}" aria-label="${t(en, th)}">${face}</button>`).join('')}</div>
         <div class="mk-fmt mk-align" role="group" aria-label="${t('Alignment', 'การจัดแนว')}">${ALIGN.map(([v, face, en, th]) => `<button type="button" data-align="${v}" aria-pressed="false" title="${t(en, th)}" aria-label="${t(en, th)}">${face}</button>`).join('')}</div>
         <label class="mk-ctl">${t('Font', 'แบบอักษร')} <select id="mk-f">${fontOptions(font0)}</select></label><button type="button" class="mk-addf" id="mk-addf" title="${t('Add a font from this computer (.ttf, .otf, .ttc)', 'เพิ่มแบบอักษรจากเครื่องนี้ (.ttf, .otf, .ttc)')}" aria-label="${t('Add a font from this computer', 'เพิ่มแบบอักษรจากเครื่องนี้')}">＋</button><input type="file" id="mk-ffile" accept=".ttf,.otf,.ttc,font/ttf,font/otf,font/collection" multiple hidden>
         <label class="mk-ctl">${t('Text size', 'ขนาดตัวอักษร')} <span><input type="number" id="mk-s" min="6" max="72" step="1" value="${textSize}"> pt</span></label>
@@ -373,6 +409,27 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const a = ed ? st.marks.find((x) => x.id === ed.dataset.id) : m;
     root.querySelectorAll('[data-align]').forEach((b) => b.setAttribute('aria-pressed', String(!!a && (a.align || 'left') === b.dataset.align)));
   }
+  // Bullets / Numbering: the lines the selection touches in the open box, or every line of the picked box. Pressed
+  // again on lines that all have it, it is taken off; numbering counts 1, 2, 3 down the lines.
+  function toggleList(kind) {
+    const ed = editingBox(); const m = ed ? st.marks.find((x) => x.id === ed.dataset.id) : selMark()?.type === 'text' ? selMark() : null;
+    if (!m) return;
+    let runs = ed ? readRuns(ed) : runsOf(m); const text = runs.map((r) => r.t).join('');
+    let a = 0; let z = text.length;
+    const sel = getSelection(); const r = ed && sel.rangeCount && ed.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+    if (r) { a = Math.min(text.length, boxOffset(ed, r.startContainer, r.startOffset)); z = Math.min(text.length, boxOffset(ed, r.endContainer, r.endOffset)); }
+    const starts = [0]; for (let i = 0; i < text.length; i++) if (text[i] === '\n') starts.push(i + 1);
+    const lines = starts.filter((s0, i) => s0 <= z && (i + 1 < starts.length ? starts[i + 1] - 1 : text.length) >= a);
+    const markOf = (s0) => text.slice(s0).match(LIST_MARK);
+    const off = lines.every((s0) => (kind === 'bullet' ? markOf(s0)?.[1] === '• ' : !!markOf(s0)?.[2]));
+    let n = 0; const edits = lines.map((s0) => [s0, markOf(s0)?.[0].length || 0, off ? '' : kind === 'bullet' ? '• ' : `${++n}. `]);
+    const map = (x) => edits.reduce((y, [s0, len, add]) => (s0 + len <= x ? y + add.length - len : s0 < x ? y - (x - s0) + add.length : y), x);
+    const a2 = map(a); const z2 = map(z);
+    [...edits].reverse().forEach(([s0, len, add]) => { runs = spliceRuns(runs, s0, s0 + len, add); });
+    if (!ed) { snapshot(); m.runs = runs; m.text = runs.map((x) => x.t).join(''); changed(); return; }
+    ed.replaceChildren(...runs.map(runNode));
+    const rr = document.createRange(); rr.setStart(...boxPos(ed, a2)); rr.setEnd(...boxPos(ed, z2)); sel.removeAllRanges(); sel.addRange(rr);
+  }
   // Left / Centre / Right: the open box (it is saved when it closes) or the picked box.
   function align(v) {
     const ed = editingBox(); const m = ed ? st.marks.find((x) => x.id === ed.dataset.id) : selMark()?.type === 'text' ? selMark() : null;
@@ -407,6 +464,10 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   fmtBar.addEventListener('pointerdown', (e) => e.preventDefault());
   fmtBar.addEventListener('mousedown', (e) => e.preventDefault());
   fmtBar.addEventListener('click', (e) => { const b = e.target.closest('[data-fmt]'); if (b) format(b.dataset.fmt); });
+  const listBar = $('.mk-list');
+  listBar.addEventListener('pointerdown', (e) => e.preventDefault());
+  listBar.addEventListener('mousedown', (e) => e.preventDefault());
+  listBar.addEventListener('click', (e) => { const b = e.target.closest('[data-list]'); if (b) toggleList(b.dataset.list); });
   const alignBar = $('.mk-align');
   alignBar.addEventListener('pointerdown', (e) => e.preventDefault());
   alignBar.addEventListener('mousedown', (e) => e.preventDefault());
@@ -802,7 +863,17 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     mk.dataset.mode = 'text'; updateFmt();
     b.onkeydown = (e) => {
       const mod = e.ctrlKey || e.metaKey;
-      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (!exec('insertLineBreak')) exec('insertHTML', '<br>'); }
+      if (e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault();
+        // In a list line, Enter starts the next item ("• " or the next number); on an empty item it ends the list.
+        const s = getSelection(); const text = readRuns(b).map((x) => x.t).join('');
+        const k = s.rangeCount ? Math.min(text.length, boxOffset(b, s.getRangeAt(0).startContainer, s.getRangeAt(0).startOffset)) : text.length;
+        const s0 = text.lastIndexOf('\n', k - 1) + 1; const e0 = text.indexOf('\n', k) < 0 ? text.length : text.indexOf('\n', k);
+        const mm = text.slice(s0).match(LIST_MARK);
+        if (mm && e0 - s0 === mm[0].length) { const r = document.createRange(); r.setStart(...boxPos(b, s0)); r.setEnd(...boxPos(b, e0)); s.removeAllRanges(); s.addRange(r); exec('delete'); return; }
+        if (!exec('insertLineBreak')) exec('insertHTML', '<br>');
+        if (mm) exec('insertText', mm[2] ? `${+mm[2] + 1}. ` : '• ');
+      }
       else if (mod && e.shiftKey && e.key.toLowerCase() === 'x') { e.preventDefault(); exec('strikeThrough'); updateFmt(); }
       else if (e.key === 'Escape') { e.preventDefault(); b.blur(); }
     };
