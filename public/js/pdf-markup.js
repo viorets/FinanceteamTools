@@ -283,7 +283,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   };
   function drawMark(m, g) {
     const stroke = { stroke: m.color, 'stroke-width': m.width, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' };
-    if (m.type === 'pen') g.append(svgEl('polyline', { ...stroke, points: m.pts.map((p) => p.join(',')).join(' ') }));
+    if (m.type === 'pen') g.append(svgEl('path', { d: inkPath(m), fill: m.color }));
     if (m.type === 'line' || m.type === 'arrow') g.append(svgEl('line', { ...stroke, x1: m.a[0], y1: m.a[1], x2: m.b[0], y2: m.b[1] }));
     if (m.type === 'arrow') { const [t, p1, p2] = arrowHead(m.a, m.b, m.width); g.append(svgEl('polyline', { ...stroke, points: [p1, t, p2].map((p) => p.join(',')).join(' ') })); }
     if (m.type === 'rect') g.append(svgEl('rect', { ...stroke, x: m.x, y: m.y, width: m.w, height: m.h }));
@@ -548,14 +548,14 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     return [x, y, Math.max(...xs) - x, Math.max(...ys) - y];
   }
   const shift = (m, dx, dy) => {
-    if (m.pts) m.pts = m.pts.map(([x, y]) => [x + dx, y + dy]);
+    if (m.pts) m.pts = m.pts.map(([x, y, ...pr]) => [x + dx, y + dy, ...pr]);
     if (m.a) { m.a = [m.a[0] + dx, m.a[1] + dy]; m.b = [m.b[0] + dx, m.b[1] + dy]; }
     if (m.rects) m.rects = m.rects.map(([x, y, w, h]) => [x + dx, y + dy, w, h]);
     if ('x' in m) { m.x += dx; m.y += dy; }
   };
   // Mark m becomes o (its copy when the resize began) scaled by f from point [ox, oy]; a text box changes its text size.
   function scaleMark(m, o, f, [ox, oy]) {
-    const S = ([x, y]) => [ox + (x - ox) * f, oy + (y - oy) * f];
+    const S = ([x, y, ...pr]) => [ox + (x - ox) * f, oy + (y - oy) * f, ...pr];
     if (o.pts) m.pts = o.pts.map(S);
     if (o.a) { m.a = S(o.a); m.b = S(o.b); }
     if (o.type === 'rect') { [m.x, m.y] = S([o.x, o.y]); m.w = o.w * f; m.h = o.h * f; }
@@ -610,6 +610,14 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   });
 
   let drag = null;
+  // A pen point: Apple Pencil adds its pressure (0–1); a mouse or finger draws at the set width.
+  const inkPt = (pt, e) => (e.pointerType === 'pen' && e.pressure > 0 ? [pt[0], pt[1], Math.round(e.pressure * 100) / 100] : pt);
+  // While drawing, only the stroke being drawn is redrawn, once per frame.
+  let inkFrame = 0;
+  const drawLive = (d) => {
+    if (inkFrame) return;
+    inkFrame = requestAnimationFrame(() => { inkFrame = 0; const g = d.p.svg.querySelector(`[data-id="${d.m.id}"]`); if (!g) { paint(); return; } g.replaceChildren(); drawMark(d.m, g); });
+  };
   // A second finger during a finger stroke or move is a pinch: undo what the first finger started.
   const cancelDrag = () => { const d = drag; drag = null; if (!d) return; st.marks = JSON.parse(st.undo.pop()); paint(); };
   // Apple Pencil (from TUSUFinanceFeedback): once a pen has been used, finger touches no longer draw (a resting palm
@@ -674,7 +682,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     }
     snapshot();
     const base = { id: uid(), page: +pel.dataset.page, color: st.shapeColor, width: st.width };
-    const m = st.tool === 'pen' ? { ...base, type: 'pen', pts: [pt] } : st.tool === 'rect' ? { ...base, type: 'rect', x: pt[0], y: pt[1], w: 0, h: 0 } : { ...base, type: st.tool, a: pt, b: pt };
+    const m = st.tool === 'pen' ? { ...base, type: 'pen', pts: [inkPt(pt, e)] } : st.tool === 'rect' ? { ...base, type: 'rect', x: pt[0], y: pt[1], w: 0, h: 0 } : { ...base, type: st.tool, a: pt, b: pt };
     st.marks.push(m); drag = { kind: 'draw', p, start: pt, m, id: e.pointerId, ptype: e.pointerType };
     pel.setPointerCapture(e.pointerId); e.preventDefault(); paint();
   });
@@ -697,8 +705,11 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       const dx = pt[0] - drag.last[0], dy = pt[1] - drag.last[1]; drag.last = pt; drag.moved = true;
       shift(m, dx, dy);
     } else if (m.type === 'pen') {
-      // Shift while drawing: a straight stroke from where it started.
-      if (e.shiftKey) m.pts = [drag.start, snap(drag.start, pt, true)]; else m.pts.push(pt);
+      // Shift while drawing: a straight stroke from where it started. Apple Pencil reports more points than are
+      // sent as events (up to 240 a second): every one is kept.
+      if (e.shiftKey) m.pts = [drag.start, snap(drag.start, pt, true)];
+      else (e.getCoalescedEvents?.().length ? e.getCoalescedEvents() : [e]).forEach((c) => m.pts.push(inkPt(at(drag.p, c), c)));
+      drawLive(drag); return;
     } else if (m.type === 'rect') {
       let w = pt[0] - drag.start[0], h = pt[1] - drag.start[1];
       if (e.shiftKey) { const s = Math.max(Math.abs(w), Math.abs(h)); w = Math.sign(w || 1) * s; h = Math.sign(h || 1) * s; }
@@ -931,7 +942,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       // Page units (top-left origin) -> PDF user space (bottom-left origin). Pages with /Rotate are not handled yet.
       const P = ([x, y]) => ({ x: ox + x, y: oy + pv.h - y });
       const line = (a, b, w, c) => pg.drawLine({ start: P(a), end: P(b), thickness: w, color: hex(c), lineCap: LineCapStyle.Round });
-      if (m.type === 'pen') for (let i = 1; i < m.pts.length; i++) line(m.pts[i - 1], m.pts[i], m.width, m.color);
+      if (m.type === 'pen') pg.drawSvgPath(inkPath(m), { x: ox, y: oy + pv.h, color: hex(m.color) }); // the outline, as on screen
       if (m.type === 'line' || m.type === 'arrow') line(m.a, m.b, m.width, m.color);
       if (m.type === 'arrow') { const [t, p1, p2] = arrowHead(m.a, m.b, m.width); line(p1, t, m.width, m.color); line(p2, t, m.width, m.color); }
       if (m.type === 'rect') {
@@ -1025,6 +1036,35 @@ function withPunctuation(r) {
     if (m) r.setStart(n, o - m[0].length);
   }
   return r;
+}
+
+// Draw (12 Nov 2026, "like GoodNotes"): a pen stroke is one filled outline instead of a line of fixed width. The points
+// ease towards the pen (less jitter), Apple Pencil pressure (a third value per point) makes the line thinner or
+// thicker, the ends are round, and the outline is joined with curves. The same path is drawn on screen and in the PDF.
+function inkOutline(raw, width) {
+  const pts = []; let prev = null;
+  raw.forEach(([x, y, p], i) => {
+    const q = prev ? [prev[0] + (x - prev[0]) * 0.55, prev[1] + (y - prev[1]) * 0.55, p] : [x, y, p];
+    if (!prev || Math.hypot(q[0] - prev[0], q[1] - prev[1]) > 0.25 || i === raw.length - 1) { pts.push(q); prev = q; }
+  });
+  const last = raw.at(-1); if (pts.length > 1) pts.push([last[0], last[1], last[2]]); // the stroke still ends at the pen
+  const rad = pts.map(([, , p]) => (width / 2) * (p == null ? 1 : Math.min(1.6, Math.max(0.3, 0.4 + 1.2 * p))));
+  const r = rad.map((v, i) => (rad[Math.max(0, i - 1)] + 2 * v + rad[Math.min(rad.length - 1, i + 1)]) / 4); // no sudden steps
+  const n = pts.length; const arc = (c, rr, a0, steps, dir) => Array.from({ length: steps }, (_, k) => { const a = a0 + dir * (k + 1) * Math.PI / (steps + 1); return [c[0] + rr * Math.cos(a), c[1] + rr * Math.sin(a)]; });
+  if (n === 1 || pts.every((q) => Math.hypot(q[0] - pts[0][0], q[1] - pts[0][1]) < 0.01)) { const [c, rr] = [pts[0], r[0]]; return [[c[0] + rr, c[1]], ...arc(c, rr, 0, 7, 1), [c[0] - rr, c[1]], ...arc(c, rr, Math.PI, 7, 1)]; } // a dot
+  const left = []; const right = []; const norm = [];
+  pts.forEach((q, i) => {
+    const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(n - 1, i + 1)];
+    let dx = b[0] - a[0], dy = b[1] - a[1]; const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+    norm.push(Math.atan2(dx, -dy)); // the left normal (-dy, dx) as an angle
+    left.push([q[0] - dy * r[i], q[1] + dx * r[i]]); right.push([q[0] + dy * r[i], q[1] - dx * r[i]]);
+  });
+  return [...left, ...arc(pts[n - 1], r[n - 1], norm[n - 1], 5, -1), ...right.reverse(), ...arc(pts[0], r[0], norm[0] + Math.PI, 5, -1)];
+}
+function inkPath(m) {
+  const o = inkOutline(m.pts, m.width); const f = (v) => Math.round(v * 100) / 100;
+  const d = o.map((a, i) => { const b = o[(i + 1) % o.length]; return `${f(a[0])} ${f(a[1])} ${f((a[0] + b[0]) / 2)} ${f((a[1] + b[1]) / 2)}`; });
+  return `M${f(o[0][0])} ${f(o[0][1])}Q${d.join(' ')}Z`;
 }
 
 // Selection rectangles of one line come in pieces: join neighbours on the same line.
