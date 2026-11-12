@@ -92,6 +92,18 @@ export function cssZoom(box, scroller, content, p) {
 export function floatBar(box, bar) {
   const set = () => box.style.setProperty('--bar-h', `${bar.offsetHeight}px`);
   new ResizeObserver(set).observe(bar); set();
+  // iPad: the on-screen keyboard scrolls the window to the caret and the bar went off the top with it. While the
+  // keyboard is up (the visible area is shorter than the window), the bar moves down to the top of the visible area,
+  // never past the bottom of `box`.
+  const vv = window.visualViewport; if (!vv) return;
+  const follow = () => {
+    if (!bar.isConnected) { vv.removeEventListener('resize', follow); vv.removeEventListener('scroll', follow); window.removeEventListener('scroll', follow); return; }
+    const keyboard = vv.height < document.documentElement.clientHeight - 80;
+    const r = box.getBoundingClientRect();
+    const dy = keyboard ? Math.min(Math.max(0, vv.offsetTop - r.top), Math.max(0, r.height - bar.offsetHeight - 16)) : 0;
+    bar.style.transform = dy ? `translateY(${Math.round(dy)}px)` : '';
+  };
+  vv.addEventListener('resize', follow); vv.addEventListener('scroll', follow); window.addEventListener('scroll', follow, { passive: true });
 }
 
 // Full screen for `box`: class `cls` makes the box fill the browser window (Escape leaves). The button with id `${p}-full` toggles it and swaps its icon.

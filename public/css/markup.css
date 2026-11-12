@@ -57,6 +57,9 @@
 .mk-page { position: relative; flex: none; margin: 0 auto; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .12); touch-action: pan-x pan-y; }
 /* Touch (iPad, v2.13): no scrolling while drawing or when a finger starts on a text box or mark. */
 .mk:is([data-tool=pen], [data-tool=line], [data-tool=arrow], [data-tool=rect]) .mk-page, .mk[data-tool=select] :is(.mk-box, .mk-mark) { touch-action: none; }
+/* iPad: a resting palm or an Apple Pencil held still while drawing or selecting must not select the PDF's text or the
+   whole page, nor open the Copy callout. An open text box still selects (.mk-box.editing). */
+.mk:is([data-tool=select], [data-tool=pen], [data-tool=line], [data-tool=arrow], [data-tool=rect]) .mk-pages { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .mk-page canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .mk-svg, .mk-hls, .mk-boxes { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* Highlights: own layer, multiplied with the page, so the paper takes the colour and the ink stays dark. */

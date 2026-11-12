@@ -518,6 +518,14 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   // would); switch to Select to scroll by finger. A touch during a pen stroke is the palm: it is ignored.
   let penSeen = false;
   const penOnly = () => penSeen && ['pen', 'line', 'arrow', 'rect'].includes(st.tool);
+  // The ignored palm still made Safari select text or the whole page on a long press: its touch is cancelled too.
+  pagesEl.addEventListener('touchstart', (e) => {
+    if (drag?.ptype === 'pen' || (penOnly() && e.target.closest?.('.mk-page'))) e.preventDefault();
+  }, { passive: false });
+  // iPad: a focus made on pointerdown does not bring up the keyboard (for touch and Apple Pencil only a release counts
+  // as the tap), so text boxes opened by touch or pen open on pointerup.
+  let tapOpen = null;
+  const openOnTap = (e, fn) => { if (e.pointerType === 'mouse') fn(); else tapOpen = { id: e.pointerId, fn }; };
   pagesEl.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'pen') penSeen = true;
     if (drag) { if (e.pointerType === 'touch' && drag.ptype !== 'pen') cancelDrag(); return; }
@@ -532,17 +540,20 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const p = pages[+pel.dataset.page]; const pt = at(p, e);
     if (st.tool === 'highlight') return; // the text layer selects; pointerup turns the selection into a highlight
     if (st.tool === 'edit') { // click a paragraph of the PDF to edit it in place
-      const hit = tgt.closest('.mk-box');
-      if (hit) { st.sel = hit.dataset.id; paint(); editBox(p, hit.dataset.id, false, [e.clientX, e.clientY]); e.preventDefault(); return; }
+      const hit = tgt.closest('.mk-box'); const xy = [e.clientX, e.clientY];
+      if (hit) { openOnTap(e, () => { st.sel = hit.dataset.id; paint(); editBox(p, hit.dataset.id, false, xy); }); e.preventDefault(); return; }
       e.preventDefault(); editAt(p, pt).catch((err) => console.error(err));
       return;
     }
     if (st.tool === 'text') {
-      const hit = tgt.closest('.mk-box');
-      if (hit) { st.sel = hit.dataset.id; paint(); editBox(p, hit.dataset.id, false, [e.clientX, e.clientY]); e.preventDefault(); return; }
-      snapshot();
-      const m = { id: uid(), page: +pel.dataset.page, type: 'text', x: pt[0], y: pt[1] - st.size * 0.7, text: '', runs: [{ t: '' }], color: st.textColor, size: st.size, font: st.font };
-      st.marks.push(m); st.sel = m.id; paint(); editBox(p, m.id, true); e.preventDefault();
+      const hit = tgt.closest('.mk-box'); const xy = [e.clientX, e.clientY];
+      if (hit) { openOnTap(e, () => { st.sel = hit.dataset.id; paint(); editBox(p, hit.dataset.id, false, xy); }); e.preventDefault(); return; }
+      openOnTap(e, () => {
+        snapshot();
+        const m = { id: uid(), page: +pel.dataset.page, type: 'text', x: pt[0], y: pt[1] - st.size * 0.7, text: '', runs: [{ t: '' }], color: st.textColor, size: st.size, font: st.font };
+        st.marks.push(m); st.sel = m.id; paint(); editBox(p, m.id, true);
+      });
+      e.preventDefault();
       return;
     }
     if (st.tool === 'select') {
@@ -593,8 +604,11 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     if (kind === 'draw' && tiny) { st.marks = st.marks.filter((x) => x !== m); st.undo.pop(); paint(); return; }
     changed();
   };
-  pagesEl.addEventListener('pointerup', endDrag);
-  pagesEl.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.id) cancelDrag(); });
+  pagesEl.addEventListener('pointerup', (e) => {
+    if (tapOpen?.id === e.pointerId) { const { fn } = tapOpen; tapOpen = null; fn(); }
+    endDrag(e);
+  });
+  pagesEl.addEventListener('pointercancel', (e) => { if (tapOpen?.id === e.pointerId) tapOpen = null; if (drag && e.pointerId === drag.id) cancelDrag(); });
 
   // Highlight: the text selected with the Highlight tool gets the highlight colour. Over the PDF's own text that is a
   // highlight mark (boxes over those words); inside a text box it is those characters. A mouse highlights on release;
@@ -618,7 +632,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     }
     const byPage = new Map();
     for (let i = 0; i < sel.rangeCount; i++) {
-      [...sel.getRangeAt(i).getClientRects()].forEach((r) => {
+      [...withPunctuation(sel.getRangeAt(i).cloneRange()).getClientRects()].forEach((r) => {
         if (r.width < 1 || r.height < 1) return;
         const p = pages.find((x) => { const b = x.el.getBoundingClientRect(); return r.top >= b.top - 2 && r.bottom <= b.bottom + 2; });
         if (!p) return;
@@ -859,6 +873,40 @@ async function textPng(m) {
   }));
   const blob = await new Promise((res) => c.toBlob(res, 'image/png'));
   return { bytes: new Uint8Array(await blob.arrayBuffer()), w: c.width / k, h: c.height / k, oy: pad / k };
+}
+
+// iPad: a selection dragged to the end of a line stopped before a closing ")" or full stop (often its own span in the
+// text layer), so the highlight came out one character short. Each end of range r takes in the closing or opening
+// punctuation right next to it, also from the neighbouring span on the same line.
+const CLOSE = /^[)\]}"'”’».,;:!?%…]+/u, OPEN = /[(\[{"'“‘«]+$/u;
+function textEnd(n, o, atEnd) { // the text node and offset at a range boundary
+  while (n.nodeType !== 3) {
+    const c = atEnd ? n.childNodes[o - 1] : n.childNodes[o]; if (!c) return null;
+    n = c; o = atEnd ? (c.nodeType === 3 ? c.data.length : c.childNodes.length) : 0;
+  }
+  return [n, o];
+}
+function sideText(n, next) { // the text of the span beside n's span on the same line (a <br> ends the line)
+  const span = n.parentElement; const s = next ? span?.nextElementSibling : span?.previousElementSibling;
+  if (!s || s.tagName !== 'SPAN' || !span.parentElement?.classList.contains('textLayer')) return null;
+  const a = span.getBoundingClientRect(), b = s.getBoundingClientRect();
+  if (Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) > a.height / 2) return null;
+  return s.firstChild?.nodeType === 3 ? s.firstChild : null;
+}
+function withPunctuation(r) {
+  const e = textEnd(r.endContainer, r.endOffset, true);
+  if (e) {
+    let [n, o] = e; let m = CLOSE.exec(n.data.slice(o));
+    if (!m && o === n.data.length) { const nx = sideText(n, true); if (nx && (m = CLOSE.exec(nx.data))) { n = nx; o = 0; } }
+    if (m) r.setEnd(n, o + m[0].length);
+  }
+  const s = textEnd(r.startContainer, r.startOffset, false);
+  if (s) {
+    let [n, o] = s; let m = OPEN.exec(n.data.slice(0, o));
+    if (!m && o === 0) { const pv = sideText(n, false); if (pv && (m = OPEN.exec(pv.data))) { n = pv; o = pv.data.length; } }
+    if (m) r.setStart(n, o - m[0].length);
+  }
+  return r;
 }
 
 // Selection rectangles of one line come in pieces: join neighbours on the same line.
