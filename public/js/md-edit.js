@@ -93,7 +93,7 @@ const docCss = (font) => `.md-doc{font-family:'${font}','Noto Sans Thai','Sarabu
 .md-doc>:first-child{margin-top:0}.md-doc h1,.md-doc h2,.md-doc h3,.md-doc h4{font-family:'Prompt','${font}',sans-serif;line-height:1.3;margin:1.4em 0 .5em;color:#002d37}
 .md-doc h1{font-size:2em;border-bottom:2px solid #00758f;padding-bottom:.25em}.md-doc h2{font-size:1.5em;border-bottom:1px solid #d5e3e9;padding-bottom:.2em}.md-doc h3{font-size:1.25em}.md-doc h4{font-size:1.05em}
 .md-doc p,.md-doc ul,.md-doc ol,.md-doc blockquote,.md-doc table,.md-doc pre{margin:0 0 1em}.md-doc ul,.md-doc ol{padding-left:1.6em}.md-doc li+li{margin-top:.25em}
-.md-doc li:has(>input[type=checkbox]){list-style:none;margin-left:-1.4em}.md-doc li>input[type=checkbox]{margin:0 .5em 0 0;width:1em;height:1em;vertical-align:-.1em;accent-color:#00758f}
+.md-doc li:has(>input[type=checkbox]),.md-doc li:has(>p:first-child>input[type=checkbox]){list-style:none;margin-left:-1.4em}.md-doc li>input[type=checkbox],.md-doc li>p:first-child>input[type=checkbox]{margin:0 .5em 0 0;width:1em;height:1em;vertical-align:-.1em;accent-color:#00758f}
 .md-doc a{color:#00758f}.md-doc blockquote{margin-left:0;padding:.4em 1em;border-left:4px solid #80b9c6;background:#f2f8fa;color:#33454f}
 .md-doc code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88em;background:#eef3f6;padding:.15em .35em;border-radius:4px}
 .md-doc pre{background:#0f2a33;color:#e6f1f4;padding:14px 16px;border-radius:8px;overflow:auto}.md-doc pre code{background:none;padding:0;color:inherit}
@@ -165,14 +165,15 @@ export function openMd(root, { download, zip }) {
     p.addHook('afterSanitizeAttributes', (n) => { if (n.tagName === 'A' && n.getAttribute('href')) { n.setAttribute('target', '_blank'); n.setAttribute('rel', 'noopener noreferrer'); } });
     return (lib = { m, p });
   });
-  const toHtml = async (text) => { const { m, p } = await ready(); return p.sanitize(m.parse(text, { gfm: true, breaks: false })); };
+  const lead = (text) => text.replace(/^[ \t\u00a0]+/gm, (s) => s.replace(/\u00a0/g, ' '));
+  const toHtml = async (text) => { const { m, p } = await ready(); return p.sanitize(m.parse(lead(text), { gfm: true, breaks: false })); };
   // The page is built block by block (one top-level element per Markdown block), and each block keeps the stretch of
   // text it came from (data-s / data-e), so an edit on the page rewrites only that stretch, and a click there finds
   // its place in the text.
   async function toBlocks(text) { await ready(); return blocksNow(text); }
   function blocksNow(text) {
     const { m, p } = lib;
-    const toks = m.lexer(text, { gfm: true, breaks: false }); const frag = document.createDocumentFragment(); let at = 0;
+    const toks = m.lexer(lead(text), { gfm: true, breaks: false }); const frag = document.createDocumentFragment(); let at = 0;
     for (const t of toks) {
       const s0 = at; at += t.raw.length; if (t.type === 'space') continue;
       const one = [t]; one.links = toks.links;
@@ -215,14 +216,15 @@ export function openMd(root, { download, zip }) {
     td.use(G.gfm);
     // bold right next to italic with no space ("**a***b*") does not parse as Markdown; keep such runs as HTML tags
     const EMPH = /^(STRONG|B|EM|I)$/;
-    const touching = (n) => EMPH.test(n.previousSibling?.nodeName || '') || EMPH.test(n.nextSibling?.nodeName || '');
+    const touching = (n) => (EMPH.test(n.previousSibling?.nodeName || '') && !/^\s/.test(n.textContent) && !/\s$/.test(n.previousSibling.textContent))
+      || (EMPH.test(n.nextSibling?.nodeName || '') && !/\s$/.test(n.textContent) && !/^\s/.test(n.nextSibling.textContent));
     td.addRule('touchingEmphasis', { filter: (n) => EMPH.test(n.nodeName) && touching(n), replacement(content, node) {
       const tag = /^(STRONG|B)$/.test(node.nodeName) ? 'strong' : 'em'; return content.trim() ? `<${tag}>${content}</${tag}>` : content;
     } });
     td.addRule('listItem', { filter: 'li', replacement(content, node, o) { // "- item" / "1. item", not Turndown's "-   item"
       const ol = node.parentNode.nodeName === 'OL'; const i = [...node.parentNode.children].indexOf(node);
       const mark = ol ? `${(+node.parentNode.getAttribute('start') || 1) + i}. ` : `${o.bulletListMarker} `;
-      content = content.replace(/^\n+/, '').replace(/\n+$/, '\n').replace(/\n/g, `\n${' '.repeat(mark.length)}`);
+      content = content.replace(/^\n+/, '').replace(/^(\[[ xX]\]) +/, '$1 ').replace(/\n+$/, '\n').replace(/\n/g, `\n${' '.repeat(mark.length)}`);
       return mark + content + (node.nextSibling && !/\n$/.test(content) ? '\n' : '');
     } });
     return td;
@@ -270,6 +272,21 @@ export function openMd(root, { download, zip }) {
     if (t) r.setStart(t, Math.min(n, t.data.length)); else { r.selectNodeContents(doc); r.collapse(false); }
     r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
   }
+  // The edited blocks as HTML for Turndown, with bold (b/strong) or italic (em/i) runs that touch merged into one,
+  // so "**Bold** next" bolded becomes "**Bold next**", not two runs that need HTML tags.
+  const KIND = { B: 'b', STRONG: 'b', I: 'i', EM: 'i' };
+  function tidy(els) {
+    const box = document.createElement('div'); els.forEach((el) => box.append(el.cloneNode(true)));
+    let again = true;
+    while (again) {
+      again = false;
+      box.querySelectorAll('b, strong, i, em').forEach((n) => {
+        const nx = n.nextSibling;
+        if (nx?.nodeType === 1 && n.isConnected && KIND[nx.nodeName] === KIND[n.nodeName] && nx.attributes.length === 0 && n.attributes.length === 0) { n.append(...nx.childNodes); nx.remove(); again = true; }
+      });
+    }
+    return box.innerHTML;
+  }
   async function pull() {
     pullT = 0; const td = await turn(); const src = snap.src; if (src == null || src !== ta.value) return;
     [...doc.childNodes].forEach((n) => { if (n.nodeType === 3 && n.data.trim()) { const pp = document.createElement('p'); n.replaceWith(pp); pp.append(n); } }); // text typed straight onto an empty page
@@ -282,7 +299,7 @@ export function openMd(root, { download, zip }) {
       const edited = g.els.some((el) => !snap.orig.has(el) || snap.orig.get(el) !== el.outerHTML) || gone.some((x) => x >= g.s && x < end);
       if (!edited) { out += old; return; }
       any = true; const tail = i < groups.length - 1 ? (old.match(/\s*$/)[0].includes('\n\n') ? old.match(/\s*$/)[0] : '\n\n') : (/\n$/.test(src) ? '\n' : '');
-      const md = td.turndown(g.els.map((el) => el.outerHTML).join('')).trim();
+      const md = td.turndown(tidy(g.els)).trim();
       out += md ? md + tail : '';
     });
     if (!any || out === src) return;
@@ -332,11 +349,22 @@ export function openMd(root, { download, zip }) {
     }
     return s0 + Math.min(guess, src.length);
   }
+  // Scroll the text so character `at` sits `rows` lines below the top. Long lines wrap in the text pane, so the
+  // caret's height is measured on a hidden copy of the pane (same width, font and wrapping), not counted in lines.
+  function scrollTextTo(at, rows) {
+    const cs = getComputedStyle(ta); const m = document.createElement('div');
+    ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'tabSize', 'wordBreak', 'overflowWrap', 'paddingTop', 'paddingLeft', 'paddingRight', 'fontVariantLigatures']
+      .forEach((k) => { m.style[k] = cs[k]; });
+    Object.assign(m.style, { position: 'absolute', visibility: 'hidden', left: '-9999px', top: '0', whiteSpace: 'pre-wrap', boxSizing: 'border-box', width: `${ta.clientWidth}px`, border: '0' });
+    m.textContent = ta.value.slice(0, at); const mark = document.createElement('span'); mark.textContent = '\u200b'; m.append(mark);
+    document.body.append(m); const y = mark.offsetTop; m.remove();
+    ta.scrollTop = Math.max(0, y - rows * (parseFloat(cs.lineHeight) || 24));
+  }
   doc.addEventListener('click', (e) => {
     if (e.target.matches('input[type="checkbox"]')) return;
     const at = sourceAt(); if (at == null) return;
     ta.setSelectionRange(at, at); quiet = Date.now() + 300;
-    const line = ta.value.slice(0, at).split('\n').length; ta.scrollTop = Math.max(0, (line - 6) * parseFloat(getComputedStyle(ta).lineHeight)); pos();
+    scrollTextTo(at, 6); pos();
   });
   const setFont = (f) => { font = f; style.textContent = docCss(f); $('#md-font').value = f; try { localStorage.setItem('md-font', f); } catch { /* not kept */ } };
 
@@ -436,7 +464,7 @@ export function openMd(root, { download, zip }) {
     let at = v.indexOf(ql, ta.selectionEnd); if (at < 0) at = v.indexOf(ql); if (at < 0) { say(`"${q}" was not found`); return false; }
     ta.focus(); ta.setSelectionRange(at, at + q.length); scrollToSel(); return true;
   };
-  const scrollToSel = () => { const before = ta.value.slice(0, ta.selectionStart).split('\n').length; ta.scrollTop = Math.max(0, (before - 4) * parseFloat(getComputedStyle(ta).lineHeight)); };
+  const scrollToSel = () => scrollTextTo(ta.selectionStart, 4);
   $('#md-fnext').onclick = findNext; fq.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); findNext(); fq.focus(); } });
   $('#md-frep').onclick = () => { const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd); if (fq.value && sel.toLowerCase() === fq.value.toLowerCase()) insert(fr.value); findNext(); };
   $('#md-fall').onclick = () => {
