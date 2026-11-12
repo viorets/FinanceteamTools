@@ -70,6 +70,12 @@
 .mk[data-tool="select"] .mk-mark * { pointer-events: visiblePainted; }
 .mk-mark line, .mk-mark polyline, .mk-mark rect:not(.mk-hl) { stroke-opacity: 1; }
 .mk-mark.on { filter: drop-shadow(0 0 2px #2babc2) drop-shadow(0 0 2px #2babc2); }
+/* Select: the resize handle at the picked mark's corner (a 32px touch target around a 12px dot) and the hold menu. */
+.mk-handle { position: absolute; width: 32px; height: 32px; margin: -16px 0 0 -16px; pointer-events: auto; touch-action: none; cursor: nwse-resize; z-index: 6; }
+.mk-handle::after { content: ""; position: absolute; inset: 10px; border-radius: 50%; background: #fff; border: 2px solid #2babc2; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
+.mk-menu { position: absolute; z-index: 20; display: flex; gap: 2px; padding: 4px; border-radius: 12px; background: var(--surface, #fff); color: var(--ink, #1d1d1f); box-shadow: 0 6px 20px rgba(0, 0, 0, .22); border: 1px solid var(--border, #d5e3e9); }
+.mk-menu button { border: 0; font: inherit; font-size: 15px; min-height: 40px; padding: 6px 14px; border-radius: 8px; background: none; color: inherit; cursor: pointer; }
+.mk-menu button:hover, .mk-menu button:focus-visible { background: var(--tint, rgba(43, 171, 194, .12)); outline: none; }
 
 /* Text boxes: rich text (b, i, u, strike, highlighted spans). */
 .mk-boxes { z-index: 2; pointer-events: none; }

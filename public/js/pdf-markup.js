@@ -316,6 +316,12 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
         // Highlights have their own layer, blended with multiply: the page takes the colour, the ink stays dark.
         (m.type === 'highlight' ? p.hls : p.svg).append(g);
       });
+      // Select: a handle at the picked mark's lower-right corner resizes it (a text box: its text size).
+      const s = st.tool === 'select' ? selMark() : null;
+      if (s && s.page === i && s.type !== 'highlight') {
+        const [x, y, w, h] = bbox(s, p); const hd = document.createElement('div'); hd.className = 'mk-handle';
+        hd.style.cssText = `left:${(x + w) * p.scale + 4}px;top:${(y + h) * p.scale + 4}px`; p.boxes.append(hd);
+      }
     });
     refreshBar();
   }
@@ -424,6 +430,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   showEmode();
   // A slider or colour drag on a picked mark is one undo step.
   let tweakId = null;
+  let menuKeys = () => false; // Escape closes the hold menu first (set with the menu below)
   const tweak = (m, f) => { if (tweakId !== m.id) { snapshot(); tweakId = m.id; } f(m); changed(); };
   ['#mk-w', '#mk-c', '#mk-hc', '#mk-o'].forEach((s) => $(s).addEventListener('change', () => { tweakId = null; }));
   $('#mk-w').oninput = (e) => {
@@ -520,7 +527,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       e.preventDefault(); format({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]);
     }
     else if (e.key === 'Delete' || e.key === 'Backspace') { if (st.sel) { e.preventDefault(); del(); } }
-    else if (e.key === 'Escape') { st.sel = null; paint(); }
+    else if (e.key === 'Escape') { if (!menuKeys(e)) { st.sel = null; paint(); } }
   };
   document.addEventListener('keydown', onKey);
 
@@ -532,6 +539,75 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const dx = b[0] - a[0], dy = b[1] - a[1]; const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4); const len = Math.hypot(dx, dy);
     return [a[0] + len * Math.cos(ang), a[1] + len * Math.sin(ang)];
   };
+
+  // A mark's box in page units [x, y, w, h] (a text box is measured on screen).
+  function bbox(m, p) {
+    if (m.type === 'text') { const b = p?.boxes.querySelector(`[data-id="${m.id}"]`); return [m.x, m.y, (b?.offsetWidth || 0) / (p?.scale || 1), (b?.offsetHeight || 0) / (p?.scale || 1)]; }
+    const pts = m.pts || (m.a ? [m.a, m.b] : m.rects ? m.rects.flatMap(([x, y, w, h]) => [[x, y], [x + w, y + h]]) : [[m.x, m.y], [m.x + m.w, m.y + m.h]]);
+    const xs = pts.map((q) => q[0]); const ys = pts.map((q) => q[1]); const x = Math.min(...xs); const y = Math.min(...ys);
+    return [x, y, Math.max(...xs) - x, Math.max(...ys) - y];
+  }
+  const shift = (m, dx, dy) => {
+    if (m.pts) m.pts = m.pts.map(([x, y]) => [x + dx, y + dy]);
+    if (m.a) { m.a = [m.a[0] + dx, m.a[1] + dy]; m.b = [m.b[0] + dx, m.b[1] + dy]; }
+    if (m.rects) m.rects = m.rects.map(([x, y, w, h]) => [x + dx, y + dy, w, h]);
+    if ('x' in m) { m.x += dx; m.y += dy; }
+  };
+  // Mark m becomes o (its copy when the resize began) scaled by f from point [ox, oy]; a text box changes its text size.
+  function scaleMark(m, o, f, [ox, oy]) {
+    const S = ([x, y]) => [ox + (x - ox) * f, oy + (y - oy) * f];
+    if (o.pts) m.pts = o.pts.map(S);
+    if (o.a) { m.a = S(o.a); m.b = S(o.b); }
+    if (o.type === 'rect') { [m.x, m.y] = S([o.x, o.y]); m.w = o.w * f; m.h = o.h * f; }
+    if (o.type === 'text') { m.size = Math.min(72, Math.max(6, Math.round(o.size * f * 2) / 2)); if (o.wrap) m.wrap = o.wrap * m.size / o.size; }
+  }
+
+  // Hold a picked mark (or right-click it) in Select: Copy, Duplicate, Delete. Hold the page after a Copy: Paste there.
+  let clip = null; // the copied mark, as JSON
+  let hold = null; // a press being held: { id, x, y, timer }
+  const holdEnd = () => { if (hold) clearTimeout(hold.timer); hold = null; };
+  const holdStart = (e, fn) => { holdEnd(); hold = { id: e.pointerId, x: e.clientX, y: e.clientY, timer: setTimeout(() => { hold = null; fn(); }, 550) }; };
+  let menu = null;
+  const closeMenu = () => { menu?.remove(); menu = null; };
+  function showMenu(cx, cy, p, m, at) {
+    closeMenu();
+    const items = m ? [['copy', t('Copy', 'คัดลอก')], ['dup', t('Duplicate', 'ทำซ้ำ')], ['del', t('Delete', 'ลบ')]] : clip ? [['paste', t('Paste', 'วาง')]] : [];
+    if (!items.length) return;
+    menu = document.createElement('div'); menu.className = 'mk-menu'; menu.setAttribute('role', 'menu');
+    menu.innerHTML = items.map(([k, label]) => `<button type="button" role="menuitem" data-act="${k}">${label}</button>`).join('');
+    mk.append(menu);
+    const r = mk.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(cx - r.left - menu.offsetWidth / 2, r.width - menu.offsetWidth - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(cy - r.top - menu.offsetHeight - 16, r.height - menu.offsetHeight - 8))}px`;
+    menu.onpointerdown = (e) => e.preventDefault();
+    menu.onkeydown = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(); } };
+    menu.onclick = (e) => {
+      const k = e.target.closest('[data-act]')?.dataset.act; if (!k) return; closeMenu();
+      const copyOf = (src) => { const c = JSON.parse(src); c.id = uid(); delete c.cover; return c; }; // a copied edit is new text
+      if (k === 'copy') clip = JSON.stringify(m);
+      else if (k === 'del') { st.sel = m.id; del(); }
+      else if (k === 'dup') { snapshot(); const c = copyOf(JSON.stringify(m)); shift(c, 12, 12); st.marks.push(c); st.sel = c.id; changed(); }
+      else if (k === 'paste') {
+        snapshot(); const c = copyOf(clip); c.page = pages.indexOf(p);
+        const [x, y] = c.type === 'text' ? [c.x, c.y] : bbox(c); shift(c, at[0] - x, at[1] - y);
+        st.marks.push(c); st.sel = c.id; changed();
+      }
+    };
+    menu.querySelector('button').focus({ preventScroll: true });
+  }
+  document.addEventListener('pointerdown', (e) => { if (menu && !menu.contains(e.target)) closeMenu(); }, true);
+  menuKeys = (e) => { if (menu && e.key === 'Escape') { e.preventDefault(); closeMenu(); return true; } return false; };
+  pagesEl.addEventListener('scroll', closeMenu, { passive: true });
+  pagesEl.addEventListener('contextmenu', (e) => {
+    if (st.tool !== 'select' || editingBox()) return;
+    const tgt = document.elementFromPoint(e.clientX, e.clientY) || e.target; // a long press: the mark pressed was redrawn when picked
+    const pel = tgt.closest('.mk-page'); if (!pel) return;
+    const p = pages[+pel.dataset.page]; const id = tgt.closest('[data-id]')?.dataset.id;
+    if (!id && !clip) return;
+    e.preventDefault(); if (drag) cancelDrag();
+    if (id) { st.sel = id; paint(); }
+    showMenu(e.clientX, e.clientY, p, id ? selMark() : null, at(p, e));
+  });
 
   let drag = null;
   // A second finger during a finger stroke or move is a pinch: undo what the first finger started.
@@ -546,11 +622,13 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   }, { passive: false });
   // iPad: a focus made on pointerdown does not bring up the keyboard (for touch and Apple Pencil only a release counts
   // as the tap), so text boxes opened by touch or pen open on pointerup.
-  let tapOpen = null;
+  let tapOpen = null; let tapOff = null;
   const openOnTap = (e, fn) => { if (e.pointerType === 'mouse') fn(); else tapOpen = { id: e.pointerId, fn }; };
   pagesEl.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'pen') penSeen = true;
     if (drag) { if (e.pointerType === 'touch' && drag.ptype !== 'pen') cancelDrag(); return; }
+    // iPad: a quick tap beside the pages (not a scroll, not a resting palm) switches to Select.
+    if (e.pointerType !== 'mouse' && st.tool !== 'select' && !e.target.closest('.mk-page')) { tapOff = { id: e.pointerId, t: Date.now() }; return; }
     if (e.pointerType === 'touch' && penOnly()) return;
     if (e.button !== 0) return;
     // Inside the open text box the browser places the caret and selects text. A press anywhere else first saves it.
@@ -579,11 +657,18 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       return;
     }
     if (st.tool === 'select') {
+      if (tgt.closest('.mk-handle') && selMark()) {
+        const m = selMark(); snapshot();
+        drag = { kind: 'resize', p, m, o: structuredClone(m), box: bbox(m, p), moved: false, id: e.pointerId, ptype: e.pointerType };
+        pel.setPointerCapture(e.pointerId); e.preventDefault();
+        return;
+      }
       const id = tgt.closest('[data-id]')?.dataset.id || null; st.sel = id; paint();
-      if (!id) return;
+      if (!id) { if (clip && e.pointerType !== 'mouse') holdStart(e, () => showMenu(e.clientX, e.clientY, p, null, pt)); return; }
       const m = selMark();
       if (m.type === 'text' && e.detail === 2) { editBox(p, id, false, [e.clientX, e.clientY]); e.preventDefault(); return; }
-      snapshot(); drag = { kind: 'move', p, last: pt, m, moved: false, id: e.pointerId, ptype: e.pointerType };
+      snapshot(); drag = { kind: 'move', p, last: pt, m, moved: false, id: e.pointerId, ptype: e.pointerType, cx: e.clientX, cy: e.clientY };
+      if (e.pointerType !== 'mouse') holdStart(e, () => { if (drag?.m === m && !drag.moved) { drag = null; st.undo.pop(); } showMenu(e.clientX, e.clientY, p, m); });
       pel.setPointerCapture(e.pointerId); e.preventDefault();
       return;
     }
@@ -600,14 +685,17 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     editBox(pages[+pel.dataset.page], hit.dataset.id, false, [e.clientX, e.clientY]);
   });
   pagesEl.addEventListener('pointermove', (e) => {
+    if (hold && e.pointerId === hold.id && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 8) holdEnd();
     if (!drag || e.pointerId !== drag.id) return;
     const pt = at(drag.p, e); const m = drag.m;
-    if (drag.kind === 'move') {
+    if (drag.kind === 'resize') {
+      const [x, y, w, h] = drag.box; drag.moved = true;
+      scaleMark(m, drag.o, Math.max(0.1, Math.hypot(pt[0] - x, pt[1] - y) / (Math.hypot(w, h) || 1)), [x, y]);
+    } else if (drag.kind === 'move') {
+      if (!drag.moved && Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy) < 6) return; // a held press stays still
+      holdEnd();
       const dx = pt[0] - drag.last[0], dy = pt[1] - drag.last[1]; drag.last = pt; drag.moved = true;
-      if (m.pts) m.pts = m.pts.map(([x, y]) => [x + dx, y + dy]);
-      if (m.a) { m.a = [m.a[0] + dx, m.a[1] + dy]; m.b = [m.b[0] + dx, m.b[1] + dy]; }
-      if (m.rects) m.rects = m.rects.map(([x, y, w, h]) => [x + dx, y + dy, w, h]);
-      if ('x' in m) { m.x += dx; m.y += dy; }
+      shift(m, dx, dy);
     } else if (m.type === 'pen') {
       // Shift while drawing: a straight stroke from where it started.
       if (e.shiftKey) m.pts = [drag.start, snap(drag.start, pt, true)]; else m.pts.push(pt);
@@ -621,16 +709,23 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   const endDrag = (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const { m, kind, moved } = drag; drag = null;
-    if (kind === 'move' && !moved) { st.undo.pop(); return; } // a click that only selected
+    if ((kind === 'move' || kind === 'resize') && !moved) { st.undo.pop(); return; } // a click that only selected
     const tiny = (m.type === 'rect' && m.w < 2 && m.h < 2) || ((m.type === 'line' || m.type === 'arrow') && Math.hypot(m.b[0] - m.a[0], m.b[1] - m.a[1]) < 2) || (m.type === 'pen' && m.pts.length < 2);
     if (kind === 'draw' && tiny) { st.marks = st.marks.filter((x) => x !== m); st.undo.pop(); paint(); return; }
     changed();
   };
   pagesEl.addEventListener('pointerup', (e) => {
+    if (hold?.id === e.pointerId) holdEnd();
+    if (tapOff?.id === e.pointerId) { const quick = Date.now() - tapOff.t < 400; tapOff = null; if (quick) setTool('select'); }
     if (tapOpen?.id === e.pointerId) { const { fn } = tapOpen; tapOpen = null; fn(); }
     endDrag(e);
   });
-  pagesEl.addEventListener('pointercancel', (e) => { if (tapOpen?.id === e.pointerId) tapOpen = null; if (drag && e.pointerId === drag.id) cancelDrag(); });
+  pagesEl.addEventListener('pointercancel', (e) => {
+    if (hold?.id === e.pointerId) holdEnd();
+    if (tapOff?.id === e.pointerId) tapOff = null;
+    if (tapOpen?.id === e.pointerId) tapOpen = null;
+    if (drag && e.pointerId === drag.id) cancelDrag();
+  });
 
   // Highlight: the text selected with the Highlight tool gets the highlight colour. Over the PDF's own text that is a
   // highlight mark (boxes over those words); inside a text box it is those characters. A mouse highlights on release;
