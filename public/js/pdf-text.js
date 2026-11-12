@@ -343,7 +343,16 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
   const seen = new Map();
   pages.forEach((p) => new Set(p.lines.filter((l) => edge(p, l)).map((l) => key(l.text))).forEach((k) => seen.set(k, (seen.get(k) || 0) + 1)));
   const PAGE_NO = /^[-–(]?\s*(?:page|หน้า(?:ที่)?)?\s*#\s*(?:(?:\/|of|จาก)\s*#)?\s*[-–)]?$/i;
-  pages.forEach((p) => { p.lines = p.lines.filter((l) => !(edge(p, l) && (PAGE_NO.test(key(l.text)) || (pages.length >= 3 && seen.get(key(l.text)) >= Math.max(2, pages.length / 2))))); });
+  const spot = (l) => `${Math.round(l.x / 6)}:${Math.round(l.top / 6)}:${Math.round(l.size)}`;
+  const spots = new Map();
+  pages.forEach((p) => new Set(p.lines.filter((l) => edge(p, l)).map(spot)).forEach((k) => spots.set(k, (spots.get(k) || 0) + 1)));
+  // alone in its band: no other line within two of its own heights
+  const alone = (p, l) => p.lines.every((o) => o === l || Math.abs(o.y - l.y) > l.size * 2);
+  pages.forEach((p) => {
+    p.lines = p.lines.filter((l) => !(edge(p, l) && (PAGE_NO.test(key(l.text))
+      || (pages.length >= 3 && seen.get(key(l.text)) >= Math.max(2, pages.length / 2))
+      || (pages.length >= 3 && spots.get(spot(l)) >= Math.max(3, pages.length / 2) && alone(p, l)))));
+  });
 
   // Body size: the size most characters use. Larger sizes become heading levels 1–3.
   const bySize = new Map();
@@ -352,6 +361,9 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
   const big = [...bySize.keys()].filter((s) => s > body * 1.15).sort((a, b) => b - a);
   const levelOf = (size) => { const i = big.indexOf(Math.round(size * 2) / 2); return i < 0 ? 0 : Math.min(i + 1, 3); };
 
+  // The document's left margin: where the most single-piece lines start.
+  const starts = new Map(); pages.forEach((p) => p.lines.forEach((l) => { if (l.cells.length === 1) { const k = Math.round(l.x); starts.set(k, (starts.get(k) || 0) + 1); } }));
+  const margin = [...starts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 72;
   const blocks = [];
   const pushTable = (t, atTop) => { if (!(atTop && joinTables(blocks.at(-1), t))) blocks.push(t); };
   let carry = null; // a paragraph that may continue on the next page
@@ -417,10 +429,18 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
       // New paragraph: a size change, a wider gap, a first-line indent, or the line above stopped short of the
       // margin. A list item goes on while its lines are indented past its marker.
       const broke = sizeChange || gap > lead * 1.35 || (prev && /…\s*\S{1,4}$/.test(prev.text)); // a contents line ends at its page number
+      // A hanging indent (a reference list): the paragraph's later lines sit indented past its first line. The first
+      // such line counts when the line above ran to the margin or the line after sits at the same indent; then every
+      // line at that indent continues it, and a line back at the first line's edge starts the next paragraph.
+      const nx = ls[i + 1]; const sameIndent = (a, b) => Math.abs(a - b) < l.size * 0.5;
+      // (only from the document's left margin: shorter centred lines look indented too)
+      const hang = !broke && cur?.type === 'p' && sameIndent(cur.x, margin) && l.x > cur.x + l.size * 0.9 && (cur.hang != null ? sameIndent(l.x, cur.hang)
+        : cur.lines === 1 && ((prev && prev.x2 >= right - l.size * 4) || !nx || l.y - nx.y > lead * 1.35 || (sameIndent(nx.x, l.x) && l.y - nx.y < lead * 1.35)));
+      if (hang) cur.hang = l.x;
       const newPara = !cur || cur.type === 'h' || broke
-        || (cur.type === 'li' ? l.x <= cur.x + l.size * 0.3 : l.x > left + l.size * 0.9 || (prev && prev.x2 < right - l.size * 4));
-      if (!cur && carry && !l.cells[0].runs[0]?.b && l.x <= left + l.size * 0.9 && blocks.at(-1) === carry) { cur = blocks.pop(); cur.runs = joinRuns(cur.runs, runs); return; }
-      if (newPara) { close(); cur = { type: 'p', runs, bold: allBold, lines: 1, at: { pg: pi, y: l.y, size: l.size } }; return; }
+        || (cur.type === 'li' ? l.x <= cur.x + l.size * 0.3 && !(prev && prev.x2 >= right - l.size * 4) : !hang && (l.x > left + l.size * 0.9 || (prev && prev.x2 < right - l.size * 4)));
+      if (!cur && carry && !l.cells[0].runs[0]?.b && (l.x <= left + l.size * 0.9 || (carry.hang != null && Math.abs(l.x - carry.hang) < l.size * 0.5)) && blocks.at(-1) === carry) { cur = blocks.pop(); cur.runs = joinRuns(cur.runs, runs); return; }
+      if (newPara) { close(); cur = { type: 'p', runs, bold: allBold, lines: 1, x: l.x, at: { pg: pi, y: l.y, size: l.size } }; return; }
       cur.runs = joinRuns(cur.runs, runs); cur.lines = (cur.lines || 1) + 1;
     });
     close(); closeTable(); flushGrids(-Infinity);
@@ -441,7 +461,7 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
     }
     b.type = 'h'; b.level = sub; prevSub = b;
   }
-  blocks.forEach((b) => { delete b.at; });
+  blocks.forEach((b) => { delete b.at; if (b.type === 'p') { delete b.x; delete b.hang; } });
   // Word's PDF export can also drop ำ outright ("กาไร" for กำไร); fixed on whole paragraphs, as a word may span pieces.
   blocks.forEach((b) => (b.rows ? b.rows.flat() : [b.runs]).forEach((rs) => rs.forEach((r) => { r.t = r.t.replace(LOST_AM, (w) => AM_WORDS[w]); })));
   const fam = {}; pages.forEach((p) => Object.entries(p.fonts).forEach(([k, v]) => { fam[k] = (fam[k] || 0) + v; }));
@@ -566,6 +586,8 @@ function trimRuns(runs) {
 const runsText = (runs) => runs.map((r) => r.t).join('').trim();
 // a column of figures: every filled cell below the header row is a figure
 const figCol = (rows, j) => { const cs = rows.slice(1).map((r) => runsText(r[j] || [])).filter(Boolean); return cs.length > 0 && cs.every((t) => FIG.test(t)); };
+// A contents line: its title, leader dots (… or ...; spaced or not), and a page number (1, ๑, iv) at the end.
+const TOC_LINE = /^(.*?\S)\s*(?:(?:…|\.{2,})\s*){2,}\.*\s*([\d๐-๙]{1,4}|[ivxlc]{1,6})$/i;
 const NO_BORDERS = `<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map((s) => `<w:${s} w:val="nil"/>`).join('')}</w:tblBorders>`;
 export async function blocksToDocx(blocks, { JSZip, font = '', size = 14, page = { w: 595, h: 842 }, title = '' } = {}) {
   const f = font || 'TH Sarabun New'; const sz = Math.round(Math.min(Math.max(size, 8), 28) * 2);
@@ -575,7 +597,11 @@ export async function blocksToDocx(blocks, { JSZip, font = '', size = 14, page =
   blocks.forEach((b) => {
     if (b.type !== 'li') list = null;
     if (b.type === 'h') body.push(wP(b.runs.map((r) => ({ ...r, b: false })), `<w:pStyle w:val="Heading${b.level}"/>`));
-    else if (b.type === 'p') body.push(wP(b.runs));
+    else if (b.type === 'p') {
+      const toc = TOC_LINE.exec(runsText(b.runs));
+      if (toc) body.push(`<w:p><w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="${twip(page.w - 144)}"/></w:tabs><w:spacing w:after="60"/></w:pPr>${wRuns([{ t: toc[1].trim(), b: b.runs.some((r) => r.b && r.t.trim()) && b.runs.every((r) => r.b || !r.t.trim()), i: false }])}<w:r><w:tab/></w:r><w:r><w:t>${x(toc[2])}</w:t></w:r></w:p>`);
+      else body.push(wP(b.runs));
+    }
     else if (b.type === 'li') {
       const kind = b.ordered ? 1 : b.marker === '-' ? 0 : 2; // 0 bullet, 1 Word numbering, 2 keep the marker as text
       if (!list || list.kind !== kind) { list = { kind, id: nums.length + 1 }; nums.push([kind, b.ordered ? parseInt(b.marker, 10) || 1 : 1]); }
