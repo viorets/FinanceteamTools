@@ -22,7 +22,8 @@ Browser-based data tools for the TUSU finance team. Turn an Excel file into a ch
 - Wide sheets (such as Google Form responses): Word tables hold at most 63 columns and only about 15 fit a page readably, so by default a sheet that is too wide becomes one block per row (question | answer, blank answers left out); or choose to split the columns into several tables
 
 ### Appearance and chart colours
-- Side navigation (top): Light, Dark or Follow device for the site. Dark is black and greys with white controls (monochrome, as on Apple's product pages)
+- Side navigation (top): Light, Dark or Follow device for the site. Dark follows [TUSU Finance Feedback](https://tusu-budget-pitching-feedback.web.app): a deep navy page with a slight blue gradient, dark teal-grey panels, light-teal labels and cyan focus rings
+- Filled controls (main buttons, the open tool, selected tabs and toggles, dialog OK buttons) use the Budget Pitching site's teal-to-cyan gradient (`#006371` → `#0097b2`) with white text, in both light and dark
 - Chart colours: TUSU Finance (the team CI, Mosaic Blue #00758F; default), TUSU Finance CI (the internal deck's teals #006371, #077989, #2babc2, #5f9aa3, ice #e8f9ff), 7 team palettes (Sakura Dusk, Midnight Violet, Old Rose, Mulled Wine, Winter Dawn, Autumn Harvest, Kombu Moss) and 10 theme-factory themes, shown as colour strips; they set the default colours of the charts, Gantt chart and Word tables
 - iPad and narrow windows: the ☰ button in the top bar opens the tools as a drawer; fields use 16px text so Safari does not zoom in
 - Side menu, in three groups: **Make** (Chart from Excel, Word table from Excel, Gantt chart), **Edit** (PDF markup, Word editor, Excel editor, Markdown editor), **Batch** (Merge PDFs, Rename files). The menu is a floating glass panel; on iPad portrait and narrow windows it slides in as a drawer from the ☰ button in the top bar, which also shows the open tool (Esc, a tap on the dimmed page or choosing a tool closes it)
@@ -122,7 +123,7 @@ The editor came from [TUSUFinanceFeedback](https://github.com/viorets/TUSUFinanc
 | Gantt Chart Creator | Quick Gantt or timeline from typed tasks or Excel; PNG/SVG match the preview | No dependencies or critical path; tasks stay in this browser |
 | Excel editing (beta) | Excel-like ribbon, live formulas, no size limit, Format as table, many export formats | Charts, images and pivot tables are dropped; filtered-out rows hidden on screen only |
 | Markdown editing | Fast writing with a live preview; Excel ranges paste as tables; .md, .html, Word, PDF downloads | PDF goes through the print window; images must be web addresses (no upload); Word file is .doc (web format) |
-| Word editing (beta) | Document in its own formatting, safe text edits, custom styles, TOC with leaders | One continuous page; no headers/footers; editing formatting near links or fields rebuilds the paragraph |
+| Word editing (beta) | Document in its own formatting, safe text edits, custom styles, TOC with leaders; pages, headers and footers, page numbers | Pages break only between paragraphs and table rows; fields other than PAGE, NUMPAGES, IF and = show their last result; editing formatting near links or fields rebuilds the paragraph |
 
 Everything runs in the browser and needs the internet for its libraries. Drafts, saved styles and Gantt tasks live in this browser only; clearing the site's data deletes them. The full list is in the plan doc's "Pros and cons" tab.
 
@@ -167,7 +168,7 @@ firebase.json                       # Firebase Hosting config
 .firebaserc                         # Firebase project: tusu-finance-team-tools
 ```
 
-Libraries are loaded from CDNs: [SheetJS](https://sheetjs.com/) reads the Excel files, [Plotly](https://plotly.com/javascript/) draws the charts, [pdf.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/) show and write PDFs, [ExcelJS](https://github.com/exceljs/exceljs) and [JSZip](https://stuk.github.io/jszip/) edit Excel and Word files, and [HyperFormula](https://hyperformula.handsontable.com/) calculates Excel formulas (used under its GPL-3.0 licence). Fonts: LINE Seed Sans TH, plus Noto Sans Thai and Sarabun from Google Fonts. Product notes for design work: `PRODUCT.md`.
+Libraries are loaded from CDNs: [SheetJS](https://sheetjs.com/) reads the Excel files, [Plotly](https://plotly.com/javascript/) draws the charts, [pdf.js](https://mozilla.github.io/pdf.js/) and [pdf-lib](https://pdf-lib.js.org/) show and write PDFs, [ExcelJS](https://github.com/exceljs/exceljs) and [JSZip](https://stuk.github.io/jszip/) edit Excel and Word files, and [HyperFormula](https://hyperformula.handsontable.com/) calculates Excel formulas (used under its GPL-3.0 licence). Fonts: LINE Seed Sans TH, plus Noto Sans Thai and Sarabun from Google Fonts. Product notes for design work: `PRODUCT.md`. The shared look (colours, type, glass, the Tools bar) is written up as the Claude Code skill **TUSU-Finance-Web-CI** in the private repo [viorets/tusu-finance-web-ci](https://github.com/viorets/tusu-finance-web-ci); keep it in step when `public/css/themes.css` changes.
 
 ## Run locally
 
@@ -178,6 +179,10 @@ firebase serve --only hosting
 ```
 
 ## Deploy
+
+Every push to `main` deploys to Firebase Hosting through GitHub Actions (`.github/workflows/`). Work on a branch (such as `design-pass`) and merge into `main` only when it should go live.
+
+Manual deploy, as a backup:
 
 ```bash
 npm install -g firebase-tools
