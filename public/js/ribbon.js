@@ -44,6 +44,7 @@ export const RI = {
   newDoc: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/>'),
   save: svg('<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>'),
   dl: svg('<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>'),
+  saveAs: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13l3 3 3-3"/>'),
   pdf: '<span style="font:700 10px system-ui">PDF</span>', txt: '<span style="font:700 10px system-ui">TXT</span>',
   md: '<span style="font:700 10px system-ui">MD</span>', html: '<span style="font:700 9px system-ui">HTML</span>',
 };
@@ -196,13 +197,15 @@ export function ribbon(spec, prefix, start = 0) {
 // The File tab (Excel, Word, Markdown): Open (and New), Save draft with the time it was saved, Download. Ids:
 // `${p}-f-open`, `${p}-f-new`, `${p}-f-draft`, `${p}-f-saved`, `${p}-f-dl`; the page or the editor wires them
 // (index.html barActions, js/md-edit.js). `name`: a file name field (its id) in the Save group.
-export function fileTab(p, { open = 'Open a file', newDoc = false, name = null, download = 'Download' } = {}) {
+// saveAs: the tooltip of a Save as… button (`${p}-f-saveas`), for an editor that asks where to save.
+export function fileTab(p, { open = 'Open a file', newDoc = false, name = null, download = 'Download', saveAs = null } = {}) {
   return { tab: 'File', file: true, groups: [
     { label: 'File', items: [{ btn: `${p}-f-open`, icon: RI.open, text: 'Open…', title: open }, ...(newDoc ? [{ btn: `${p}-f-new`, icon: RI.newDoc, text: 'New', title: 'Start a new document' }] : [])] },
     { label: 'Save', items: [...(name ? [{ input: name, title: 'File name', placeholder: 'File name', width: 180 }] : []),
       { btn: `${p}-f-draft`, icon: RI.save, text: 'Save draft', title: 'Keep a draft on this device' },
       { html: `<span class="rb-note" id="${p}-f-saved" aria-live="polite"></span>` },
-      { btn: `${p}-f-dl`, icon: RI.dl, text: download, title: download }] },
+      { btn: `${p}-f-dl`, icon: RI.dl, text: download, title: download },
+      ...(saveAs ? [{ btn: `${p}-f-saveas`, icon: RI.saveAs, text: 'Save as…', title: saveAs }] : [])] },
   ] };
 }
 /** "Saved 14:02" beside Save draft in the File tab. */

@@ -1439,7 +1439,7 @@
             };
         }
         openGantt($('ganttTool'), { download });
-        const md = openMd($('mdTool'), { download });
+        const md = openMd($('mdTool'), { download, zip: zipLib });
         openWordTable($('wordTool'), { download });
         openPdfMerge($('mergeTool'), { download });
         openBatchRename($('renameTool'), { download });

@@ -1,12 +1,14 @@
 // Markdown editor: the .md text on the left, the formatted page on the right (Edit, Split or Preview), a ribbon in the
 // glass toolbar for headings, emphasis, lists, quotes, links, images, tables, code and find & replace. Typing helpers:
 // Enter continues a list, Tab / Shift+Tab indent a list item, "-->" gives → and "==>" gives ➜, and a range copied
-// from Excel is pasted as a Markdown table. Downloads: .md, a standalone .html, a Word .doc, or PDF (print).
+// from Excel is pasted as a Markdown table. Downloads: .md, a standalone .html, Word (.docx), or PDF (print); Save as
+// asks where to save in Chrome and Edge.
 // Markdown is turned into HTML by marked (GitHub-flavoured: tables, task lists, strikethrough) and cleaned by
 // DOMPurify before it is shown. Drafts are kept in this browser (localStorage), by file name.
 import { fileTab, markSaved, ribbon, RI, setPressed } from './ribbon.js';
 import { actionMenu, clampZoom, fullScreen, helpPop, pinchZoom, viewBar } from './view-tools.js';
 import { ARROWS } from './rich-text.js';
+import { blocksToDocx } from './pdf-text.js';
 
 const MARKED = 'https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js';
 const PURIFY = 'https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js';
@@ -16,7 +18,53 @@ const TD_GFM = 'https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1.0.2/dist/turn
 const STORE = 'md-drafts-v1'; const LAST = 'md-last';
 const FONTS = ['Noto Sans Thai', 'Sarabun', 'LINE Seed Sans TH', 'TH Sarabun New', 'Georgia'];
 const FORMATS = [['md', 'Markdown (.md)', 'The text as written'], ['html', 'Web page (.html)', 'Formatted, one file with its styles'],
-  ['doc', 'Word (.doc)', 'Formatted; opens in Word'], ['pdf', 'PDF', 'Print the formatted page, then Save as PDF']];
+  ['docx', 'Word (.docx)', 'Headings, lists, tables, bold and italic'], ['pdf', 'PDF', 'Print the formatted page, then Save as PDF']];
+// What each format is saved as: extension, type, and the Save as dialog's file type.
+const TYPES = { md: ['.md', 'text/markdown;charset=utf-8', 'Markdown'], html: ['.html', 'text/html;charset=utf-8', 'Web page'],
+  docx: ['.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Word document'] };
+
+// The formatted page (sanitised HTML) -> the blocks pdf-text.js writes as Word: headings, paragraphs, list items
+// (task items keep ☐ / ☑ as their marker), and tables. Bold and italic are kept; links keep their text; quotes and
+// code blocks become plain paragraphs; nested lists follow their parent item.
+export function htmlToBlocks(html) {
+  const root = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html').body; const out = [];
+  const runsOf = (node, b = false, i = false, acc = []) => {
+    node.childNodes.forEach((n) => {
+      if (n.nodeType === 3) { const t = n.data.replace(/\s+/g, ' '); if (t) acc.push({ t, b, i }); return; }
+      if (n.nodeType !== 1) return; const tag = n.tagName;
+      if (tag === 'BR') acc.push({ t: '\n', b, i });
+      else if (tag === 'UL' || tag === 'OL' || tag === 'INPUT') { /* nested lists are their own blocks; checkboxes are the marker */ }
+      else runsOf(n, b || tag === 'STRONG' || tag === 'B', i || tag === 'EM' || tag === 'I', acc);
+    });
+    return acc;
+  };
+  const trim = (runs) => {
+    if (runs[0]) runs[0].t = runs[0].t.replace(/^\s+/, ''); if (runs.at(-1)) runs.at(-1).t = runs.at(-1).t.replace(/\s+$/, '');
+    return runs.filter((r) => r.t);
+  };
+  const list = (el) => {
+    let n = parseInt(el.getAttribute('start'), 10) || 1;
+    [...el.children].filter((li) => li.tagName === 'LI').forEach((li) => {
+      const box = li.querySelector(':scope > input[type=checkbox], :scope > p > input[type=checkbox]');
+      const marker = box ? (box.hasAttribute('checked') ? '☑' : '☐') : el.tagName === 'OL' ? `${n}.` : '-';
+      const runs = trim(runsOf(li)); if (runs.length || box) out.push({ type: 'li', ordered: !box && el.tagName === 'OL', marker, runs });
+      n += 1; li.querySelectorAll(':scope > ul, :scope > ol').forEach(list);
+    });
+  };
+  const walk = (el) => [...el.children].forEach((n) => {
+    const tag = n.tagName;
+    if (/^H[1-6]$/.test(tag)) out.push({ type: 'h', level: Math.min(+tag[1], 4), runs: trim(runsOf(n)) });
+    else if (tag === 'UL' || tag === 'OL') list(n);
+    else if (tag === 'BLOCKQUOTE' || tag === 'DIV') walk(n);
+    else if (tag === 'PRE') out.push({ type: 'p', runs: [{ t: n.textContent.replace(/\n$/, ''), b: false, i: false }] });
+    else if (tag === 'TABLE') {
+      const rows = [...n.querySelectorAll('tr')].map((tr) => [...tr.children].map((c) => trim(runsOf(c, c.tagName === 'TH'))));
+      if (rows.length) out.push({ type: 'table', borders: true, rows });
+    } else if (tag !== 'HR') { const runs = trim(runsOf(n)); if (runs.length) out.push({ type: 'p', runs }); }
+  });
+  walk(root);
+  return out;
+}
 
 const script = (src, global) => window[global] ? Promise.resolve(window[global]) : new Promise((res, rej) => {
   const s = document.createElement('script'); s.src = src; s.crossOrigin = 'anonymous';
@@ -40,7 +88,7 @@ const I = {
   next: svg('<path d="m6 9 6 6 6-6"/>'),
 };
 
-// The formatted page: the same rules on screen, in the .html and .doc downloads and in print.
+// The formatted page: the same rules on screen, in the .html download and in print.
 const docCss = (font) => `.md-doc{font-family:'${font}','Noto Sans Thai','Sarabun',sans-serif;font-size:16px;line-height:1.65;color:#1b1f23;max-width:780px;margin:0 auto;padding:40px 48px;background:#fff;overflow-wrap:break-word}
 .md-doc>:first-child{margin-top:0}.md-doc h1,.md-doc h2,.md-doc h3,.md-doc h4{font-family:'Prompt','${font}',sans-serif;line-height:1.3;margin:1.4em 0 .5em;color:#002d37}
 .md-doc h1{font-size:2em;border-bottom:2px solid #00758f;padding-bottom:.25em}.md-doc h2{font-size:1.5em;border-bottom:1px solid #d5e3e9;padding-bottom:.2em}.md-doc h3{font-size:1.25em}.md-doc h4{font-size:1.05em}
@@ -53,8 +101,8 @@ const docCss = (font) => `.md-doc{font-family:'${font}','Noto Sans Thai','Sarabu
 .md-doc th{background:#00758f;color:#fff}.md-doc tr:nth-child(even) td{background:#f2f8fa}.md-doc img{max-width:100%}.md-doc hr{border:0;border-top:1px solid #c9d6dc;margin:2em 0}
 @media print{.md-doc{padding:0;max-width:none}}`;
 
-// Opens the editor in `root`. download(bytes, name, type) saves a file. Resolves { isDirty() }.
-export function openMd(root, { download }) {
+// Opens the editor in `root`. download(bytes, name, type) saves a file; zip() loads JSZip. Resolves { isDirty() }.
+export function openMd(root, { download, zip }) {
   let drafts = {}; try { drafts = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch { /* storage off */ }
   const keep = () => { try { localStorage.setItem(STORE, JSON.stringify(drafts)); return true; } catch { return false; } };
   let last = null; try { last = localStorage.getItem(LAST); } catch { /* storage off */ }
@@ -63,7 +111,7 @@ export function openMd(root, { download }) {
   let font = FONTS[0]; try { font = localStorage.getItem('md-font') || font; } catch { /* default */ }
 
   const spec = [
-    fileTab('md', { open: 'Open a Markdown file (.md)', newDoc: true, name: 'mdName', download: 'Download as…' }),
+    fileTab('md', { open: 'Open a Markdown file (.md)', newDoc: true, name: 'mdName', download: 'Download as…', saveAs: 'Choose the folder and name (Chrome and Edge; other browsers download)' }),
     { tab: 'Home', groups: [
       { label: 'Text', items: [{ select: 'md-h', title: 'Paragraph or heading', options: [['', 'Style…'], ['0', 'Paragraph'], ['1', 'Heading 1'], ['2', 'Heading 2'], ['3', 'Heading 3'], ['4', 'Heading 4']], width: 104 },
         { btn: 'md-b', icon: RI.bold, title: 'Bold (Ctrl+B)' }, { btn: 'md-i', icon: RI.italic, title: 'Italic (Ctrl+I)' }, { btn: 'md-s', icon: RI.strike, title: 'Strikethrough' }, { btn: 'md-c', icon: I.code, title: 'Inline code' }] },
@@ -457,16 +505,21 @@ export function openMd(root, { download }) {
     saved = ta.value; dirty = false; counts(); markSaved(root, 'md'); say('Draft saved on this device');
   }
   $('#md-f-draft').onclick = saveDraft; $('#md-draft').onclick = saveDraft;
+  const pageHead = (title) => `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&family=Prompt:wght@500;600&family=Sarabun:wght@400;700&display=swap"><style>body{margin:0;background:#fff}${docCss(font)}</style>`;
+  const baseName = () => fileName().replace(/\.(md|markdown|txt)$/i, '');
+  const titleOf = (text) => (/^#\s+(.+)$/m.exec(text)?.[1] || baseName()).trim();
+  // The file in a format (md, html, docx): { bytes, name, type }.
+  async function fileAs(fmt) {
+    const text = ta.value; const [ext, type] = TYPES[fmt]; const name = `${baseName()}${ext}`;
+    if (fmt === 'md') return { bytes: new TextEncoder().encode(text), name, type };
+    const body = await toHtml(text);
+    if (fmt === 'html') return { bytes: new TextEncoder().encode(`<!doctype html><html lang="th"><head>${pageHead(esc(titleOf(text)))}</head><body><article class="md-doc">${body}</article></body></html>`), name, type };
+    // Word: TH fonts are drawn small, so they get 16 pt (as Thai documents use); the others 11 pt.
+    return { bytes: await blocksToDocx(htmlToBlocks(body), { JSZip: await zip(), font, size: /^TH /.test(font) ? 16 : 11, title: titleOf(text) }), name, type };
+  }
   async function exportAs(fmt) {
-    const base = fileName().replace(/\.(md|markdown|txt)$/i, ''); const text = ta.value;
-    if (fmt === 'md') { download(new TextEncoder().encode(text), `${base}.md`, 'text/markdown;charset=utf-8'); say(`${base}.md downloaded`); return; }
-    const body = await toHtml(text); const title = esc((/^#\s+(.+)$/m.exec(text)?.[1] || base).trim());
-    const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&family=Prompt:wght@500;600&family=Sarabun:wght@400;700&display=swap"><style>body{margin:0;background:#fff}${docCss(font)}</style>`;
-    if (fmt === 'html') { download(new TextEncoder().encode(`<!doctype html><html lang="th"><head>${head}</head><body><article class="md-doc">${body}</article></body></html>`), `${base}.html`, 'text/html;charset=utf-8'); say(`${base}.html downloaded`); return; }
-    if (fmt === 'doc') {
-      const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${title}</title><style>${docCss(font).replace(/max-width:780px;margin:0 auto;padding:40px 48px;/, '')}</style></head><body><div class="md-doc">${body}</div></body></html>`;
-      download(new TextEncoder().encode(html), `${base}.doc`, 'application/msword'); say(`${base}.doc downloaded`); return;
-    }
+    if (fmt !== 'pdf') { const f = await fileAs(fmt); download(f.bytes, f.name, f.type); say(`${f.name} downloaded`); return; }
+    const text = ta.value; const body = await toHtml(text); const head = pageHead(esc(titleOf(text)));
     // PDF: the browser's print dialog on the formatted page (Save as PDF), from a hidden frame.
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0'; f.title = 'Print';
     document.body.append(f); const d = f.contentDocument;
@@ -476,6 +529,23 @@ export function openMd(root, { download }) {
     say('Choose "Save as PDF" in the print window');
   }
   ['#md-dl', '#md-f-dl'].forEach((id) => { const b = $(id); b.onclick = () => actionMenu(b, FORMATS, (v) => exportAs(v).catch((e) => say(e.message))); });
+  // Save as: Chrome and Edge open the system's save dialog (folder and name). It must open on the tap, so it comes
+  // before the file is made. Other browsers cannot ask; the file downloads under its name and the status line says so.
+  const saveBtn = $('#md-f-saveas');
+  saveBtn.onclick = () => actionMenu(saveBtn, FORMATS.filter(([v]) => v !== 'pdf'), async (fmt) => {
+    try {
+      const [ext, type, desc] = TYPES[fmt];
+      if (!window.showSaveFilePicker) {
+        const f = await fileAs(fmt); download(f.bytes, f.name, f.type);
+        say(`${f.name} downloaded: this browser cannot ask where to save (Chrome and Edge can)`); return;
+      }
+      let handle;
+      try { handle = await window.showSaveFilePicker({ suggestedName: baseName() + ext, types: [{ description: desc, accept: { [type.split(';')[0]]: [ext] } }] }); }
+      catch (err) { if (err.name === 'AbortError') return; throw err; }
+      const f = await fileAs(fmt); const w = await handle.createWritable(); await w.write(f.bytes); await w.close();
+      say(`Saved ${handle.name}`);
+    } catch (err) { say(err.message); }
+  });
 
   setFont(FONTS.includes(font) ? font : FONTS[0]); setView('split'); setPressed(rb, 'md-sync', true);
   load(name, saved, drafts[name] ? `${name} · draft restored` : 'Start typing, or open a .md file (File tab)');
