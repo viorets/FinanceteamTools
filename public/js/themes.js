@@ -5,6 +5,8 @@
 //   Gantt group colours and today line. Changing one fires a 'site-theme' event on window with the theme.
 // UI themes per theme-factory theme are on hold (plan doc, "UI themes (on hold)" tab).
 const THEME_KEY = 'site-theme'; const MODE_KEY = 'site-mode';
+// The chart colours a new visitor gets (and the one not stored): TUSU Finance CI, the internal deck's teals.
+const DEFAULT_THEME = 'tusu-ci';
 // chart: series colours, in the order they are handed out; presets: the five swatches beside a colour box (default: the
 // first five chart colours); ink: chart text and lines (charts are white paper); today: the Gantt today line.
 export const THEMES = [
@@ -38,14 +40,14 @@ export const THEMES = [
 // Sarabun and Prompt from Google Fonts (index.html); Georgia and Arial from the system.
 export const CHART_FONTS = ['LINE Seed Sans TH', 'Noto Sans Thai', 'Sarabun', 'Prompt', 'Georgia', 'Arial'];
 export const fontStack = (f) => `'${f}', 'Noto Sans Thai', sans-serif`;
-const byId = (id) => THEMES.find((t) => t.id === id) || THEMES[0];
+const byId = (id) => THEMES.find((t) => t.id === id) || THEMES.find((t) => t.id === DEFAULT_THEME);
 const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const write = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* not kept */ } };
 export const presetsOf = (t) => t.presets || t.chart.slice(0, 5);
 
-export function currentTheme() { return byId(read(THEME_KEY) || 'default'); }
+export function currentTheme() { return byId(read(THEME_KEY) || DEFAULT_THEME); }
 export function setTheme(id) {
-  const t = byId(id); write(THEME_KEY, t.id === 'default' ? null : t.id);
+  const t = byId(id); write(THEME_KEY, t.id === DEFAULT_THEME ? null : t.id);
   window.dispatchEvent(new CustomEvent('site-theme', { detail: t }));
   return t;
 }
