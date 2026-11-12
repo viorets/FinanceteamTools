@@ -824,7 +824,8 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   const closeMenu = () => { menu?.remove(); menu = null; };
   function showMenu(cx, cy, p, m, at) {
     closeMenu();
-    const items = m ? [['copy', t('Copy', 'คัดลอก')], ['dup', t('Duplicate', 'ทำซ้ำ')], ['del', t('Delete', 'ลบ')]] : clip ? [['paste', t('Paste', 'วาง')]] : [];
+    const items = m ? [['copy', t('Copy', 'คัดลอก')], ['dup', t('Duplicate', 'ทำซ้ำ')], ['del', t('Delete', 'ลบ')]]
+      : [...(clip ? [['paste', t('Paste', 'วาง')]] : []), ...(p.page ? [] : [['rmpage', t('Remove this page', 'ลบหน้านี้')]])]; // only a page added here
     if (!items.length) return;
     menu = document.createElement('div'); menu.className = 'mk-menu'; menu.setAttribute('role', 'menu');
     menu.innerHTML = items.map(([k, label]) => `<button type="button" role="menuitem" data-act="${k}">${label}</button>`).join('');
@@ -840,6 +841,10 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       if (k === 'copy') clip = JSON.stringify(m);
       else if (k === 'del') { st.sel = m.id; del(); }
       else if (k === 'dup') { snapshot(); const c = copyOf(JSON.stringify(m)); shift(c, 12, 12); st.marks.push(c); st.sel = c.id; changed(); }
+      else if (k === 'rmpage') { // the added page and its marks; later pages move up
+        const i = pages.indexOf(p); if (i < 0 || p.page) return;
+        snapshot(); st.marks = st.marks.filter((x) => x.page !== i); st.marks.forEach((x) => { if (x.page > i) x.page -= 1; }); st.sel = null; changed();
+      }
       else if (k === 'paste') {
         snapshot(); const c = copyOf(clip); c.page = pages.indexOf(p);
         const [x, y] = c.type === 'text' ? [c.x, c.y] : bbox(c); shift(c, at[0] - x, at[1] - y);
@@ -856,7 +861,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const tgt = document.elementFromPoint(e.clientX, e.clientY) || e.target; // a long press: the mark pressed was redrawn when picked
     const pel = tgt.closest('.mk-page'); if (!pel) return;
     const p = pages[+pel.dataset.page]; const id = tgt.closest('[data-id]')?.dataset.id;
-    if (!id && !clip) return;
+    if (!id && !clip && p.page) return;
     e.preventDefault(); if (drag) cancelDrag();
     if (id) { st.sel = id; paint(); }
     showMenu(e.clientX, e.clientY, p, id ? selMark() : null, at(p, e));
@@ -939,7 +944,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
         return;
       }
       const id = tgt.closest('[data-id]')?.dataset.id || null; st.sel = id; paint();
-      if (!id) { if (clip && e.pointerType !== 'mouse') holdStart(e, () => showMenu(e.clientX, e.clientY, p, null, pt)); return; }
+      if (!id) { if ((clip || !p.page) && e.pointerType !== 'mouse') holdStart(e, () => showMenu(e.clientX, e.clientY, p, null, pt)); return; }
       const m = selMark();
       if (m.type === 'text' && e.detail === 2) { editBox(p, id, false, [e.clientX, e.clientY]); e.preventDefault(); return; }
       if (m.type === 'table' && e.detail === 2) { const c = tgt.closest('.mk-tc'); editTable(p, id, c ? [+c.dataset.r, +c.dataset.c] : [0, 0]); e.preventDefault(); return; }
