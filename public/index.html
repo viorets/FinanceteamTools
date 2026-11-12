@@ -60,7 +60,7 @@
         button, select, label, input[type="checkbox"], input[type="color"], .tab-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         /* Tick boxes big enough to hit with a finger, in the theme colour (browsers default to 13px). */
         input[type="checkbox"] { width: 18px; height: 18px; flex: none; accent-color: var(--primary); }
-        .skip { position: absolute; left: 12px; top: -48px; z-index: 100; padding: 10px 14px; border-radius: 8px; background: var(--primary); color: var(--on-primary); font-weight: bold; text-decoration: none; }
+        .skip { position: absolute; left: 12px; top: -48px; z-index: 100; padding: 10px 14px; border-radius: 8px; background: var(--primary-fill); color: var(--on-primary); font-weight: bold; text-decoration: none; }
         .skip:focus { top: 12px; }
         .app-main:focus { outline: none; } /* reached by the skip link only; focus moves on to its controls */
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
@@ -117,9 +117,8 @@
         }
         .tab-btn svg { flex: none; }
         .tab-btn:hover:not(.active) { background-color: var(--tint); }
-        /* The open tool: filled, with a soft glow of the same colour (plain shadow first for Safari before 16.2). */
-        .tab-btn.active { background-color: var(--primary); color: var(--on-primary); font-weight: 600;
-            box-shadow: 0 6px 18px rgba(27, 73, 101, .3); box-shadow: 0 6px 18px color-mix(in srgb, var(--primary) 35%, transparent); }
+        /* The open tool: the teal-to-cyan fill, with a soft glow of the same colour. */
+        .tab-btn.active { background: var(--primary-fill); color: var(--on-primary); font-weight: 600; box-shadow: 0 6px 18px var(--primary-glow); }
         .tab-btn:focus-visible { outline: 2px solid var(--palette-2); outline-offset: 2px; }
         /* Tool groups (Make, Edit, Batch): small quiet headings. */
         .tab-group { display: block; margin: 16px 12px 6px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
@@ -134,7 +133,7 @@
         .mode-pick label { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; margin: 0; padding: 6px 2px;
             border-radius: 12px; font-size: 11px; font-weight: normal; color: var(--ink-2); background: var(--surface-2); cursor: pointer; min-height: 44px; box-sizing: border-box; }
         .mode-pick input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-        .mode-pick label:has(input:checked) { background: var(--primary); color: var(--on-primary); }
+        .mode-pick label:has(input:checked) { background: var(--primary-fill); color: var(--on-primary); }
         .mode-pick label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
         /* Chart colours: colour strips only (names in tooltips); the open list is a grid of strips. */
         .strip { display: flex; flex: 1; height: 18px; border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08); }
@@ -167,7 +166,7 @@
             .menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
             .topbar .top-name { font-weight: bold; font-size: 15px; color: var(--ink); white-space: nowrap; }
             .tool-now { display: flex; align-items: center; gap: 8px; min-width: 0; margin-left: auto; padding: 0 12px; min-height: 40px; border-radius: 12px;
-                background: var(--primary); color: var(--on-primary); font-size: 14px; font-weight: 600; }
+                background: var(--primary-fill); color: var(--on-primary); font-size: 14px; font-weight: 600; }
             .tool-now span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .tool-now .beta { display: none; }
             /* The side panel becomes a drawer that slides in from the left over a dimmed page. */
@@ -289,14 +288,14 @@
         }
 
         .action-btn {
-            background-color: var(--primary);
+            background: var(--primary-fill);
             color: var(--on-primary);
             cursor: pointer;
             border: none;
             font-weight: 600;
             font-size: 15px;
             border-radius: 10px;
-            transition: background-color 0.2s;
+            transition: filter 0.2s;
             margin-top: 10px;
             padding: 12px;
             width: 100%;
@@ -306,9 +305,7 @@
             gap: 8px;
         }
 
-        .action-btn:hover {
-            background-color: var(--primary-hover);
-        }
+        .action-btn:hover:not(:disabled) { filter: brightness(.93); } /* a gradient has no hover colour: dim it, as Budget Pitching does */
         .action-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
         /* Chart from Excel: options grouped as Data / Style / Text; Download above the chart; a first-screen card. */

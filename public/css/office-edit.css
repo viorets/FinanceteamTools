@@ -82,7 +82,7 @@
 .xe-fm { display: grid; gap: 6px; }
 .xe-fmrow { display: flex; gap: 6px; }
 .xe-fmb { flex: 1; min-height: 36px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
-.xe-fmok { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.xe-fmok { background: var(--primary-fill); color: var(--on-primary); border-color: transparent; }
 .xe-fml { max-height: 200px; overflow: auto; display: grid; }
 .xe-fmi { display: flex; align-items: center; gap: 8px; padding: 4px 6px; font-size: 13px; color: var(--ink); cursor: pointer; margin: 0; font-weight: normal; }
 
@@ -118,7 +118,7 @@
 .de-srow { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .de-srow > label { flex: 1; min-width: 100px; }
 .de-shead { display: flex; justify-content: space-between; align-items: center; color: var(--ink); }
-.de-sform .de-sok { min-height: 36px; padding: 0 16px; background: var(--primary); color: var(--on-primary); font-weight: 600; }
+.de-sform .de-sok { min-height: 36px; padding: 0 16px; background: var(--primary-fill); color: var(--on-primary); font-weight: 600; }
 .de-stymod { height: 36px; padding: 0 10px; white-space: nowrap; }
 .de-keep { display: inline-block; width: 0; }
 .de-ink { position: absolute; inset: 0; pointer-events: none; }

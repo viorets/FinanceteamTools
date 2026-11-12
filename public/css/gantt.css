@@ -18,8 +18,8 @@
 .gc-colors .gc-color .hex-in { width: 6.6em; margin: 0; }
 .gc-out { min-width: 0; }
 .gc-transp { margin-right: 4px; color: var(--ink-2); }
-.gc-btn.gc-primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-.gc-btn.gc-primary:hover { background: var(--primary-hover); }
+.gc-btn.gc-primary { background: var(--primary-fill); border-color: transparent; color: var(--on-primary); }
+.gc-btn.gc-primary:hover { background: var(--primary-fill); filter: brightness(.93); }
 .gc-btn:disabled { opacity: .45; cursor: default; }
 .gc-status { margin: 6px 0 0; min-height: 1.3em; }
 .gc-editor { min-width: 0; }

@@ -15,6 +15,10 @@
   --ink-2: #3d5a6c;       /* secondary text */
   --primary: #1b4965;     /* primary buttons, open tab */
   --primary-hover: #24597a;
+  /* Filled controls (main buttons, the open tool, selected tabs): the Budget Pitching site's --solid-grad, teal to
+     cyan, in both modes; white text stays readable on it. --primary-glow is its soft shadow. */
+  --primary-fill: linear-gradient(100deg, #006371, #0097b2);
+  --primary-glow: rgba(0, 121, 137, .32);
   --primary-text: #1b4965; /* primary used as text (section labels, selected tabs); lighter in dark */
   --on-primary: #ffffff;
   --accent: #5fa8d3;      /* focus rings, secondary marks */

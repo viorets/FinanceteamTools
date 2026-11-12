@@ -20,7 +20,7 @@
 .mk-tools { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 22px; background: var(--tint, rgba(43, 171, 194, .12)); }
 .mk-bar button { border: 0; font: inherit; font-size: 14px; min-height: 40px; padding: 6px 14px; border-radius: 980px; cursor: pointer; color: var(--ink, #1d1d1f); background: var(--tint, rgba(43, 171, 194, .12)); }
 .mk-tools button { background: none; }
-.mk-bar button[aria-pressed="true"] { background: var(--primary, #006371); color: var(--on-primary, #fff); }
+.mk-bar button[aria-pressed="true"] { background: var(--primary-fill, #006371); color: var(--on-primary, #fff); }
 .mk-bar button:disabled { opacity: .4; cursor: default; }
 .mk-bar button:focus-visible { outline: 2px solid var(--accent, #2babc2); outline-offset: 1px; }
 .mk-bar .mk-addf { padding: 6px 12px; min-width: 40px; } /* add a font from this computer */
@@ -114,6 +114,6 @@
 .mk-emode { display: none; padding: 3px; border-radius: 980px; background: var(--tint, rgba(43, 171, 194, .12)); }
 .mk[data-tool="edit"] .mk-emode { display: inline-flex; }
 .mk-bar .mk-emode button { background: none; min-height: 34px; padding: 4px 14px; }
-.mk-bar .mk-emode button[aria-pressed="true"] { background: var(--primary, #006371); color: var(--on-primary, #fff); }
+.mk-bar .mk-emode button[aria-pressed="true"] { background: var(--primary-fill, #006371); color: var(--on-primary, #fff); }
 :root[data-mode="dark"] .mk-caution { color: #fcd34d; background: rgba(251, 191, 36, .14); }
 @media (prefers-color-scheme: dark) { :root:not([data-mode="light"]) .mk-caution { color: #fcd34d; background: rgba(251, 191, 36, .14); } }
