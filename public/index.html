@@ -16,6 +16,7 @@
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png?v=2">
+    <script>try { var ic = localStorage.getItem('site-ui-icon'); if (ic) document.querySelector('link[rel="icon"]').href = ic; } catch (e) {}</script>
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
     <!-- SheetJS for reading Excel files -->
@@ -91,9 +92,9 @@
             z-index: 10;
         }
         .brand { display: flex; align-items: center; gap: 12px; padding: 0 6px; }
-        /* Logo mark: the paper plane in white on a square of the two brand blues. */
+        /* Logo mark: the paper plane in white on a square of the two brand blues (the palette's with "Use for the whole site"). */
         .brand .mk { width: 40px; height: 40px; border-radius: 12px; flex: none; display: grid; place-items: center;
-            background: linear-gradient(140deg, #1b4965, #5fa8d3); box-shadow: 0 4px 12px rgba(27, 73, 101, .25); }
+            background: var(--logo-fill, linear-gradient(140deg, #1b4965, #5fa8d3)); box-shadow: 0 4px 12px var(--logo-glow, rgba(27, 73, 101, .25)); }
         .brand .mk img { width: 26px; height: 26px; filter: brightness(0) invert(1); }
         .brand h1 { margin: 0; font-size: 16.5px; line-height: 1.2; } /* gradient title: css/themes.css */
         .brand h1 span { display: block; margin-top: 2px; font-family: var(--font-family); font-size: 12px; font-weight: normal; letter-spacing: 0; color: var(--ink-2); }

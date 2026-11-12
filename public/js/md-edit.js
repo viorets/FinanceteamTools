@@ -90,15 +90,15 @@ const I = {
 
 // The formatted page: the same rules on screen, in the .html download and in print.
 const docCss = (font) => `.md-doc{font-family:'${font}','Noto Sans Thai','Sarabun',sans-serif;font-size:16px;line-height:1.65;color:#1b1f23;max-width:780px;margin:0 auto;padding:40px 48px;background:#fff;overflow-wrap:break-word}
-.md-doc>:first-child{margin-top:0}.md-doc h1,.md-doc h2,.md-doc h3,.md-doc h4{font-family:'Prompt','${font}',sans-serif;line-height:1.3;margin:1.4em 0 .5em;color:#002d37}
-.md-doc h1{font-size:2em;border-bottom:2px solid #00758f;padding-bottom:.25em}.md-doc h2{font-size:1.5em;border-bottom:1px solid #d5e3e9;padding-bottom:.2em}.md-doc h3{font-size:1.25em}.md-doc h4{font-size:1.05em}
+.md-doc>:first-child{margin-top:0}.md-doc h1,.md-doc h2,.md-doc h3,.md-doc h4{font-family:'Prompt','${font}',sans-serif;line-height:1.3;margin:1.4em 0 .5em;color:var(--md-head,#002d37)}
+.md-doc h1{font-size:2em;border-bottom:2px solid var(--md-rule,#00758f);padding-bottom:.25em}.md-doc h2{font-size:1.5em;border-bottom:1px solid #d5e3e9;padding-bottom:.2em}.md-doc h3{font-size:1.25em}.md-doc h4{font-size:1.05em}
 .md-doc p,.md-doc ul,.md-doc ol,.md-doc blockquote,.md-doc table,.md-doc pre{margin:0 0 1em}.md-doc ul,.md-doc ol{padding-left:1.6em}.md-doc li+li{margin-top:.25em}
-.md-doc li:has(>input[type=checkbox]),.md-doc li:has(>p:first-child>input[type=checkbox]){list-style:none;margin-left:-1.4em}.md-doc li>input[type=checkbox],.md-doc li>p:first-child>input[type=checkbox]{margin:0 .5em 0 0;width:1em;height:1em;vertical-align:-.1em;accent-color:#00758f}
-.md-doc a{color:#00758f}.md-doc blockquote{margin-left:0;padding:.4em 1em;border-left:4px solid #80b9c6;background:#f2f8fa;color:#33454f}
+.md-doc li:has(>input[type=checkbox]),.md-doc li:has(>p:first-child>input[type=checkbox]){list-style:none;margin-left:-1.4em}.md-doc li>input[type=checkbox],.md-doc li>p:first-child>input[type=checkbox]{margin:0 .5em 0 0;width:1em;height:1em;vertical-align:-.1em;accent-color:var(--md-th,#00758f)}
+.md-doc a{color:var(--md-link,#00758f)}.md-doc blockquote{margin-left:0;padding:.4em 1em;border-left:4px solid #80b9c6;background:#f2f8fa;color:#33454f}
 .md-doc code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88em;background:#eef3f6;padding:.15em .35em;border-radius:4px}
 .md-doc pre{background:#0f2a33;color:#e6f1f4;padding:14px 16px;border-radius:8px;overflow:auto}.md-doc pre code{background:none;padding:0;color:inherit}
 .md-doc table{border-collapse:collapse;width:auto;max-width:100%;display:block;overflow:auto}.md-doc th,.md-doc td{border:1px solid #c9d6dc;padding:6px 12px}.md-doc th:not([align]),.md-doc td:not([align]){text-align:left}
-.md-doc th{background:#00758f;color:#fff}.md-doc tr:nth-child(even) td{background:#f2f8fa}.md-doc img{max-width:100%}.md-doc hr{border:0;border-top:1px solid #c9d6dc;margin:2em 0}
+.md-doc th{background:var(--md-th,#00758f);color:#fff}.md-doc tr:nth-child(even) td{background:#f2f8fa}.md-doc img{max-width:100%}.md-doc hr{border:0;border-top:1px solid #c9d6dc;margin:2em 0}
 @media print{.md-doc{padding:0;max-width:none}}`;
 
 // Opens the editor in `root`. download(bytes, name, type) saves a file; zip() loads JSZip. Resolves { isDirty() }.

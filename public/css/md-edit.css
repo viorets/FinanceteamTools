@@ -33,29 +33,29 @@
    page (their styles come from the module). */
 :root[data-mode="dark"] .md-prev { background: #1b2124; color-scheme: dark; }
 :root[data-mode="dark"] .md-prev .md-doc { background: #1b2124; color: #e3e9eb; }
-:root[data-mode="dark"] .md-prev .md-doc :is(h1, h2, h3, h4) { color: #7fd8e5; }
-:root[data-mode="dark"] .md-prev .md-doc h1 { border-bottom-color: #2babc2; }
+:root[data-mode="dark"] .md-prev .md-doc :is(h1, h2, h3, h4) { color: var(--md-head, #7fd8e5); }
+:root[data-mode="dark"] .md-prev .md-doc h1 { border-bottom-color: var(--md-rule, #2babc2); }
 :root[data-mode="dark"] .md-prev .md-doc h2, :root[data-mode="dark"] .md-prev .md-doc hr { border-color: #2c4a50; }
-:root[data-mode="dark"] .md-prev .md-doc a { color: #4cc6d9; }
+:root[data-mode="dark"] .md-prev .md-doc a { color: var(--md-link, #4cc6d9); }
 :root[data-mode="dark"] .md-prev .md-doc blockquote { background: rgba(76, 198, 217, .08); border-left-color: #2c4a50; color: #a3adb1; }
 :root[data-mode="dark"] .md-prev .md-doc code { background: #1f2b2e; color: #e3e9eb; }
 :root[data-mode="dark"] .md-prev .md-doc pre { background: #0d1214; }
 :root[data-mode="dark"] .md-prev .md-doc pre code { background: none; }
 :root[data-mode="dark"] .md-prev .md-doc :is(th, td) { border-color: #2c4a50; }
-:root[data-mode="dark"] .md-prev .md-doc th { background: #0b7f8f; }
+:root[data-mode="dark"] .md-prev .md-doc th { background: var(--md-th, #0b7f8f); }
 :root[data-mode="dark"] .md-prev .md-doc tr:nth-child(even) td { background: rgba(76, 198, 217, .06); }
 @media (prefers-color-scheme: dark) {
   :root[data-mode="auto"] .md-prev { background: #1b2124; color-scheme: dark; }
   :root[data-mode="auto"] .md-prev .md-doc { background: #1b2124; color: #e3e9eb; }
-  :root[data-mode="auto"] .md-prev .md-doc :is(h1, h2, h3, h4) { color: #7fd8e5; }
-  :root[data-mode="auto"] .md-prev .md-doc h1 { border-bottom-color: #2babc2; }
+  :root[data-mode="auto"] .md-prev .md-doc :is(h1, h2, h3, h4) { color: var(--md-head, #7fd8e5); }
+  :root[data-mode="auto"] .md-prev .md-doc h1 { border-bottom-color: var(--md-rule, #2babc2); }
   :root[data-mode="auto"] .md-prev .md-doc h2, :root[data-mode="auto"] .md-prev .md-doc hr { border-color: #2c4a50; }
-  :root[data-mode="auto"] .md-prev .md-doc a { color: #4cc6d9; }
+  :root[data-mode="auto"] .md-prev .md-doc a { color: var(--md-link, #4cc6d9); }
   :root[data-mode="auto"] .md-prev .md-doc blockquote { background: rgba(76, 198, 217, .08); border-left-color: #2c4a50; color: #a3adb1; }
   :root[data-mode="auto"] .md-prev .md-doc code { background: #1f2b2e; color: #e3e9eb; }
   :root[data-mode="auto"] .md-prev .md-doc pre { background: #0d1214; }
   :root[data-mode="auto"] .md-prev .md-doc pre code { background: none; }
   :root[data-mode="auto"] .md-prev .md-doc :is(th, td) { border-color: #2c4a50; }
-  :root[data-mode="auto"] .md-prev .md-doc th { background: #0b7f8f; }
+  :root[data-mode="auto"] .md-prev .md-doc th { background: var(--md-th, #0b7f8f); }
   :root[data-mode="auto"] .md-prev .md-doc tr:nth-child(even) td { background: rgba(76, 198, 217, .06); }
 }
