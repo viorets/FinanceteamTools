@@ -217,7 +217,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
         <label class="mk-ctl">${t('Text size', 'ขนาดตัวอักษร')} <span><input type="number" id="mk-s" min="6" max="72" step="1" value="${textSize}"> pt</span></label>
       </div>
       <div class="mk-g mk-g-shape"><label class="mk-ctl">${t('Width', 'ความหนา')} <span><input type="range" id="mk-w" min="1" max="12" step="0.5" value="2"><output id="mk-wv">2</output></span></label></div>
-      <div class="mk-g mk-g-color"><label class="mk-ctl">${t('Colour', 'สี')} <span><input type="color" id="mk-c" value="${defaults.shapeColor || TEXT.color}"></span></label></div>
+      <div class="mk-g mk-g-color"><label class="mk-ctl">${t('Colour', 'สี')} <span><input type="color" id="mk-c" value="${defaults.shapeColor || TEXT.color}"></span></label><span class="mk-recent" role="group" aria-label="${t('Recent colours', 'สีที่ใช้ล่าสุด')}"></span></div>
       <div class="mk-g mk-g-hl">
         <button type="button" id="mk-hl" class="mk-hl-btn">${t('Highlight selection', 'ไฮไลต์ข้อความที่เลือก')}</button>
         <label class="mk-ctl">${t('Highlight colour', 'สีไฮไลต์')} <span><input type="color" id="mk-hc" value="${HIGHLIGHT}"></span></label>
@@ -378,7 +378,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     mk.dataset.mode = mode();
     $('#mk-del').disabled = !st.sel;
     if (m?.type === 'text') { $('#mk-s').value = m.size; $('#mk-f').value = fontOf(m); } // the picked text box's size and font
-    $('#mk-c').value = m && m.type !== 'highlight' && m.color ? m.color : textMode() ? st.textColor : st.shapeColor; syncC();
+    $('#mk-c').value = m && m.type !== 'highlight' && m.color ? m.color : textMode() ? st.textColor : st.shapeColor; syncC(); showRecent();
     $('#mk-hc').value = m?.type === 'highlight' ? m.color || HIGHLIGHT : st.hlColor; syncHC();
     const op = Math.round((m?.type === 'highlight' ? m.opacity ?? HL_OPACITY : st.hlOpacity) * 100);
     $('#mk-o').value = op; $('#mk-ov').textContent = `${op}%`;
@@ -528,6 +528,23 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
     const v = e.target.value;
     if (textMode()) st.textColor = v; else st.shapeColor = v;
     const m = selMark(); if (m && m.type !== 'highlight') tweak(m, (x) => { x.color = v; });
+  };
+  // Recent colours: the last six text colours and the last six shape colours chosen, kept in this browser. A swatch
+  // picks its colour again, as the colour box would (the picked mark or box, and what comes next).
+  function recentKey() { return textMode() ? 'mk-recent-text' : 'mk-recent-shape'; } // functions: paint() may run before this point
+  function recentOf(k) { try { return (JSON.parse(localStorage.getItem(k)) || []).filter((c) => /^#[0-9a-f]{6}$/.test(c)); } catch { return []; } }
+  function showRecent() {
+    $('.mk-recent').innerHTML = recentOf(recentKey()).map((c) => `<button type="button" class="mk-sw" data-c="${c}" style="background:${c}" title="${c}" aria-label="${t('Colour', 'สี')} ${c}"></button>`).join('');
+  }
+  $('#mk-c').addEventListener('change', (e) => {
+    const c = e.target.value.toLowerCase(); const k = recentKey();
+    try { localStorage.setItem(k, JSON.stringify([c, ...recentOf(k).filter((x) => x !== c)].slice(0, 6))); } catch { /* not kept */ }
+    showRecent();
+  });
+  $('.mk-recent').onclick = (e) => {
+    const b = e.target.closest('[data-c]'); if (!b) return;
+    const inp = $('#mk-c'); inp.value = b.dataset.c; syncC();
+    inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change'));
   };
   // Highlight colour and opacity: the picked highlight, and every new highlight (also inside text boxes).
   $('#mk-hc').oninput = (e) => {

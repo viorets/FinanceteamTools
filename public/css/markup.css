@@ -35,6 +35,10 @@
 .mk:not([data-tool="highlight"]) .mk-hl-btn { display: none; }
 .mk-ctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2, #3a3a3c); }
 .mk-ctl > span { display: flex; align-items: center; gap: 8px; }
+/* Recent colours beside the colour box: round swatches (32px to tap). */
+.mk-recent { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 4px; }
+.mk-bar .mk-sw { width: 32px; height: 32px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .25); cursor: pointer; }
+.mk-bar .mk-sw:focus-visible { outline: 2px solid var(--accent, #2babc2); outline-offset: 2px; }
 .mk-ctl input[type=range] { width: 110px; accent-color: var(--primary, #006371); }
 .mk-ctl input[type=color] { flex: none; width: 36px; height: 32px; padding: 0; border: 1px solid rgba(0, 0, 0, .15); border-radius: 6px; background: none; }
 .mk-ctl output { min-width: 2.8em; text-align: right; font-variant-numeric: tabular-nums; }
