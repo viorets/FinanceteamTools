@@ -16,6 +16,7 @@ export const ICON = {
   help: svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>'),
   dl: svg('<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>'),
   chev: svg('<path d="m6 9 6 6 6-6"/>'),
+  prev: svg('<path d="m15 18-6-6 6-6"/>'), next: svg('<path d="m9 18 6-6-6-6"/>'),
   hl: svg('<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>'),
 };
 export const ZOOM_MIN = 0.5; export const ZOOM_MAX = 4;
@@ -23,8 +24,9 @@ export const clampZoom = (z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round
 export const iconBtn = (id, label, face) => `<button type="button" id="${id}" class="vt-ic" title="${label}" aria-label="${label}">${face}</button>`;
 // Zoom − / % / + and Save draft, Download, Undo, Redo, Delete, Full screen, as one markup string. `t(en, th)` translates.
 // Save draft and Download sit here so they work in full screen too; the page wires them (index.html, fileActions).
-// opts.open: an Open button first (the PDF editor, which has no File tab); opts.help: a "?" button last (tips).
-export const viewBar = (p, t = (en) => en, { open = false, help = false } = {}) => `<div class="vt-zoom" role="group" aria-label="${t('Zoom', 'ซูม')}">${iconBtn(`${p}-zout`, t('Zoom out', 'ซูมออก'), ICON.zout)}<button type="button" id="${p}-zfit" class="vt-zpct" title="${t('Back to 100%', 'กลับเป็น 100%')}">100%</button>${iconBtn(`${p}-zin`, t('Zoom in', 'ซูมเข้า'), ICON.zin)}</div>
+// opts.open: an Open button first (the PDF editor, which has no File tab); opts.help: a "?" button last (tips);
+// opts.pages: the page box after zoom (‹ Page [n] / N ›, wired by pageNav).
+export const viewBar = (p, t = (en) => en, { open = false, help = false, pages = false } = {}) => `<div class="vt-zoom" role="group" aria-label="${t('Zoom', 'ซูม')}">${iconBtn(`${p}-zout`, t('Zoom out', 'ซูมออก'), ICON.zout)}<button type="button" id="${p}-zfit" class="vt-zpct" title="${t('Back to 100%', 'กลับเป็น 100%')}">100%</button>${iconBtn(`${p}-zin`, t('Zoom in', 'ซูมเข้า'), ICON.zin)}</div>${pages ? `<div class="vt-pages" role="group" aria-label="${t('Pages', 'หน้า')}">${iconBtn(`${p}-pgprev`, t('Previous page', 'หน้าก่อน'), ICON.prev)}<label><span class="vt-sr">${t('Page', 'หน้า')}</span><input type="number" id="${p}-pgnum" inputmode="numeric" min="1" value="1" title="${t('Page: type a number and press Enter', 'หน้า: พิมพ์เลขหน้าแล้วกด Enter')}"></label><span id="${p}-pgof" class="vt-pn">/ 1</span>${iconBtn(`${p}-pgnext`, t('Next page', 'หน้าถัดไป'), ICON.next)}</div>` : ''}
   <div class="vt-acts">${open ? iconBtn(`${p}-open`, t('Open another file', 'เปิดไฟล์อื่น'), ICON.open) : ''}${iconBtn(`${p}-draft`, t('Save draft on this device', 'บันทึกฉบับร่างในเครื่องนี้'), ICON.save)}${iconBtn(`${p}-dl`, t('Download', 'ดาวน์โหลด'), ICON.dl)}${iconBtn(`${p}-undo`, t('Undo (Ctrl+Z)', 'เลิกทำ (Ctrl+Z)'), ICON.undo)}${iconBtn(`${p}-redo`, t('Redo (Ctrl+Y)', 'ทำซ้ำ (Ctrl+Y)'), ICON.redo)}${iconBtn(`${p}-del`, t('Delete', 'ลบ'), ICON.del)}${iconBtn(`${p}-full`, t('Full screen', 'เต็มจอ'), ICON.full)}${help ? iconBtn(`${p}-help`, t('Tips and shortcuts', 'เคล็ดลับและคีย์ลัด'), ICON.help) : ''}</div>`;
 
 // Zoom gestures on `el`: Ctrl/⌘ + wheel (Chrome and Edge also send a trackpad pinch this way; a plain wheel still
@@ -85,6 +87,42 @@ export function cssZoom(box, scroller, content, p) {
     else if (e.key === '0') { e.preventDefault(); zoomTo(1); }
   });
   return { get: () => z, zoomTo };
+}
+
+// The page box (viewBar opts.pages): pages() lists the page elements inside `scroller`. The number follows scrolling;
+// typing a number (Enter) or pressing ‹ › scrolls that page to the top, just under the floating toolbar. Returns a
+// function to call when the pages change (the Word editor lays its pages out again as you type).
+export function pageNav(root, p, scroller, pages) {
+  const inp = root.querySelector(`#${p}-pgnum`); const of = root.querySelector(`#${p}-pgof`);
+  const prev = root.querySelector(`#${p}-pgprev`); const next = root.querySelector(`#${p}-pgnext`);
+  if (!inp) return () => {};
+  const bar = root.querySelector('.mk-bar, .oe-bar');
+  const off = () => Math.max(0, (bar?.getBoundingClientRect().bottom ?? 0) - scroller.getBoundingClientRect().top) + 12;
+  const current = () => {
+    const line = scroller.getBoundingClientRect().top + off() + 48; let k = 0;
+    pages().forEach((el, i) => { if (el.getBoundingClientRect().top <= line) k = i; });
+    return k;
+  };
+  const show = () => {
+    const n = pages().length; const k = current();
+    of.textContent = `/ ${n || 1}`; inp.max = n || 1;
+    if (document.activeElement !== inp) inp.value = k + 1;
+    prev.disabled = k <= 0; next.disabled = k >= n - 1;
+  };
+  const go = (i) => {
+    const ps = pages(); if (!ps.length) return;
+    const el = ps[Math.max(0, Math.min(ps.length - 1, i))];
+    scroller.scrollTop += el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - off();
+    show();
+  };
+  let frame = 0;
+  scroller.addEventListener('scroll', () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; show(); }); }, { passive: true });
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(Math.round(+inp.value) - 1); inp.blur(); } else if (e.key === 'Escape') { inp.blur(); } });
+  inp.addEventListener('change', () => go(Math.round(+inp.value) - 1));
+  inp.addEventListener('blur', show);
+  prev.onclick = () => go(current() - 1); next.onclick = () => go(current() + 1);
+  show();
+  return show;
 }
 
 // A toolbar floating over the content that scrolls under it: keeps --bar-h on `box` equal to the bar's height (it

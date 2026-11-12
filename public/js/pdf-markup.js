@@ -12,7 +12,7 @@ import { normHex, pairHex } from './hex-color.js';
 import { addFontFile, fontStack, loadUserFonts, siteFont, textWriter } from './pdf-realtext.js';
 import { damagedThai, madeByCanva, pageParagraphs } from './pdf-text.js';
 // pdf-redact.js (Edit text) and pdf-ocr.js (scanned pages) load only when used: the Feedback site leaves both out.
-import { ICON, clampZoom, floatBar, fullScreen, iconBtn, pinchZoom, viewBar, zoomAround } from './view-tools.js';
+import { ICON, clampZoom, floatBar, fullScreen, iconBtn, pageNav, pinchZoom, viewBar, zoomAround } from './view-tools.js';
 
 const PDFJS_BASE = Promise.withResolvers ? 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/' : 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/legacy/build/';
 const PDFJS = `${PDFJS_BASE}pdf.min.mjs`;
@@ -224,7 +224,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
         <label class="mk-ctl">${t('Opacity', 'ความทึบ')} <span><input type="range" id="mk-o" min="10" max="100" step="5" value="${HL_OPACITY * 100}"><output id="mk-ov">${HL_OPACITY * 100}%</output></span></label>
       </div>
       <span class="mk-grow"></span>
-      ${viewBar('mk', t, { open: true, help: true })}${iconBtn('mk-reset', t('Reset edits: remove every mark (Undo brings them back)', 'ล้างการแก้ไข: ลบเครื่องหมายทั้งหมด (เลิกทำเพื่อนำกลับมา)'), RESET_ICON)}
+      ${viewBar('mk', t, { open: true, help: true, pages: true })}${iconBtn('mk-reset', t('Reset edits: remove every mark (Undo brings them back)', 'ล้างการแก้ไข: ลบเครื่องหมายทั้งหมด (เลิกทำเพื่อนำกลับมา)'), RESET_ICON)}
       <span class="mk-emode" role="group" aria-label="${t('New text in Edit text', 'ข้อความใหม่ในการแก้ข้อความ')}"><button type="button" data-emode="edit" title="${t('New text takes the format of the paragraph', 'ข้อความใหม่ใช้รูปแบบเดิมของย่อหน้า')}">${t('Edit', 'แก้ไข')}</button><button type="button" data-emode="markup" title="${t('New text takes your text colour, so the changes stand out', 'ข้อความใหม่ใช้สีข้อความของคุณ ให้เห็นการแก้ไขชัด')}">${t('Markup', 'มาร์กอัป')}</button></span>
       <p class="mk-caution" role="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>${t('Edit text: the text below an edit does not move. A longer edit can overlap it (amber outline); a shorter one leaves a gap.', 'แก้ข้อความ: ข้อความด้านล่างจะไม่เลื่อนตาม ถ้าแก้ให้ยาวขึ้นอาจทับข้อความด้านล่าง (กรอบสีส้ม) ถ้าสั้นลงจะเหลือช่องว่าง')}</span></p>
     </div><div class="mk-pages" id="mk-pages"><p class="mk-wait">${t('Loading…', 'กำลังโหลด…')}</p></div></div>`;
@@ -593,6 +593,7 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
 
   // ---------- full screen (tools on top) ----------
   fullScreen(mk, 'mk', 'mk-full', t);
+  pageNav(mk, 'mk', pagesEl, () => pages.map((p) => p.el));
 
   const onKey = (e) => {
     if (!root.isConnected) { document.removeEventListener('keydown', onKey); return; }

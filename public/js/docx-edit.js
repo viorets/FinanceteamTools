@@ -7,7 +7,7 @@
 // characters (every run keeps its formatting); a formatting edit rebuilds the paragraph's runs, each from its source
 // run. The text is shown in pages, with each page's header and footer; headers and footers can be typed in, and
 // page numbers (format, first number, start and stop page) are written into the footer or header as Word fields.
-import { cssZoom, floatBar, fullScreen, viewBar } from './view-tools.js';
+import { cssZoom, floatBar, fullScreen, pageNav, viewBar } from './view-tools.js';
 import { fileTab, ribbon, RI, setPressed } from './ribbon.js';
 import { pairHex } from './hex-color.js';
 import { arrowize, exec } from './rich-text.js';
@@ -420,7 +420,7 @@ export async function openDocxEditor(root, bytes) {
   const scroller = $('.de-doc'); const box = $('.oe');
   scroller.append(sheet);
   const rb = ribbon(spec, 'de', 1); $('.de-top').append(rb);
-  const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('de', undefined, { help: true }); $('.de-top').append(tools);
+  const tools = document.createElement('span'); tools.className = 'oe-tools'; tools.innerHTML = viewBar('de', undefined, { help: true, pages: true }); $('.de-top').append(tools);
   const view = cssZoom(box, scroller, () => sheet, 'de');
   // The page fits the window's width when it opens, and again when the window narrows (an iPad turned to portrait):
   // only ever smaller, so a zoom the user chose to read closer stays until it no longer fits.
@@ -1088,6 +1088,7 @@ export async function openDocxEditor(root, bytes) {
   const GAP = 24; // px between pages on screen
   const PG = pgH / 15; const PW = pgW / 15;
   const frames = document.createElement('div'); frames.className = 'de-frames'; frames.setAttribute('aria-hidden', 'true'); sheet.prepend(frames);
+  const navShow = pageNav(box, 'de', scroller, () => [...frames.children]); // the page box follows the laid-out pages
   const hfLayer = document.createElement('div'); hfLayer.className = 'de-hfl'; sheet.insertBefore(hfLayer, ink);
   sheet.classList.add('de-paged');
   const settingsXml = await text('word/settings.xml');
@@ -1259,6 +1260,7 @@ export async function openDocxEditor(root, bytes) {
     pageList = pages;
     page.style.minHeight = `${pages.length * stride - gap}px`;
     frames.innerHTML = pages.map((_, i) => `<div class="de-pf" style="position:absolute;left:0;top:${i * stride}px;width:${PW}px;height:${PG}px"></div>`).join('');
+    navShow();
     drawHf(secs);
   }
   // Headers and footers of every page.

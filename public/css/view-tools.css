@@ -1,4 +1,12 @@
 /* View tools shared by the PDF, Excel and Word editors (js/view-tools.js): zoom control, icon buttons, HEX field. */
+/* Page box: ‹ Page [n] / N › (js/view-tools.js pageNav). */
+.vt-pages { display: inline-flex; align-items: center; gap: 4px; }
+.vt-pages input { width: 3.2em; min-height: 36px; box-sizing: border-box; padding: 0 4px; border: 1px solid var(--border, #d5e3e9); border-radius: 8px; background: var(--surface, #fff); color: var(--ink, #1d1d1f); font: inherit; font-size: 16px; text-align: center; -moz-appearance: textfield; }
+.vt-pages input::-webkit-inner-spin-button, .vt-pages input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.vt-pages .vt-pn { min-width: 2.6em; font-size: 14px; color: var(--ink-2, #4a5a60); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vt-pages button { min-width: 40px; min-height: 40px; padding: 0; border: 0; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink, #1d1d1f); background: var(--tint, rgba(43, 171, 194, .12)); }
+.vt-pages button:disabled { opacity: .4; cursor: default; }
+.vt-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .vt-zoom { display: inline-grid; grid-template-columns: 40px minmax(56px, 1fr) 40px; gap: 4px; }
 .vt-acts { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 40px; gap: 4px; }
 /* Download format menu (Excel): opens under the bar's Download button, also in full screen. */
