@@ -7,6 +7,10 @@
 const THEME_KEY = 'site-theme'; const MODE_KEY = 'site-mode';
 // The chart colours a new visitor gets (and the one not stored): TUSU Finance CI, the internal deck's teals.
 const DEFAULT_THEME = 'tusu-ci';
+// "Use for the whole site": the chart colour theme also colours the interface (page, panels, text, borders, buttons).
+// The CSS is kept so the one-line script in index.html's <head> paints it before the page draws.
+const UI_KEY = 'site-ui-theme'; const UI_CSS = 'site-ui-css';
+const CI_THEMES = ['default', 'tusu-ci']; // the site's own colours are the CI: these two need no generated set
 // chart: series colours, in the order they are handed out; presets: the five swatches beside a colour box (default: the
 // first five chart colours); ink: chart text and lines (charts are white paper); today: the Gantt today line.
 export const THEMES = [
@@ -61,9 +65,62 @@ export function setMode(mode) {
   write(MODE_KEY, mode === 'light' ? null : mode); syncMeta();
 }
 
+// ---------- the chart theme over the whole site ----------
+// The interface colours come from the theme's strongest colour (its hue and saturation) and a second colour for
+// accents, at fixed lightness levels chosen like the CI's, so text keeps its contrast in light and dark with any
+// palette (a grey palette gives greys). Written as a stylesheet with the same selectors as css/themes.css.
+const hsl = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const mx = Math.max(r, g, b); const mn = Math.min(r, g, b); const l = (mx + mn) / 2; const d = mx - mn;
+  if (!d) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = (mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60;
+  return [(h + 360) % 360, s, l];
+};
+export function uiCss(t) {
+  const cols = t.chart.map((c) => ({ c, hsl: hsl(c) }));
+  // the key: the palette's lead colour (the first that is not grey); the accent: the next colour of another hue (or
+  // the key). Palettes list their own colours first and warning colours (reds) last, so order is the safest guide.
+  const key = cols.find((x) => x.hsl[1] >= 0.12) || cols[0];
+  const hueGap = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+  const other = cols.find((x) => x !== key && x.c.toLowerCase() !== (t.today || '').toLowerCase() && x.hsl[1] > 0.15 && hueGap(x.hsl[0], key.hsl[0]) > 18) || key; // not the warning colour (the Gantt today line)
+  const h = Math.round(key.hsl[0]); const s = Math.min(key.hsl[1], 0.7); const ha = Math.round(other.hsl[0]); const sa = Math.min(other.hsl[1], 0.75);
+  const c = (hh, ss, l, a) => (a == null ? `hsl(${hh} ${Math.round(ss * 100)}% ${l}%)` : `hsl(${hh} ${Math.round(ss * 100)}% ${l}% / ${a})`);
+  const light = {
+    '--bg': c(h, s * 0.5, 96), '--surface': '#ffffff', '--surface-2': c(h, s * 0.4, 94), '--ink': c(h, s * 0.8, 22), '--ink-2': c(h, s * 0.3, 34),
+    '--primary': c(h, s, 28), '--primary-hover': c(h, s, 33), '--primary-text': c(h, s * 0.8, 24), '--on-primary': '#ffffff',
+    '--accent': c(ha, sa, 50), '--tint': c(h, s * 0.6, 92), '--border': c(h, s * 0.3, 86), '--border-strong': c(h, s * 0.5, 62),
+    '--primary-fill': `linear-gradient(100deg, ${c(h, s, 26)}, ${c(ha, sa, 28)})`, '--primary-glow': c(h, s, 30, 0.32),
+    '--title-grad': `linear-gradient(90deg, ${c(h, s, 26)}, ${c(ha, sa, 40)})`,
+    '--glass-tint': `linear-gradient(135deg, rgba(255, 255, 255, .74), ${c(h, s * 0.5, 92, 0.58)})`, '--glass-solid': c(h, s * 0.4, 97),
+    '--backdrop': `radial-gradient(42vmax 42vmax at 8% 6%, ${c(h, s, 40, 0.22)}, transparent 70%), radial-gradient(38vmax 38vmax at 92% 42%, ${c(ha, sa, 50, 0.22)}, transparent 70%), radial-gradient(46vmax 36vmax at 40% 108%, ${c(h, s, 25, 0.14)}, transparent 70%), linear-gradient(160deg, ${c(h, s * 0.4, 97)}, ${c(h, s * 0.4, 92)} 45%, ${c(h, s * 0.5, 84)})`,
+  };
+  const dark = {
+    '--bg': c(h, s * 0.5, 6), '--surface': c(h, s * 0.25, 12), '--surface-2': c(h, s * 0.3, 15), '--ink': c(h, s * 0.15, 94), '--ink-2': c(h, s * 0.12, 68),
+    '--primary': c(h, s, 27), '--primary-hover': c(h, s, 32), '--primary-text': c(ha, sa * 0.9, 75), '--on-primary': '#ffffff',
+    '--accent': c(ha, sa, 62), '--tint': c(ha, sa, 62, 0.12), '--border': c(h, s * 0.5, 75, 0.14), '--border-strong': c(h, s * 0.4, 25),
+    '--primary-fill': `linear-gradient(100deg, ${c(h, s, 26)}, ${c(ha, sa, 28)})`, '--primary-glow': c(h, s, 40, 0.32),
+    '--title-grad': `linear-gradient(90deg, ${c(ha, sa, 62)}, ${c(ha, sa * 0.8, 82)})`,
+    '--glass-tint': `linear-gradient(135deg, ${c(h, s * 0.25, 12, 0.72)}, ${c(h, s * 0.25, 9, 0.64)})`, '--glass-solid': c(h, s * 0.25, 12),
+    '--glass-bar-tint': `linear-gradient(135deg, ${c(h, s * 0.25, 9, 0.94)}, ${c(h, s * 0.25, 9, 0.9)})`, '--glass-border': c(h, s * 0.5, 75, 0.14),
+    '--backdrop': `radial-gradient(45vmax 40vmax at 8% 8%, ${c(h, s, 45, 0.11)}, transparent 70%), radial-gradient(40vmax 35vmax at 92% 12%, ${c(ha, sa, 55, 0.07)}, transparent 70%), radial-gradient(45vmax 45vmax at 85% 92%, ${c(h, s, 35, 0.12)}, transparent 70%), linear-gradient(180deg, ${c(h, s * 0.5, 8)}, ${c(h, s * 0.5, 6)})`,
+  };
+  const block = (o) => Object.entries(o).map(([k, v]) => `${k}: ${v};`).join(' ');
+  return `:root { ${block(light)} }\n:root[data-mode="dark"] { ${block(dark)} }\n@media (prefers-color-scheme: dark) { :root[data-mode="auto"] { ${block(dark)} } }`;
+}
+export const siteWide = () => read(UI_KEY) === '1';
+// Paint (or clear) the whole-site colours for theme t, and keep the CSS for the next page load.
+export function applySiteWide(t = currentTheme()) {
+  const css = siteWide() && !CI_THEMES.includes(t.id) ? uiCss(t) : '';
+  let el = document.getElementById('uiTheme');
+  if (css) { if (!el) { el = document.createElement('style'); el.id = 'uiTheme'; document.head.append(el); } el.textContent = css; } else el?.remove();
+  write(UI_CSS, css || null); syncMeta();
+}
+export function setSiteWide(on) { write(UI_KEY, on ? '1' : null); applySiteWide(); }
+
 // Side navigation controls: Appearance radio buttons, and the chart colour themes shown as colour strips only (the
 // name is in each option's tooltip and read out by screen readers). The strips sit in a <details> that opens a grid.
-export function viewControls(modeGroup, chartPick) {
+export function viewControls(modeGroup, chartPick, wholeSite = null) {
   modeGroup.querySelectorAll('input[name="mode"]').forEach((r) => {
     r.checked = r.value === currentMode();
     r.addEventListener('change', () => { if (r.checked) setMode(r.value); });
@@ -76,8 +133,9 @@ export function viewControls(modeGroup, chartPick) {
     now.innerHTML = strip(t); sum.setAttribute('aria-label', `Chart colours: ${t.name}`); sum.title = t.name;
     grid.querySelectorAll('input').forEach((i) => { i.checked = i.value === t.id; });
   };
-  show(currentTheme()); syncMeta();
-  grid.addEventListener('change', (e) => { show(setTheme(e.target.value)); chartPick.open = false; sum.focus(); });
+  show(currentTheme()); applySiteWide();
+  grid.addEventListener('change', (e) => { const t = setTheme(e.target.value); show(t); applySiteWide(t); chartPick.open = false; sum.focus(); });
+  if (wholeSite) { wholeSite.checked = siteWide(); wholeSite.addEventListener('change', () => setSiteWide(wholeSite.checked)); }
   // Close on Escape or a click elsewhere.
   document.addEventListener('click', (e) => { if (chartPick.open && !chartPick.contains(e.target)) chartPick.open = false; });
   chartPick.addEventListener('keydown', (e) => { if (e.key === 'Escape' && chartPick.open) { chartPick.open = false; sum.focus(); } });
