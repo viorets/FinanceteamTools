@@ -8,7 +8,7 @@
 .gc-side .gc-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .gc-side input[type="text"] { font: inherit; font-size: 16px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; color: var(--fg-color); background: var(--surface); }
 .gc-checks { border: 0; padding: 0; margin: 4px 0 14px; display: grid; gap: 8px; }
-.gc-checks legend, .gc-label { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary); margin-bottom: 6px; padding: 0; }
+.gc-checks legend, .gc-label { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary-text); margin-bottom: 6px; padding: 0; }
 .gc-checks label, .gc-transp { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; min-height: 32px; }
 .gc-checks input, .gc-transp input, .gc-table input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--palette-1); margin: 0; }
 .gc-colors { display: grid; gap: 8px; }

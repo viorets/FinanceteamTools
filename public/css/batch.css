@@ -11,7 +11,7 @@
 .mg-to { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-2); }
 .mg-to label { margin: 0; font-weight: normal; }
 .mg-to input { width: 4.5em; min-height: 40px; box-sizing: border-box; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); color: var(--fg-color); font-size: 16px; }
-.bt-label { display: block; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary); margin-bottom: 6px; }
+.bt-label { display: block; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary-text); margin-bottom: 6px; }
 .bt-side input[type="text"] { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px; color: var(--fg-color); background: var(--surface); }
 .bt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .bt-count { font-size: 15px; font-weight: normal; color: var(--ink-2); }
@@ -61,7 +61,7 @@ input[aria-invalid="true"] { border-color: var(--danger) !important; }
 .rn-set { border-top: 1px solid var(--border); margin: 0; padding: 0; }
 .rn-set:last-of-type { border-bottom: 1px solid var(--border); margin-bottom: 14px; }
 .rn-set[open] { padding-bottom: 12px; display: grid; gap: 8px; }
-.rn-set > summary { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary); min-height: 44px; display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+.rn-set > summary { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--primary-text); min-height: 44px; display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
 .rn-set > summary::-webkit-details-marker { display: none; }
 /* open/closed marker, and what a closed section is doing (e.g. "b → X") */
 .rn-set > summary::after { content: ""; width: 8px; height: 8px; margin-left: auto; border: solid var(--ink-2); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform .15s ease-out; }
