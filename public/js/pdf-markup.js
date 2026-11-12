@@ -734,7 +734,12 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       const px = []; for (let i = 0; i < d.length; i += 16) px.push([d[i], d[i + 1], d[i + 2], 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]]);
       px.sort((a, b) => a[3] - b[3]);
       const avg = (list) => `#${[0, 1, 2].map((j) => Math.round(list.reduce((s, q) => s + q[j], 0) / list.length).toString(16).padStart(2, '0')).join('')}`;
-      return { ink: avg(px.slice(0, Math.max(1, px.length * 0.04))), bg: avg(px.slice(Math.floor(px.length * 0.6))) };
+      // Ink: the darkest 1% (thin Thai strokes have few solid pixels; a wider share averages in their grey edges, and
+      // the new text came out lighter than the old). A near-black grey is black drawn smooth: it becomes black.
+      const dark = px.slice(0, Math.max(1, Math.round(px.length * 0.01)));
+      let ink = avg(dark); const [r, g, b] = [1, 3, 5].map((i) => parseInt(ink.slice(i, i + 2), 16));
+      if (Math.max(r, g, b) < 72 && Math.max(r, g, b) - Math.min(r, g, b) < 24) ink = '#000000';
+      return { ink, bg: avg(px.slice(Math.floor(px.length * 0.6))) };
     } catch { return fall; }
   }
   // An edited paragraph's runs with its line breaks where the screen wraps them (the PDF has no wrapping).
