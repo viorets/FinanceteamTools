@@ -427,7 +427,8 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
       }
       const sizeChange = prev && Math.abs(prev.size - l.size) > body * 0.1;
       // New paragraph: a size change, a wider gap, a first-line indent, or the line above stopped short of the
-      // margin. A list item goes on while its lines are indented past its marker.
+      // margin. A list item goes on while its lines are indented past its marker, or after a line that ran to the
+      // margin (unless the new line is bold after plain text: a sub-heading).
       const broke = sizeChange || gap > lead * 1.35 || (prev && /…\s*\S{1,4}$/.test(prev.text)); // a contents line ends at its page number
       // A hanging indent (a reference list): the paragraph's later lines sit indented past its first line. The first
       // such line counts when the line above ran to the margin or the line after sits at the same indent; then every
@@ -438,10 +439,10 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
         : cur.lines === 1 && ((prev && prev.x2 >= right - l.size * 4) || !nx || l.y - nx.y > lead * 1.35 || (sameIndent(nx.x, l.x) && l.y - nx.y < lead * 1.35)));
       if (hang) cur.hang = l.x;
       const newPara = !cur || cur.type === 'h' || broke
-        || (cur.type === 'li' ? l.x <= cur.x + l.size * 0.3 && !(prev && prev.x2 >= right - l.size * 4) : !hang && (l.x > left + l.size * 0.9 || (prev && prev.x2 < right - l.size * 4)));
+        || (cur.type === 'li' ? (cur.cont != null ? !sameIndent(l.x, cur.cont) : l.x <= cur.x + l.size * 0.3 && !(prev && prev.x2 >= right - l.size * 4 && !(allBold && !cur.runs.every((r) => r.b || !r.t.trim())))) : !hang && (l.x > left + l.size * 0.9 || (prev && prev.x2 < right - l.size * 4)));
       if (!cur && carry && !l.cells[0].runs[0]?.b && (l.x <= left + l.size * 0.9 || (carry.hang != null && Math.abs(l.x - carry.hang) < l.size * 0.5)) && blocks.at(-1) === carry) { cur = blocks.pop(); cur.runs = joinRuns(cur.runs, runs); return; }
       if (newPara) { close(); cur = { type: 'p', runs, bold: allBold, lines: 1, x: l.x, at: { pg: pi, y: l.y, size: l.size } }; return; }
-      cur.runs = joinRuns(cur.runs, runs); cur.lines = (cur.lines || 1) + 1;
+      cur.runs = joinRuns(cur.runs, runs); cur.lines = (cur.lines || 1) + 1; if (cur.type === 'li') cur.cont ??= l.x; // where its wrapped lines go
     });
     close(); closeTable(); flushGrids(-Infinity);
     const lastB = blocks.at(-1);
@@ -461,7 +462,7 @@ export async function pdfToBlocks(doc, { onPage = () => {}, ocr = null, onOcr = 
     }
     b.type = 'h'; b.level = sub; prevSub = b;
   }
-  blocks.forEach((b) => { delete b.at; if (b.type === 'p') { delete b.x; delete b.hang; } });
+  blocks.forEach((b) => { delete b.at; if (b.type === 'p') { delete b.x; delete b.hang; } delete b.cont; });
   // Word's PDF export can also drop ำ outright ("กาไร" for กำไร); fixed on whole paragraphs, as a word may span pieces.
   blocks.forEach((b) => (b.rows ? b.rows.flat() : [b.runs]).forEach((rs) => rs.forEach((r) => { r.t = r.t.replace(LOST_AM, (w) => AM_WORDS[w]); })));
   const fam = {}; pages.forEach((p) => Object.entries(p.fonts).forEach(([k, v]) => { fam[k] = (fam[k] || 0) + v; }));
