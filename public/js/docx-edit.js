@@ -906,7 +906,7 @@ export async function openDocxEditor(root, bytes) {
     el.textContent = `${words.toLocaleString()} words · ${t.replace(/\s/g, '').length.toLocaleString()} characters`;
   }
   const baseName = () => (root.dataset.name || 'document').replace(/\.docx$/i, '');
-  function exportFile(data, ext, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = `${baseName()}.${ext}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); status(`${baseName()}.${ext} downloaded`); }
+  function exportFile(data, ext, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = `${baseName()}.${ext}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); status(`${baseName()}.${ext} downloaded`); } // 60 s: iPad Safari reads the file after its prompt
   const paras = () => [...page.querySelectorAll('.de-p')];
   $('#de-x-txt').onclick = () => exportFile(paras().map(plainText).join('\r\n'), 'txt', 'text/plain');
   $('#de-x-md').onclick = () => exportFile(paras().map((d) => {

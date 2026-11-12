@@ -472,7 +472,26 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
   alignBar.addEventListener('pointerdown', (e) => e.preventDefault());
   alignBar.addEventListener('mousedown', (e) => e.preventDefault());
   alignBar.addEventListener('click', (e) => { const b = e.target.closest('[data-align]'); if (b) align(b.dataset.align); });
-  const onSel = () => { if (!root.isConnected) { document.removeEventListener('selectionchange', onSel); return; } if (editingBox()) updateFmt(); };
+  const onSel = () => { if (!root.isConnected) { document.removeEventListener('selectionchange', onSel); return; } if (editingBox()) { updateFmt(); caretInView(); } };
+  // iPad: the on-screen keyboard covers the lower part of the screen. While a text box is open, the pages scroll so the
+  // caret's line stays between the toolbar and the keyboard; room is added below the last page so a box near the end
+  // can come up too.
+  let viewFrame = 0;
+  function caretInView() {
+    if (viewFrame) return;
+    viewFrame = requestAnimationFrame(() => {
+      viewFrame = 0; const vv = window.visualViewport; const ed = editingBox();
+      const kb = vv && ed ? Math.max(0, document.documentElement.clientHeight - vv.height) : 0;
+      if (kb < 80) { pagesEl.style.paddingBottom = ''; return; } // no keyboard
+      pagesEl.style.paddingBottom = `${kb + 16}px`;
+      const s = getSelection(); let r = s.rangeCount && ed.contains(s.anchorNode) ? s.getRangeAt(0).getBoundingClientRect() : null;
+      if (!r || (!r.width && !r.height)) r = ed.getBoundingClientRect();
+      const top = Math.max(vv.offsetTop, $('.mk-bar').getBoundingClientRect().bottom) + 8; const bottom = vv.offsetTop + vv.height - 16;
+      if (r.bottom > bottom) pagesEl.scrollTop += Math.min(r.bottom - bottom, r.top - top);
+      else if (r.top < top) pagesEl.scrollTop -= top - r.top;
+    });
+  }
+  window.visualViewport?.addEventListener('resize', caretInView);
   document.addEventListener('selectionchange', onSel);
 
   const setTool = (k) => {
@@ -878,13 +897,14 @@ export async function openPdfEditor(root, { bytes, name, draft = null, t = (en) 
       else if (e.key === 'Escape') { e.preventDefault(); b.blur(); }
     };
     b.onpaste = (e) => { e.preventDefault(); exec('insertText', e.clipboardData?.getData('text/plain') || ''); };
-    b.oninput = (e) => { if (e.inputType === 'insertText' && e.data === '>') arrowize(); updateFmt(); };
+    b.oninput = (e) => { if (e.inputType === 'insertText' && e.data === '>') arrowize(); updateFmt(); caretInView(); };
     // Markup (Edit text): what is typed into a paragraph of the PDF takes your text colour; Edit keeps the paragraph's
     b.onbeforeinput = (e) => {
       if (!m.cover || !st.markup || !/^insert(Text|CompositionText|FromPaste|ReplacementText)$/.test(e.inputType)) return;
       if (getSelection().isCollapsed) exec('foreColor', st.textColor);
     };
     b.onblur = () => {
+      pagesEl.style.paddingBottom = '';
       b.onblur = null; b.classList.remove('editing'); b.contentEditable = 'false';
       m.runs = readRuns(b); m.text = m.runs.map((x) => x.t).join('');
       if (!m.text.trim() && !m.cover) { st.marks = st.marks.filter((x) => x.id !== id); if (st.sel === id) st.sel = null; } // an emptied edit deletes the paragraph

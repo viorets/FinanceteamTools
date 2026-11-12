@@ -1200,7 +1200,7 @@
         import { openXlsxEditor } from './js/xlsx-edit.js';
         import { openDocxEditor } from './js/docx-edit.js';
         import { pairHex } from './js/hex-color.js';
-        import { actionMenu, helpPop, noticeBox } from './js/view-tools.js';
+        import { actionMenu, helpPop, noticeBox, toast } from './js/view-tools.js';
         import { markSaved } from './js/ribbon.js';
         import { openMd } from './js/md-edit.js';
         import { openPdfMerge } from './js/pdf-merge.js';
@@ -1234,14 +1234,14 @@
         document.querySelectorAll('#svgTool input[type="color"]').forEach(pairHex);
 
         const $ = (id) => document.getElementById(id);
-        const status = (t) => { $('pdfStatus').textContent = t; };
+        const status = (t) => { $('pdfStatus').textContent = t; const fs = document.querySelector('#pdfEditor .mk-full'); if (fs && t) toast(fs, t); }; // in full screen the status line is hidden
         const mb = (n) => (n < 102400 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(2)} MB`); // small files in KB, not "0.00 MB"
         const download = (bytes, name, type) => {
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([bytes], { type }));
             a.download = name;
             document.body.append(a); a.click(); a.remove();
-            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+            setTimeout(() => URL.revokeObjectURL(a.href), 60000); // iPad Safari reads the file after its download prompt
         };
         let editor = null; let fileName = ''; let draftKey = ''; let pdfLocked = false;
         // A PDF locked by its author (it opens without a password, but changes are not allowed) has an /Encrypt entry
@@ -1353,7 +1353,11 @@
         function barActions(root, p, { open, draft, download: dl, more = null, tips = '' }) {
             const on = (id, fn) => { const b = root.querySelector(`#${id}`); if (b) b.onclick = fn; };
             const h = root.querySelector(`#${p}-help`); if (h && tips) helpPop(h, tips);
-            const save = async () => { if (await draft()) markSaved(root, p); };
+            const save = async () => {
+                if (!await draft()) return;
+                markSaved(root, p);
+                const fs = root.querySelector('.mk-full, .oe-full'); if (fs && p !== 'mk') toast(fs, 'Draft saved on this device'); // the PDF status says it
+            };
             on(`${p}-open`, open); on(`${p}-f-open`, open); on(`${p}-draft`, save); on(`${p}-f-draft`, save);
             [`${p}-dl`, `${p}-f-dl`].forEach((id) => { const b = root.querySelector(`#${id}`); if (b) b.onclick = more ? () => actionMenu(b, more, dl) : () => dl(); });
         }

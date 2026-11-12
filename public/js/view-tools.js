@@ -160,10 +160,17 @@ export function helpPop(btn, html) {
   };
 }
 
+// A short message inside `box` (an editor in full screen, where the page's status line is out of sight).
+export function toast(box, text, ms = 3500) {
+  let el = box.querySelector(':scope > .vt-toast');
+  if (!el) { el = document.createElement('div'); el.className = 'vt-toast'; el.setAttribute('role', 'status'); box.append(el); }
+  el.textContent = text; el.hidden = false; clearTimeout(el.timer); el.timer = setTimeout(() => { el.hidden = true; }, ms);
+}
+
 // A small menu under `btn` (the Download button's file formats): items [[value, label, note]]; onPick(value). Placed
 // in the button's editor box, so it shows in full screen too; Escape or a click outside closes it.
 export function actionMenu(btn, items, onPick) {
-  const box = btn.closest('.oe') || document.body;
+  const box = btn.closest('.oe, .mk') || document.body; // in the editor, so the menu is not behind it in full screen
   let m = box.querySelector(':scope > .vt-menu');
   if (!m) { m = document.createElement('div'); m.className = 'vt-menu'; m.setAttribute('role', 'menu'); box.append(m); }
   m.innerHTML = items.map(([v, label, note]) => `<button type="button" role="menuitem" data-v="${v}">${label}<small>${note}</small></button>`).join('');
