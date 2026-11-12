@@ -19,6 +19,7 @@
      cyan, in both modes; white text stays readable on it. --primary-glow is its soft shadow. */
   --primary-fill: linear-gradient(100deg, #006371, #0097b2);
   --primary-glow: rgba(0, 121, 137, .32);
+  --title-grad: linear-gradient(90deg, #006371, #2babc2); /* titles, as on TUSU Finance Feedback (its --grad) */
   --primary-text: #1b4965; /* primary used as text (section labels, selected tabs); lighter in dark */
   --on-primary: #ffffff;
   --accent: #5fa8d3;      /* focus rings, secondary marks */
@@ -36,13 +37,13 @@
    lifted CI teal primary, cyan focus. Chart colours are separate. Same values as the tusu-finance-web-ci skill. */
 :root[data-mode="dark"] {
   --bg: #0a0f1a; --surface: #1b2124; --surface-2: #1f2b2e; --ink: #eef2f3; --ink-2: #a3adb1;
-  --primary: #0b7f8f; --primary-hover: #0e93a5; --primary-text: #7fd8e5; --on-primary: #ffffff; --accent: #4cc6d9; --tint: rgba(76, 198, 217, .12);
+  --primary: #0b7f8f; --primary-hover: #0e93a5; --title-grad: linear-gradient(90deg, #4cc6d9, #a6e8f0); --primary-text: #7fd8e5; --on-primary: #ffffff; --accent: #4cc6d9; --tint: rgba(76, 198, 217, .12);
   --border: rgba(140, 200, 210, .14); --border-strong: #2c4a50; --danger: #ff6b6b; --danger-tint: rgba(255, 107, 107, .14); color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-mode="auto"] {
     --bg: #0a0f1a; --surface: #1b2124; --surface-2: #1f2b2e; --ink: #eef2f3; --ink-2: #a3adb1;
-    --primary: #0b7f8f; --primary-hover: #0e93a5; --primary-text: #7fd8e5; --on-primary: #ffffff; --accent: #4cc6d9; --tint: rgba(76, 198, 217, .12);
+    --primary: #0b7f8f; --primary-hover: #0e93a5; --title-grad: linear-gradient(90deg, #4cc6d9, #a6e8f0); --primary-text: #7fd8e5; --on-primary: #ffffff; --accent: #4cc6d9; --tint: rgba(76, 198, 217, .12);
     --border: rgba(140, 200, 210, .14); --border-strong: #2c4a50; --danger: #ff6b6b; --danger-tint: rgba(255, 107, 107, .14); color-scheme: dark;
   }
 }
@@ -117,4 +118,12 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-even
 }
 @media (prefers-reduced-transparency: reduce) {
   .glass, .side, .sidebar, .chart-grid, .mk-bar, .oe-bar, .xe-pop, .xe-hint, .de-pop, .vt-menu, .vt-help { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* Titles in the CI gradient, as on TUSU Finance Feedback: the brand name, section titles (Chart, Preview, Pages, Tasks)
+   and the empty-state titles. fit-content keeps the whole gradient on the words. The brand's subtitle keeps its own
+   colour. */
+.brand h1, .gc-h, .cx-empty h3, .ed-empty h2 {
+  width: fit-content; max-width: 100%;
+  background: var(--title-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
