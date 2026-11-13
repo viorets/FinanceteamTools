@@ -386,20 +386,57 @@ export function openMd(root, { download, zip }) {
     const v = ta.value; const s = v.lastIndexOf('\n', ta.selectionStart - 1) + 1;
     const endAt = ta.selectionEnd > ta.selectionStart && v[ta.selectionEnd - 1] === '\n' ? ta.selectionEnd - 1 : ta.selectionEnd;
     let e = v.indexOf('\n', endAt); if (e < 0) e = v.length;
-    const out = fn(v.slice(s, e).split('\n')).join('\n');
+    const out = fn(v.slice(s, e).split('\n'), s).join('\n');
     ta.setSelectionRange(s, e); insert(out); ta.setSelectionRange(s, s + out.length);
   }
   const MARK = /^(\s*)([-*+] \[[ xX]\] |[-*+] |\d+[.)] |> ?)/;
-  const toggle = (re, make) => lines((ls) => {
+  // make(k, indent, at): the marker for the k-th changed line; `at` is where the first selected line starts.
+  const toggle = (re, make) => lines((ls, at) => {
     const on = ls.filter((l) => l.trim()).every((l) => re.test(l));
-    let k = 0; return ls.map((l) => (!l.trim() ? l : on ? l.replace(re, '$1') : l.replace(MARK, '$1').replace(/^(\s*)/, `$1${make(k++)}`)));
+    let k = 0; return ls.map((l) => (!l.trim() ? l : on ? l.replace(re, '$1') : l.replace(MARK, '$1').replace(/^(\s*)/, (w) => w + make(k++, w, at))));
   });
+  // The lines above line-start `ls`, nearest last.
+  const above = (v, ls) => { const a = v.slice(0, ls).split('\n'); a.pop(); return a; };
+  const depth = (l) => l.match(/^\s*/)[0].length;
+  // The number for a new numbered item at line-start `ls`, indent `ind`: one more than the closest numbered item above
+  // at that indent, passing blank lines, nested (deeper) lines and bullets at that indent; else 1.
+  function nextNum(v, ls, ind) {
+    const a = above(v, ls);
+    for (let i = a.length - 1; i >= 0; i--) {
+      const l = a[i]; if (!l.trim()) continue; const d = depth(l); if (d > ind) continue;
+      if (d === ind) { const o = /^\s*(\d+)([.)]) /.exec(l); if (o) return { n: +o[1] + 1, d: o[2] }; if (/^\s*[-*+] /.test(l)) continue; }
+      break;
+    }
+    return { n: 1, d: '.' };
+  }
+  // The marker that continues the parent list of a nested item at line-start `ls`, indent `ind` ('' if none).
+  function parentMark(v, ls, ind) {
+    const a = above(v, ls);
+    for (let i = a.length - 1; i >= 0; i--) {
+      const l = a[i]; if (!l.trim() || depth(l) >= ind) continue;
+      const p = /^(\s*)([-*+] \[[ xX]\] |[-*+] |\d+[.)] )/.exec(l); if (!p) return '';
+      if (/^\d/.test(p[2])) { const { n, d } = nextNum(v, ls, p[1].length); return `${p[1]}${n}${d} `; }
+      return p[1] + (/\[/.test(p[2]) ? '- [ ] ' : p[2]);
+    }
+    return '';
+  }
+  // A list numbered on the page follows on from a numbered list above it that only bullets separate it from.
+  function continueOl() {
+    const n = getSelection().anchorNode; const ol = (n?.nodeType === 1 ? n : n?.parentElement)?.closest('ol');
+    if (!ol || !doc.contains(ol) || ol.hasAttribute('start')) return;
+    let top = ol; while (top.parentElement !== doc) { top = top.parentElement; if (top.tagName === 'LI') return; } // Chrome may leave it inside the old <p>
+    let p = top.previousElementSibling; while (p?.tagName === 'UL') p = p.previousElementSibling;
+    if (p?.tagName === 'OL') ol.start = (p.start || 1) + p.children.length;
+  }
   const indent = (d) => lines((ls) => ls.map((l) => (d > 0 ? (/^\s*\d+[.)] /.test(l) ? '   ' : '  ') + l : l.replace(/^( {1,3}|\t)/, ''))));
   $('#md-b').onclick = () => (onPage() ? pageCmd('bold') : wrap('**')); $('#md-i').onclick = () => (onPage() ? pageCmd('italic') : wrap('*'));
   $('#md-s').onclick = () => (onPage() ? pageCmd('strikeThrough') : wrap('~~')); $('#md-c').onclick = () => (onPage() ? pageCmd('code') : wrap('`', '`', 'code'));
   $('#md-h').onchange = (e) => { const v = e.target.value; e.target.value = ''; if (v === '') return; const n = +v; if (onPage()) { pageCmd('formatBlock', n ? `h${n}` : 'p'); return; } lines((ls) => ls.map((l) => (n ? `${'#'.repeat(n)} ` : '') + l.replace(/^#{1,6}\s+/, ''))); };
   $('#md-ul').onclick = () => (onPage() ? pageCmd('insertUnorderedList') : toggle(/^(\s*)[-*+] (?!\[[ xX]\] )/, () => '- '));
-  $('#md-ol').onclick = () => (onPage() ? pageCmd('insertOrderedList') : toggle(/^(\s*)\d+[.)] /, (k) => `${k + 1}. `));
+  $('#md-ol').onclick = () => {
+    if (onPage()) { pageCmd('insertOrderedList'); continueOl(); return; }
+    let first; toggle(/^(\s*)\d+[.)] /, (k, w, at) => { first ||= nextNum(ta.value, at, w.length); return `${first.n + k}${first.d} `; });
+  };
   $('#md-task').onclick = () => toggle(/^(\s*)[-*+] \[[ xX]\] /, () => '- [ ] ');
   $('#md-q').onclick = () => (onPage() ? pageCmd('formatBlock', 'blockquote') : toggle(/^(\s*)> ?/, () => '> '));
   $('#md-in').onclick = () => indent(1); $('#md-out').onclick = () => indent(-1);
@@ -432,7 +469,9 @@ export function openMd(root, { download, zip }) {
     if (e.key !== 'Enter' || e.shiftKey || e.isComposing || s !== ta.selectionEnd) return;
     const m = /^(\s*)([-*+] \[[ xX]\] |[-*+] |(\d+)([.)]) |> )/.exec(line); if (!m) return;
     e.preventDefault();
-    if (line === m[0]) { ta.setSelectionRange(ls, s); insert(''); return; } // Enter on an empty item ends the list
+    // Enter on an empty item: a nested one moves up to its parent list ("2." after the bullets under "1."); a top-level
+    // one ends the list.
+    if (line === m[0]) { const up = m[1] && !/^>/.test(m[2]) ? parentMark(v, ls, m[1].length) : ''; ta.setSelectionRange(ls, s); insert(up); return; }
     insert(`\n${m[1]}${m[3] ? `${+m[3] + 1}${m[4]} ` : /\[/.test(m[2]) ? '- [ ] ' : m[2]}`);
   });
   ta.addEventListener('input', (e) => {
