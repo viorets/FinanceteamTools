@@ -1,15 +1,20 @@
-// OCR for PDF pages (PaddleOCR, run in the browser with onnxruntime-web): finds the text lines on a rendered page
-// (PP-OCRv3 mobile detection) and reads each line (PP-OCRv5 Thai recognition: Thai, English, digits). Returns
-// pdf.js-like text items in PDF units, so js/pdf-text.js builds paragraphs, lists and tables from them as usual.
-// Engine (public/vendor/ort/) and models (public/models/ocr/) are served from this site and load on first use only.
+// OCR for PDF pages (OpenThai 2.0 OCR Text by iApp, PaddleOCR models run in the browser with onnxruntime-web): finds
+// the text lines on a rendered page (PP-OCRv6 tiny detection) and reads each line (OpenThai recognition: Thai, Thai
+// digits, English, digits). Returns pdf.js-like text items in PDF units, so js/pdf-text.js builds paragraphs, lists
+// and tables from them as usual.
+// Engine (public/vendor/ort/) and models (public/models/ocr/openthai2/) are served from this site and load on first
+// use only. A new model goes in a new folder: models are cached for 30 days (firebase.json).
 
 import { fixThai, loadWords } from './thai-check.js';
 
 const ORT = new URL('../vendor/ort/', import.meta.url).href; // onnxruntime-web 1.20.1, served from this site
-const MODELS = new URL('../models/ocr/', import.meta.url).href;
+const MODELS = new URL('../models/ocr/openthai2/', import.meta.url).href;
 const MAX_SIDE = 1600; // detection input, longest side (px)
 const READ_SIDE = 2800; // the page as rendered for reading lines (sharper small marks)
-const REC_H = 48; // PP-OCRv5 recognition line height
+const REC_H = 48; // recognition line height
+// detection limits: text pixels above THRESH; keep regions whose mean is over BOX_THRESH; grow them by UNCLIP.
+// OpenThai's own det.yml values (0.2 / 0.4 / 1.4) scored the same on 23 test pages (14 Nov 2026), so these stay.
+const THRESH = 0.3; const BOX_THRESH = 0.6; const UNCLIP = 1.6;
 
 let ready = null;
 // Loads onnxruntime-web, both models and the character list (once). onProgress(text) reports what is loading.
@@ -20,11 +25,11 @@ export function loadOcr(onProgress = () => {}) {
       await new Promise((res, rej) => { const s = document.createElement('script'); s.src = `${ORT}ort.min.js`; s.crossOrigin = 'anonymous'; s.onload = res; s.onerror = () => rej(new Error('Could not load the OCR engine. Check the internet connection and try again.')); document.head.append(s); });
     }
     const { ort } = window; ort.env.wasm.wasmPaths = ORT;
-    onProgress('Loading the Thai OCR models (about 10 MB, first time only)…');
+    onProgress('Loading the Thai OCR models (about 4 MB, first time only)…');
     const [det, rec, dict] = await Promise.all([
       ort.InferenceSession.create(`${MODELS}det.onnx`),
-      ort.InferenceSession.create(`${MODELS}th-rec.onnx`),
-      fetch(`${MODELS}th-dict.txt`).then((r) => { if (!r.ok) throw new Error('OCR character list missing'); return r.text(); }),
+      ort.InferenceSession.create(`${MODELS}rec.onnx`),
+      fetch(`${MODELS}rec_dict.txt`).then((r) => { if (!r.ok) throw new Error('OCR character list missing'); return r.text(); }),
     ]);
     // class 0 is the CTC blank; then one class per dictionary line; the last class is a space
     const chars = ['', ...dict.replace(/\r/g, '').split('\n').filter((c, i, a) => c !== '' || i < a.length - 1), ' '];
@@ -92,24 +97,24 @@ async function detect({ ort, det }, cv) {
   for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) data[k * n + i] = (px[i * 4 + k] / 255 - mean[k]) / std[k];
   const out = await det.run({ [det.inputNames[0]]: new ort.Tensor('float32', data, [1, 3, H, W]) });
   const prob = out[det.outputNames[0]].data;
-  // connected regions above 0.3; keep those whose mean probability is over 0.6
+  // connected regions above THRESH; keep those whose mean probability is over BOX_THRESH
   const seen = new Uint8Array(n); const boxes = []; const stack = [];
   for (let i = 0; i < n; i++) {
-    if (seen[i] || prob[i] < 0.3) continue;
+    if (seen[i] || prob[i] < THRESH) continue;
     let x0 = W, y0 = H, x1 = 0, y1 = 0, sum = 0, cnt = 0; stack.push(i); seen[i] = 1;
     while (stack.length) {
       const j = stack.pop(); const x = j % W; const y = (j - x) / W;
       sum += prob[j]; cnt++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
       for (const k of [j - 1, j + 1, j - W, j + W]) {
-        if (k < 0 || k >= n || seen[k] || prob[k] < 0.3) continue;
+        if (k < 0 || k >= n || seen[k] || prob[k] < THRESH) continue;
         if ((k === j - 1 && x === 0) || (k === j + 1 && x === W - 1)) continue;
         seen[k] = 1; stack.push(k);
       }
     }
     const w = x1 - x0 + 1; const h = y1 - y0 + 1;
-    if (cnt < 10 || Math.min(w, h) < 3 || sum / cnt < 0.6) continue;
-    // unclip: DB shrinks text regions; grow by area * 1.6 / perimeter on every side
-    const d = (w * h * 1.6) / (2 * (w + h));
+    if (cnt < 10 || Math.min(w, h) < 3 || sum / cnt < BOX_THRESH) continue;
+    // unclip: DB shrinks text regions; grow by area * UNCLIP / perimeter on every side
+    const d = (w * h * UNCLIP) / (2 * (w + h));
     const sx = cv.width / W; const sy = cv.height / H;
     // pad: extra width read at each end, so a narrow first letter (เ, ไ) is not cut off; the box itself (used for
     // layout) stays tight
