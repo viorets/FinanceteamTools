@@ -1300,7 +1300,7 @@
         const range = (ns) => ns.reduce((out, n) => { const r = out.at(-1); if (r && n === r[1] + 1) r[1] = n; else out.push([n, n]); return out; }, []).map(([a, b]) => (a === b ? a : `${a}–${b}`)).join(', ');
         async function pdfText(fmt) {
             const base = fileName.replace(/\.pdf$/i, '');
-            // Scanned pages and pages with damaged Thai are read by OCR (models load the first time, about 10 MB).
+            // Scanned pages and pages with damaged Thai are read by OCR (models load the first time, about 4 MB).
             let ocrFixed = 0; const ocrCheck = [];
             const r = await pdfToBlocks(editor.doc, {
                 onPage: (n, all) => status(`Reading the text of page ${n} of ${all}…`),
